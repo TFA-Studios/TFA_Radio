@@ -99,3 +99,44 @@ export function variationsSummaryLabel(brief) {
   if (!n) return '';
   return n === 1 ? ' + 1x variatie' : ' + ' + n + 'x variaties';
 }
+
+// ---------------------------------------------------------------------------
+// Post-production review workflow (client review page + dashboard "Productie
+// & review" section) — see the parseReviewRounds comment in lib/db.js for
+// the reviewRounds JSON shape this reads.
+
+// Revision rounds included before the dashboard flags a brief as "over the
+// included count" — a soft cap only: feedback is never blocked past this,
+// it's purely an internal heads-up for the producer (per the user's explicit
+// choice of "soft cap, just flag it internally" over a hard block).
+export const INCLUDED_REVISIONS = 2;
+
+export const PRODUCTION_STATUS_LABELS = {
+  '': 'Nog niet gestart',
+  awaiting_review: 'Wacht op klantreview',
+  in_revision: 'Feedback ontvangen',
+  approved: 'Goedgekeurd',
+};
+
+export function parseReviewRounds(brief) {
+  if (!brief || !brief.reviewRounds) return [];
+  try {
+    const parsed = JSON.parse(brief.reviewRounds);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// The round the client should currently see/react to — always the most
+// recent one, or null if production hasn't shared anything yet.
+export function currentReviewRound(brief) {
+  const rounds = parseReviewRounds(brief);
+  return rounds.length ? rounds[rounds.length - 1] : null;
+}
+
+// True once the number of rounds started exceeds the included count —
+// purely informational (see INCLUDED_REVISIONS above).
+export function reviewOverIncludedCap(brief) {
+  return parseReviewRounds(brief).length > INCLUDED_REVISIONS;
+}

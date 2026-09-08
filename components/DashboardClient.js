@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { variationsSummaryLabel } from './flowData';
+import { variationsSummaryLabel, parseReviewRounds as parseReviewRoundsOf, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS } from './flowData';
 
 const RANGES = [
   { key: '7d', label: 'Laatste week' },
@@ -141,13 +141,38 @@ export default function DashboardClient({ briefs }) {
   const [noteDraft, setNoteDraft] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
+  const [reviewLinkDraft, setReviewLinkDraft] = useState('');
+  const [reviewBusy, setReviewBusy] = useState(false);
 
-  // Clear any unsent note draft whenever a different brief's modal opens
-  // (or the modal closes) — otherwise a half-typed note for one brief could
-  // get silently posted to the next one the producer opens.
+  // Clear any unsent note/review-link draft whenever a different brief's
+  // modal opens (or the modal closes) — otherwise a half-typed value for one
+  // brief could get silently posted to the next one the producer opens.
   useEffect(() => {
     setNoteDraft('');
+    setReviewLinkDraft('');
   }, [selected && selected.id]);
+
+  async function handleAddReviewRound(id) {
+    const frameioLink = reviewLinkDraft.trim();
+    if (!frameioLink) return;
+    setReviewBusy(true);
+    try {
+      const res = await fetch(`/api/dashboard/briefs/${id}/review-round`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frameioLink }),
+      });
+      if (!res.ok) throw new Error('add review round failed');
+      const brief = await res.json();
+      setRows((cur) => cur.map((b) => (b.id === id ? brief : b)));
+      setSelected((cur) => (cur && cur.id === id ? brief : cur));
+      setReviewLinkDraft('');
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setReviewBusy(false);
+    }
+  }
 
   async function handleMetaChange(id, patch) {
     const prev = rows;
@@ -496,6 +521,81 @@ export default function DashboardClient({ briefs }) {
                     </button>
                   </div>
                 </div>
+              </div>
+
+              <div style={{ ...modalCardStyle, gridColumn: '1 / -1' }}>
+                <ModalSectionTitle>Productie & review</ModalSectionTitle>
+                {(() => {
+                  const rounds = parseReviewRoundsOf(selected);
+                  const overCap = rounds.length > INCLUDED_REVISIONS;
+                  const statusLabel = PRODUCTION_STATUS_LABELS[selected.productionStatus || ''] || selected.productionStatus;
+                  return (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850' }}>{statusLabel}</span>
+                        {rounds.length > 0 && (
+                          <span style={{ fontSize: 11.5, color: '#8C8880' }}>· {rounds.length} {rounds.length === 1 ? 'ronde' : 'rondes'} gedeeld</span>
+                        )}
+                        {overCap && (
+                          <span style={{ fontSize: 11, fontWeight: 600, color: '#8C6D1F', background: 'rgba(230,200,88,.22)', borderRadius: 4, padding: '2px 6px' }}>
+                            Boven inbegrepen aantal ({INCLUDED_REVISIONS})
+                          </span>
+                        )}
+                      </div>
+
+                      {rounds.length > 0 && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                          {rounds.slice().reverse().map((r, i) => (
+                            <div key={r.id} style={{ background: '#FFFFFF', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                                <a href={r.frameioLink} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: '#1F6F8C', textDecoration: 'underline', wordBreak: 'break-all' }}>
+                                  Ronde {rounds.length - i} — Frame.io
+                                </a>
+                                {r.approvedAt ? (
+                                  <span style={{ fontSize: 11, fontWeight: 600, color: '#1D7A46' }}>Goedgekeurd</span>
+                                ) : (
+                                  <span style={{ fontSize: 11, color: '#8C8880' }}>{new Date(r.createdAt).toLocaleDateString('nl-NL')}</span>
+                                )}
+                              </div>
+                              {r.feedback && r.feedback.length > 0 && (
+                                <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #F3F1EA', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  {r.feedback.map((f) => (
+                                    <div key={f.id} style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5 }}>
+                                      <span style={{ color: '#9C9890', fontSize: 11 }}>{new Date(f.createdAt).toLocaleDateString('nl-NL')} — </span>
+                                      {f.text}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          type="text"
+                          value={reviewLinkDraft}
+                          onChange={(e) => setReviewLinkDraft(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && !reviewBusy) handleAddReviewRound(selected.id); }}
+                          placeholder="Plak hier de Frame.io-link…"
+                          style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddReviewRound(selected.id)}
+                          disabled={reviewBusy || !reviewLinkDraft.trim()}
+                          style={{
+                            border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
+                            padding: '8px 16px', whiteSpace: 'nowrap', cursor: reviewBusy || !reviewLinkDraft.trim() ? 'not-allowed' : 'pointer', opacity: reviewBusy || !reviewLinkDraft.trim() ? 0.6 : 1,
+                          }}
+                        >
+                          {rounds.length > 0 ? 'Nieuwe ronde delen' : 'Delen met klant'}
+                        </button>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               {(selected.editedScript || selected.generatedScript) && (

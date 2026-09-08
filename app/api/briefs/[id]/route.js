@@ -25,8 +25,18 @@ export async function PATCH(request, { params }) {
   // instant the response is sent — so we await it here, wrapped so a
   // failure never turns a successful submission into a 500.
   if (body && body.submitted && !wasSubmitted && brief.submittedAt) {
+    // Same origin the dashboard link below is built from — reused so the
+    // confirmation email can link back to the client's own overview page
+    // inside the app (previously the email had no way back into the app at
+    // all beyond re-finding the original URL).
+    let appUrl;
     try {
-      await sendConfirmationEmail(brief);
+      appUrl = new URL(request.url).origin;
+    } catch (e) {
+      appUrl = undefined;
+    }
+    try {
+      await sendConfirmationEmail(brief, appUrl);
     } catch (err) {
       console.error('[api/briefs/:id] sendConfirmationEmail failed:', err && err.message);
     }
@@ -34,12 +44,7 @@ export async function PATCH(request, { params }) {
     // email, both entirely separate from the client's own confirmation
     // email above and both optional (no-op if unconfigured). Never allowed
     // to turn a successful submission into a failed request.
-    let dashboardUrl;
-    try {
-      dashboardUrl = new URL(request.url).origin + '/dashboard';
-    } catch (e) {
-      dashboardUrl = undefined;
-    }
+    const dashboardUrl = appUrl ? appUrl + '/dashboard' : undefined;
     try {
       await sendTeamNotificationEmail(brief, dashboardUrl);
     } catch (err) {
