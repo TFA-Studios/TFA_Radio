@@ -23,6 +23,26 @@ const STATUS_META = {
 };
 const STATUS_ORDER = ['todo', 'pending_customer', 'in_progress', 'done'];
 
+// The studio engineers a brief can be assigned to — a fixed dropdown instead
+// of free text, since in practice it's always one of these two. Kept as a
+// simple array (not an object with keys) since assignedTo is stored as the
+// plain display name already (see lib/db.js's updateBriefTeamMeta) — no
+// separate id/label mapping needed.
+const ASSIGNEE_OPTIONS = ['Marco', 'Karim'];
+
+// Sections of the brief detail modal — see the `modalTab` state on
+// DashboardClient. Grouped by what a producer actually comes to look at:
+// the client's own answers (Overzicht), the creative deliverables (Creatief),
+// internal team logistics (Team), and the post-production review workflow
+// (Productie & review) each get their own tab instead of all six sections
+// stacking in one long scroll.
+const MODAL_TABS = [
+  { key: 'overzicht', label: 'Overzicht' },
+  { key: 'creatief', label: 'Creatief' },
+  { key: 'team', label: 'Team' },
+  { key: 'productie', label: 'Productie & review' },
+];
+
 function rangeToMs(key) {
   const days = { '7d': 7, '30d': 30, '182d': 182, '365d': 365 }[key];
   return days ? days * 24 * 60 * 60 * 1000 : null;
@@ -60,6 +80,34 @@ function parseAdditionalContacts(brief) {
 
 function statusMetaOf(brief) {
   return STATUS_META[brief.status] || STATUS_META.todo;
+}
+
+// Short badge shown right in the table (and echoed at the top of the
+// modal) so a review round in flight is visible without opening the brief
+// at all. Separate from the producer-editable `status` pill — this reads
+// productionStatus directly, which lib/db.js's addReviewRound/
+// addReviewFeedback/approveReview keep in sync with `status` behind the
+// scenes (awaiting_review -> pending_customer, in_revision -> in_progress,
+// approved -> done), but the wording here is specific to the review step
+// rather than the generic 4-value workflow status.
+const PRODUCTION_BADGE_META = {
+  awaiting_review: { label: 'Review verzonden', color: '#8C6D1F', bg: 'rgba(230,200,88,.22)' },
+  in_revision: { label: 'Feedback ontvangen', color: '#C2513F', bg: 'rgba(194,81,63,.12)' },
+  approved: { label: 'Goedgekeurd', color: '#1D7A46', bg: 'rgba(29,122,70,.12)' },
+};
+function ProductionBadge({ brief, small }) {
+  const meta = PRODUCTION_BADGE_META[brief.productionStatus];
+  if (!meta) return null;
+  return (
+    <span
+      style={{
+        display: 'inline-block', fontSize: small ? 10.5 : 11.5, fontWeight: 600, color: meta.color, background: meta.bg,
+        borderRadius: 999, padding: small ? '2px 7px' : '3px 9px', whiteSpace: 'nowrap',
+      }}
+    >
+      {meta.label}
+    </span>
+  );
 }
 
 function StatusSelect({ brief, onChange, compact }) {
@@ -143,13 +191,23 @@ export default function DashboardClient({ briefs }) {
   const [metaBusy, setMetaBusy] = useState(false);
   const [reviewLinkDraft, setReviewLinkDraft] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
+  // Which section of the brief detail modal is showing — see MODAL_TABS
+  // below. Everything used to render stacked in one long scroll (Contact,
+  // Levering, Team, Productie & review, Script, Stem, Muziek all on top of
+  // each other); splitting it into tabs means only one section is on screen
+  // at a time, so opening a brief reads as a focused view instead of a wall
+  // of cards to scroll past.
+  const [modalTab, setModalTab] = useState('overzicht');
 
-  // Clear any unsent note/review-link draft whenever a different brief's
-  // modal opens (or the modal closes) — otherwise a half-typed value for one
-  // brief could get silently posted to the next one the producer opens.
+  // Clear any unsent note/review-link draft, and jump back to the first tab,
+  // whenever a different brief's modal opens (or the modal closes) —
+  // otherwise a half-typed value for one brief could get silently posted to
+  // the next one the producer opens, and the modal would reopen wherever the
+  // last brief happened to leave it.
   useEffect(() => {
     setNoteDraft('');
     setReviewLinkDraft('');
+    setModalTab('overzicht');
   }, [selected && selected.id]);
 
   async function handleAddReviewRound(id) {
@@ -385,7 +443,10 @@ export default function DashboardClient({ briefs }) {
                 return (
                   <tr key={b.id} onClick={() => setSelected(b)} className="tfa-dash-row" style={{ borderBottom: '1px solid #F3F1EA', cursor: 'pointer' }}>
                     <td style={{ padding: '12px 16px', fontWeight: 600, color: b.companyName ? '#1D1D1D' : '#9C9890' }}>
-                      {b.companyName || 'Nog geen bedrijfsnaam'}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span>{b.companyName || 'Nog geen bedrijfsnaam'}</span>
+                        <ProductionBadge brief={b} small />
+                      </div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>{b.hoofdspotLength || '20'}″</td>
                     <td style={{ padding: '12px 16px', color: b.assignedTo ? '#1D1D1D' : '#9C9890' }}>{b.assignedTo || '—'}</td>
@@ -425,14 +486,119 @@ export default function DashboardClient({ briefs }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
               <div>
                 <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, margin: 0 }}>{selected.companyName || 'Nog geen bedrijfsnaam'}</h2>
-                <div style={{ marginTop: 8 }}>
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <StatusSelect brief={selected} onChange={handleStatusChange} />
+                  <ProductionBadge brief={selected} />
                 </div>
               </div>
               <button type="button" onClick={() => setSelected(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer', flex: 'none' }}>✕</button>
             </div>
 
-            <div className="tfa-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: 18 }}>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 18, borderBottom: '1px solid #EEECE3', paddingBottom: 10 }}>
+              {MODAL_TABS.map((t) => {
+                const active = modalTab === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setModalTab(t.key)}
+                    style={{
+                      border: 'none', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                      background: active ? '#1D1D1D' : '#F3F1EA', color: active ? '#FFFFFF' : '#5C5850',
+                    }}
+                  >
+                    {t.label}
+                    {t.key === 'productie' && selected.productionStatus && (
+                      <span style={{ marginLeft: 7 }}><ProductionBadge brief={selected} small /></span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {modalTab === 'productie' && (
+            <div
+              style={{
+                marginTop: 16, background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 14, padding: '16px 18px',
+                boxShadow: '0 4px 18px rgba(230,200,88,.18)',
+              }}
+            >
+              {(() => {
+                const rounds = parseReviewRoundsOf(selected);
+                const overCap = rounds.length > INCLUDED_REVISIONS;
+                const statusLabel = PRODUCTION_STATUS_LABELS[selected.productionStatus || ''] || selected.productionStatus;
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+                      <span style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850' }}>{statusLabel}</span>
+                      {rounds.length > 0 && (
+                        <span style={{ fontSize: 11.5, color: '#8C8880' }}>· {rounds.length} {rounds.length === 1 ? 'ronde' : 'rondes'} gedeeld</span>
+                      )}
+                      {overCap && (
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#8C6D1F', background: 'rgba(230,200,88,.32)', borderRadius: 4, padding: '2px 6px' }}>
+                          Boven inbegrepen aantal ({INCLUDED_REVISIONS})
+                        </span>
+                      )}
+                    </div>
+
+                    {rounds.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
+                        {rounds.slice().reverse().map((r, i) => (
+                          <div key={r.id} style={{ background: '#FFFFFF', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+                              <a href={r.frameioLink} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: '#1F6F8C', textDecoration: 'underline', wordBreak: 'break-all' }}>
+                                Ronde {rounds.length - i} — Frame.io
+                              </a>
+                              {r.approvedAt ? (
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#1D7A46' }}>Goedgekeurd</span>
+                              ) : (
+                                <span style={{ fontSize: 11, color: '#8C8880' }}>{new Date(r.createdAt).toLocaleDateString('nl-NL')}</span>
+                              )}
+                            </div>
+                            {r.feedback && r.feedback.length > 0 && (
+                              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #F3F1EA', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                {r.feedback.map((f) => (
+                                  <div key={f.id} style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5 }}>
+                                    <span style={{ color: '#9C9890', fontSize: 11 }}>{new Date(f.createdAt).toLocaleDateString('nl-NL')} — </span>
+                                    {f.text}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <input
+                        type="text"
+                        value={reviewLinkDraft}
+                        onChange={(e) => setReviewLinkDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !reviewBusy) handleAddReviewRound(selected.id); }}
+                        placeholder="Plak hier de Frame.io-link…"
+                        style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleAddReviewRound(selected.id)}
+                        disabled={reviewBusy || !reviewLinkDraft.trim()}
+                        style={{
+                          border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
+                          padding: '8px 16px', whiteSpace: 'nowrap', cursor: reviewBusy || !reviewLinkDraft.trim() ? 'not-allowed' : 'pointer', opacity: reviewBusy || !reviewLinkDraft.trim() ? 0.6 : 1,
+                        }}
+                      >
+                        {rounds.length > 0 ? 'Nieuwe ronde delen' : 'Delen met klant'}
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+            )}
+
+            {modalTab === 'overzicht' && (
+            <div className="tfa-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: 16 }}>
               <div style={modalCardStyle}>
                 <ModalSectionTitle>Contact</ModalSectionTitle>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -452,23 +618,27 @@ export default function DashboardClient({ briefs }) {
                   {selected.submittedAt && <Field label="Verzonden">{new Date(selected.submittedAt).toLocaleString('nl-NL')}</Field>}
                 </div>
               </div>
+            </div>
+            )}
 
-              <div style={{ ...modalCardStyle, gridColumn: '1 / -1' }}>
+            {modalTab === 'team' && (
+            <div style={{ marginTop: 16 }}>
+              <div style={modalCardStyle}>
                 <ModalSectionTitle>Team</ModalSectionTitle>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 200px' }}>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Toegewezen aan</div>
-                    <input
-                      type="text"
-                      defaultValue={selected.assignedTo || ''}
-                      placeholder="Naam van teamlid"
-                      onBlur={(e) => {
-                        const value = e.target.value.trim();
-                        if (value !== (selected.assignedTo || '')) handleMetaChange(selected.id, { assignedTo: value });
-                      }}
+                    <select
+                      value={ASSIGNEE_OPTIONS.includes(selected.assignedTo) ? selected.assignedTo : ''}
+                      onChange={(e) => handleMetaChange(selected.id, { assignedTo: e.target.value })}
                       disabled={metaBusy}
                       style={{ width: '100%', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
-                    />
+                    >
+                      <option value="">Niet toegewezen</option>
+                      {ASSIGNEE_OPTIONS.map((name) => (
+                        <option key={name} value={name}>{name}</option>
+                      ))}
+                    </select>
                   </div>
                   <div style={{ flex: '1 1 160px' }}>
                     <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Deadline</div>
@@ -522,88 +692,22 @@ export default function DashboardClient({ briefs }) {
                   </div>
                 </div>
               </div>
+            </div>
+            )}
 
-              <div style={{ ...modalCardStyle, gridColumn: '1 / -1' }}>
-                <ModalSectionTitle>Productie & review</ModalSectionTitle>
-                {(() => {
-                  const rounds = parseReviewRoundsOf(selected);
-                  const overCap = rounds.length > INCLUDED_REVISIONS;
-                  const statusLabel = PRODUCTION_STATUS_LABELS[selected.productionStatus || ''] || selected.productionStatus;
-                  return (
-                    <>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
-                        <span style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850' }}>{statusLabel}</span>
-                        {rounds.length > 0 && (
-                          <span style={{ fontSize: 11.5, color: '#8C8880' }}>· {rounds.length} {rounds.length === 1 ? 'ronde' : 'rondes'} gedeeld</span>
-                        )}
-                        {overCap && (
-                          <span style={{ fontSize: 11, fontWeight: 600, color: '#8C6D1F', background: 'rgba(230,200,88,.22)', borderRadius: 4, padding: '2px 6px' }}>
-                            Boven inbegrepen aantal ({INCLUDED_REVISIONS})
-                          </span>
-                        )}
-                      </div>
-
-                      {rounds.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                          {rounds.slice().reverse().map((r, i) => (
-                            <div key={r.id} style={{ background: '#FFFFFF', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px' }}>
-                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                                <a href={r.frameioLink} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: '#1F6F8C', textDecoration: 'underline', wordBreak: 'break-all' }}>
-                                  Ronde {rounds.length - i} — Frame.io
-                                </a>
-                                {r.approvedAt ? (
-                                  <span style={{ fontSize: 11, fontWeight: 600, color: '#1D7A46' }}>Goedgekeurd</span>
-                                ) : (
-                                  <span style={{ fontSize: 11, color: '#8C8880' }}>{new Date(r.createdAt).toLocaleDateString('nl-NL')}</span>
-                                )}
-                              </div>
-                              {r.feedback && r.feedback.length > 0 && (
-                                <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #F3F1EA', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                  {r.feedback.map((f) => (
-                                    <div key={f.id} style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5 }}>
-                                      <span style={{ color: '#9C9890', fontSize: 11 }}>{new Date(f.createdAt).toLocaleDateString('nl-NL')} — </span>
-                                      {f.text}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input
-                          type="text"
-                          value={reviewLinkDraft}
-                          onChange={(e) => setReviewLinkDraft(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' && !reviewBusy) handleAddReviewRound(selected.id); }}
-                          placeholder="Plak hier de Frame.io-link…"
-                          style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddReviewRound(selected.id)}
-                          disabled={reviewBusy || !reviewLinkDraft.trim()}
-                          style={{
-                            border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
-                            padding: '8px 16px', whiteSpace: 'nowrap', cursor: reviewBusy || !reviewLinkDraft.trim() ? 'not-allowed' : 'pointer', opacity: reviewBusy || !reviewLinkDraft.trim() ? 0.6 : 1,
-                          }}
-                        >
-                          {rounds.length > 0 ? 'Nieuwe ronde delen' : 'Delen met klant'}
-                        </button>
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-
-              {(selected.editedScript || selected.generatedScript) && (
-                <div style={{ ...modalCardStyle, gridColumn: '1 / -1' }}>
+            {modalTab === 'creatief' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
+              {(selected.editedScript || selected.generatedScript) ? (
+                <div style={modalCardStyle}>
                   <ModalSectionTitle>Script</ModalSectionTitle>
                   <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 14.5, lineHeight: 1.6, color: '#1D1D1D' }}>
                     {selected.editedScript !== null && selected.editedScript !== undefined ? selected.editedScript : selected.generatedScript}
                   </div>
+                </div>
+              ) : (
+                <div style={modalCardStyle}>
+                  <ModalSectionTitle>Script</ModalSectionTitle>
+                  <div style={{ fontSize: 13.5, color: '#9C9890' }}>Nog geen script goedgekeurd.</div>
                 </div>
               )}
 
@@ -633,6 +737,7 @@ export default function DashboardClient({ briefs }) {
                 })()}
               </div>
             </div>
+            )}
 
             <a
               href={`/api/dashboard/briefs/${selected.id}/pdf`}
