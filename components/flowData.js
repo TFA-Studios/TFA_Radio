@@ -165,3 +165,21 @@ export function formatRoundLabel(round) {
   const base = dateLabel ? 'Map van ' + dateLabel : 'Map';
   return round.note && round.note.trim() ? base + ' — ' + round.note.trim() : base;
 }
+
+// Full date + TIME ("8 sep 2026, 14:32") for an ISO timestamp — used
+// wherever it matters exactly WHEN something happened (a round shared,
+// feedback left, a round approved), as opposed to formatFolderDate above
+// (which is only ever the date-only label matching the Frame.io folder
+// name). Distinct on purpose: a client can be quick to respond, so two
+// rounds — or a round and its feedback — can easily land on the same
+// calendar day, and only the time tells them apart.
+export function formatDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  try {
+    return new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+  } catch (e) {
+    return iso;
+  }
+}

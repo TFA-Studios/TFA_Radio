@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { variationsSummaryLabel, parseReviewRounds as parseReviewRoundsOf, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel } from './flowData';
+import { variationsSummaryLabel, parseReviewRounds as parseReviewRoundsOf, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime } from './flowData';
 
 const RANGES = [
   { key: '7d', label: 'Laatste week' },
@@ -32,15 +32,18 @@ const ASSIGNEE_OPTIONS = ['Marco', 'Karim'];
 
 // Sections of the brief detail modal — see the `modalTab` state on
 // DashboardClient. Grouped by what a producer actually comes to look at:
-// the client's own answers (Overzicht), the creative deliverables (Creatief),
-// internal team logistics (Team), and the post-production review workflow
-// (Productie & review) each get their own tab instead of all six sections
-// stacking in one long scroll.
+// the client's own answers (Overzicht), the post-production review
+// workflow (Productie & review), the creative deliverables (Creatief), and
+// internal team logistics (Team) each get their own tab instead of all six
+// sections stacking in one long scroll. Productie & review sits second
+// (not last) since it's the tab a producer needs most often once a brief
+// is actually in production — see the modalTab default-tab logic below,
+// which now opens straight to it in that case.
 const MODAL_TABS = [
   { key: 'overzicht', label: 'Overzicht' },
+  { key: 'productie', label: 'Productie & review' },
   { key: 'creatief', label: 'Creatief' },
   { key: 'team', label: 'Team' },
-  { key: 'productie', label: 'Productie & review' },
 ];
 
 function rangeToMs(key) {
@@ -190,7 +193,6 @@ export default function DashboardClient({ briefs }) {
   const [noteBusy, setNoteBusy] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
   const [reviewLinkDraft, setReviewLinkDraft] = useState('');
-  const [reviewNoteDraft, setReviewNoteDraft] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
   // Which section of the brief detail modal is showing — see MODAL_TABS
   // below. Everything used to render stacked in one long scroll (Contact,
@@ -213,8 +215,14 @@ export default function DashboardClient({ briefs }) {
     // shouldn't have to retype it, just add a note for the new folder and
     // share again. Still editable in case the link itself ever needs fixing.
     setReviewLinkDraft((selected && selected.frameioLink) || '');
-    setReviewNoteDraft('');
-    setModalTab('overzicht');
+    // Default straight to Productie & review once a brief is actually IN
+    // that stage — a producer opening a brief mid-production almost always
+    // wants the Frame.io link/feedback, not the client's own answers, and
+    // making them click "Productie & review" every single time before
+    // reaching it was exactly the extra-clicks complaint. Anything earlier
+    // in the process (still filling in the brief, nothing shared yet)
+    // still opens on Overzicht as before.
+    setModalTab(selected && selected.productionStatus ? 'productie' : 'overzicht');
   }, [selected && selected.id]);
 
   async function handleAddReviewRound(id) {
@@ -225,13 +233,12 @@ export default function DashboardClient({ briefs }) {
       const res = await fetch(`/api/dashboard/briefs/${id}/review-round`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frameioLink, note: reviewNoteDraft.trim() }),
+        body: JSON.stringify({ frameioLink }),
       });
       if (!res.ok) throw new Error('add review round failed');
       const brief = await res.json();
       setRows((cur) => cur.map((b) => (b.id === id ? brief : b)));
       setSelected((cur) => (cur && cur.id === id ? brief : cur));
-      setReviewNoteDraft('');
     } catch (err) {
       console.error(err);
     } finally {
@@ -350,7 +357,16 @@ export default function DashboardClient({ briefs }) {
   }
 
   const cardStyle = { background: '#FFFFFF', borderRadius: 14, padding: '20px 22px', boxShadow: '0 1px 10px rgba(29,29,29,.05)' };
+  // Two card styles inside the brief modal, used deliberately for two
+  // different kinds of content — every card used to share modalCardStyle
+  // (the gold-accented one), which is exactly why the modal read as "one
+  // flat wall of identical boxes" regardless of whether a section was just
+  // reference info or something the producer needed to act on. Now: gold
+  // ONLY marks something actionable (an input, a dropdown, the Productie
+  // tab), plain marks read-only reference info (Contact, Levering, Script,
+  // Stem, Muziek) — so the gold accent actually means something again.
   const modalCardStyle = { background: '#FBF9EC', border: '1.5px solid #EAE3C4', borderLeft: '4px solid #E6C858', borderRadius: '4px 14px 14px 4px', padding: '14px 16px' };
+  const refCardStyle = { background: '#FFFFFF', border: '1px solid #EEECE3', borderRadius: 12, padding: '14px 16px' };
   // Active tile always highlights in the brand's gold, regardless of that
   // status's own accent color (used only for its number/label) — one
   // consistent "this is the active filter" signal instead of a color that
@@ -496,6 +512,25 @@ export default function DashboardClient({ briefs }) {
                 <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                   <StatusSelect brief={selected} onChange={handleStatusChange} />
                   <ProductionBadge brief={selected} />
+                  {/* Always-visible shortcut, regardless of which tab is
+                      open — checking Frame.io was the single most frequent
+                      reason to open a brief, and it used to always cost a
+                      click into "Productie & review" first even though the
+                      link itself never needed the rest of that tab. */}
+                  {selected.frameioLink && (
+                    <a
+                      href={selected.frameioLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        fontSize: 11.5, fontWeight: 600, color: '#1F6F8C', background: 'rgba(31,111,140,.1)',
+                        borderRadius: 999, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap',
+                      }}
+                    >
+                      🎬 Open Frame.io
+                    </a>
+                  )}
                 </div>
               </div>
               <button type="button" onClick={() => setSelected(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer', flex: 'none' }}>✕</button>
@@ -557,16 +592,16 @@ export default function DashboardClient({ briefs }) {
                                 {formatRoundLabel(r)}
                               </span>
                               {r.approvedAt ? (
-                                <span style={{ fontSize: 11, fontWeight: 600, color: '#1D7A46' }}>Goedgekeurd</span>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: '#1D7A46' }}>Goedgekeurd {formatDateTime(r.approvedAt)}</span>
                               ) : (
-                                <span style={{ fontSize: 11, color: '#8C8880' }}>gedeeld {new Date(r.createdAt).toLocaleDateString('nl-NL')}</span>
+                                <span style={{ fontSize: 11, color: '#8C8880' }}>gedeeld {formatDateTime(r.createdAt)}</span>
                               )}
                             </div>
                             {r.feedback && r.feedback.length > 0 && (
                               <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #F3F1EA', display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 {r.feedback.map((f) => (
                                   <div key={f.id} style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5 }}>
-                                    <span style={{ color: '#9C9890', fontSize: 11 }}>{new Date(f.createdAt).toLocaleDateString('nl-NL')} — </span>
+                                    <span style={{ color: '#9C9890', fontSize: 11 }}>{formatDateTime(f.createdAt)} — </span>
                                     {f.text}
                                   </div>
                                 ))}
@@ -582,37 +617,30 @@ export default function DashboardClient({ briefs }) {
                         <label style={{ fontSize: 11, fontWeight: 600, color: '#8C8880', display: 'block', marginBottom: 4 }}>
                           Frame.io-link {rounds.length > 0 ? '(zelfde link, alleen aanpassen indien nodig)' : ''}
                         </label>
-                        <input
-                          type="text"
-                          value={reviewLinkDraft}
-                          onChange={(e) => setReviewLinkDraft(e.target.value)}
-                          placeholder="Plak hier de Frame.io-link…"
-                          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
-                        />
-                      </div>
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        <input
-                          type="text"
-                          value={reviewNoteDraft}
-                          onChange={(e) => setReviewNoteDraft(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter' && !reviewBusy) handleAddReviewRound(selected.id); }}
-                          placeholder="Notitie voor deze map (optioneel), bijv. &quot;na klantfeedback&quot;"
-                          style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleAddReviewRound(selected.id)}
-                          disabled={reviewBusy || !reviewLinkDraft.trim()}
-                          style={{
-                            border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
-                            padding: '8px 16px', whiteSpace: 'nowrap', cursor: reviewBusy || !reviewLinkDraft.trim() ? 'not-allowed' : 'pointer', opacity: reviewBusy || !reviewLinkDraft.trim() ? 0.6 : 1,
-                          }}
-                        >
-                          {rounds.length > 0 ? 'Nieuwe map delen' : 'Delen met klant'}
-                        </button>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            type="text"
+                            value={reviewLinkDraft}
+                            onChange={(e) => setReviewLinkDraft(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' && !reviewBusy) handleAddReviewRound(selected.id); }}
+                            placeholder="Plak hier de Frame.io-link…"
+                            style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleAddReviewRound(selected.id)}
+                            disabled={reviewBusy || !reviewLinkDraft.trim()}
+                            style={{
+                              border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
+                              padding: '8px 16px', whiteSpace: 'nowrap', cursor: reviewBusy || !reviewLinkDraft.trim() ? 'not-allowed' : 'pointer', opacity: reviewBusy || !reviewLinkDraft.trim() ? 0.6 : 1,
+                            }}
+                          >
+                            {rounds.length > 0 ? 'Nieuwe map delen' : 'Delen met klant'}
+                          </button>
+                        </div>
                       </div>
                       <div style={{ fontSize: 11, color: '#8C8880' }}>
-                        Voegt vandaag ({new Date().toLocaleDateString('nl-NL')}) toe als nieuwe map binnen dezelfde Frame.io-link.
+                        Voegt nu ({formatDateTime(new Date().toISOString())}) toe als nieuwe map binnen dezelfde Frame.io-link.
                       </div>
                     </div>
                   </>
@@ -623,7 +651,7 @@ export default function DashboardClient({ briefs }) {
 
             {modalTab === 'overzicht' && (
             <div className="tfa-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: 16 }}>
-              <div style={modalCardStyle}>
+              <div style={refCardStyle}>
                 <ModalSectionTitle>Contact</ModalSectionTitle>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <Field label="Contactpersoon" empty={!selected.contactPerson}>{selected.contactPerson || 'Nog niet opgegeven'}</Field>
@@ -634,7 +662,7 @@ export default function DashboardClient({ briefs }) {
                 </div>
               </div>
 
-              <div style={modalCardStyle}>
+              <div style={refCardStyle}>
                 <ModalSectionTitle>Levering</ModalSectionTitle>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <Field label="Hoofdspot">{selected.hoofdspotLength || '20'}″{variationsSummaryLabel(selected)}</Field>
@@ -722,25 +750,25 @@ export default function DashboardClient({ briefs }) {
             {modalTab === 'creatief' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
               {(selected.editedScript || selected.generatedScript) ? (
-                <div style={modalCardStyle}>
+                <div style={refCardStyle}>
                   <ModalSectionTitle>Script</ModalSectionTitle>
                   <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 14.5, lineHeight: 1.6, color: '#1D1D1D' }}>
                     {selected.editedScript !== null && selected.editedScript !== undefined ? selected.editedScript : selected.generatedScript}
                   </div>
                 </div>
               ) : (
-                <div style={modalCardStyle}>
+                <div style={refCardStyle}>
                   <ModalSectionTitle>Script</ModalSectionTitle>
                   <div style={{ fontSize: 13.5, color: '#9C9890' }}>Nog geen script goedgekeurd.</div>
                 </div>
               )}
 
-              <div style={modalCardStyle}>
+              <div style={refCardStyle}>
                 <ModalSectionTitle>Stem</ModalSectionTitle>
                 <Field label="Gekozen stem" empty={!selected.selectedVoiceLabel}>{selected.selectedVoiceLabel || 'Nog niet gekozen'}</Field>
               </div>
 
-              <div style={modalCardStyle}>
+              <div style={refCardStyle}>
                 <ModalSectionTitle>Muziek</ModalSectionTitle>
                 {(() => {
                   const tracks = parseSelectedTracks(selected);

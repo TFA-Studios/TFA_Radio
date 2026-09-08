@@ -5,7 +5,7 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { MONTH_NAMES_LOWER, variationsCountOf } from '../../../../components/flowData';
+import { MONTH_NAMES_LOWER, variationsCountOf, PRODUCTION_STATUS_LABELS } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
 
 function parseVariationScripts(brief) {
@@ -125,8 +125,28 @@ export default function OverviewPage({ params }) {
     const nextSteps = [
       { n: '1', label: 'Opname', detail: 'De stem neemt jouw script in de studio op.' },
       { n: '2', label: 'Montage & mix', detail: 'Stem, muziek en eventuele varianten worden samengevoegd.' },
-      { n: '3', label: 'Levering', detail: 'Je ontvangt de eindbestanden, klaar voor uitzending.' },
+      {
+        n: '3', label: 'Review & goedkeuring',
+        detail: 'Zodra er een eerste versie klaarstaat, ontvang je een e-mail met een link om ‘m te beluisteren, feedback te geven of goed te keuren.',
+      },
+      { n: '4', label: 'Levering', detail: 'Na jouw goedkeuring ontvang je de eindbestanden, klaar voor uitzending.' },
     ];
+    // One always-visible "status" line + button to the review page — not
+    // conditional on whether a round exists yet, deliberately: a client
+    // shouldn't have to reason about why a box appears/disappears. The
+    // review page itself (app/brief/[id]/review) already handles "nothing
+    // shared yet" gracefully, so this can just always point there. Not
+    // everyone notices/keeps the one review-ready email either, and this
+    // overview page (keyed by the brief's own id) is the one link a client
+    // is likely to hold onto, so it doubles as a reliable way back in.
+    const statusLabel = PRODUCTION_STATUS_LABELS[brief.productionStatus || ''] || 'Nog niet gestart';
+    const statusHint = brief.productionStatus === 'awaiting_review'
+      ? 'Er staat een versie klaar om te beluisteren.'
+      : brief.productionStatus === 'in_revision'
+      ? 'TFA verwerkt je laatste feedback.'
+      : brief.productionStatus === 'approved'
+      ? 'Je hebt de laatste versie goedgekeurd — TFA rondt de levering af.'
+      : 'Zodra er een eerste versie klaarstaat, kun je hem hier beluisteren en beoordelen.';
     return (
       <StepShell briefId={id} current={7} brief={brief} bigNum="07" kicker="Verzonden naar TFA" title={'Bedankt, ' + companyName + '!'}>
         <div
@@ -171,6 +191,28 @@ export default function OverviewPage({ params }) {
               <div style={{ fontSize: 12, lineHeight: 1.5, color: '#8C8880' }}>{s.detail}</div>
             </div>
           ))}
+        </div>
+
+        <div
+          style={{
+            marginTop: 18, background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 14, padding: '20px 22px',
+            boxShadow: '0 6px 20px rgba(230,200,88,.2)', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 16, flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 4 }}>
+              Status: {statusLabel}
+            </div>
+            <div style={{ fontSize: 14, color: '#5C5850' }}>{statusHint}</div>
+          </div>
+          <a
+            href={`/brief/${id}/review`}
+            className="btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', whiteSpace: 'nowrap', padding: '13px 22px', flex: 'none' }}
+          >
+            Bekijk status en review
+          </a>
         </div>
 
         <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
