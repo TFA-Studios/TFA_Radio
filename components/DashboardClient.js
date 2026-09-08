@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { variationsSummaryLabel, parseReviewRounds as parseReviewRoundsOf, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS } from './flowData';
+import { variationsSummaryLabel, parseReviewRounds as parseReviewRoundsOf, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel } from './flowData';
 
 const RANGES = [
   { key: '7d', label: 'Laatste week' },
@@ -190,6 +190,7 @@ export default function DashboardClient({ briefs }) {
   const [noteBusy, setNoteBusy] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
   const [reviewLinkDraft, setReviewLinkDraft] = useState('');
+  const [reviewNoteDraft, setReviewNoteDraft] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
   // Which section of the brief detail modal is showing — see MODAL_TABS
   // below. Everything used to render stacked in one long scroll (Contact,
@@ -206,7 +207,13 @@ export default function DashboardClient({ briefs }) {
   // last brief happened to leave it.
   useEffect(() => {
     setNoteDraft('');
-    setReviewLinkDraft('');
+    // Prefill with the brief's existing master Frame.io link (if any) — see
+    // the reviewRounds comment in lib/db.js: it's the SAME link every round,
+    // only the dated folder inside it changes, so the producer normally
+    // shouldn't have to retype it, just add a note for the new folder and
+    // share again. Still editable in case the link itself ever needs fixing.
+    setReviewLinkDraft((selected && selected.frameioLink) || '');
+    setReviewNoteDraft('');
     setModalTab('overzicht');
   }, [selected && selected.id]);
 
@@ -218,13 +225,13 @@ export default function DashboardClient({ briefs }) {
       const res = await fetch(`/api/dashboard/briefs/${id}/review-round`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frameioLink }),
+        body: JSON.stringify({ frameioLink, note: reviewNoteDraft.trim() }),
       });
       if (!res.ok) throw new Error('add review round failed');
       const brief = await res.json();
       setRows((cur) => cur.map((b) => (b.id === id ? brief : b)));
       setSelected((cur) => (cur && cur.id === id ? brief : cur));
-      setReviewLinkDraft('');
+      setReviewNoteDraft('');
     } catch (err) {
       console.error(err);
     } finally {
@@ -543,16 +550,16 @@ export default function DashboardClient({ briefs }) {
 
                     {rounds.length > 0 && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 14 }}>
-                        {rounds.slice().reverse().map((r, i) => (
+                        {rounds.slice().reverse().map((r) => (
                           <div key={r.id} style={{ background: '#FFFFFF', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-                              <a href={r.frameioLink} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, fontWeight: 600, color: '#1F6F8C', textDecoration: 'underline', wordBreak: 'break-all' }}>
-                                Ronde {rounds.length - i} — Frame.io
-                              </a>
+                              <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1D1D1D' }}>
+                                {formatRoundLabel(r)}
+                              </span>
                               {r.approvedAt ? (
                                 <span style={{ fontSize: 11, fontWeight: 600, color: '#1D7A46' }}>Goedgekeurd</span>
                               ) : (
-                                <span style={{ fontSize: 11, color: '#8C8880' }}>{new Date(r.createdAt).toLocaleDateString('nl-NL')}</span>
+                                <span style={{ fontSize: 11, color: '#8C8880' }}>gedeeld {new Date(r.createdAt).toLocaleDateString('nl-NL')}</span>
                               )}
                             </div>
                             {r.feedback && r.feedback.length > 0 && (
@@ -570,26 +577,43 @@ export default function DashboardClient({ briefs }) {
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <input
-                        type="text"
-                        value={reviewLinkDraft}
-                        onChange={(e) => setReviewLinkDraft(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && !reviewBusy) handleAddReviewRound(selected.id); }}
-                        placeholder="Plak hier de Frame.io-link…"
-                        style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleAddReviewRound(selected.id)}
-                        disabled={reviewBusy || !reviewLinkDraft.trim()}
-                        style={{
-                          border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
-                          padding: '8px 16px', whiteSpace: 'nowrap', cursor: reviewBusy || !reviewLinkDraft.trim() ? 'not-allowed' : 'pointer', opacity: reviewBusy || !reviewLinkDraft.trim() ? 0.6 : 1,
-                        }}
-                      >
-                        {rounds.length > 0 ? 'Nieuwe ronde delen' : 'Delen met klant'}
-                      </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#8C8880', display: 'block', marginBottom: 4 }}>
+                          Frame.io-link {rounds.length > 0 ? '(zelfde link, alleen aanpassen indien nodig)' : ''}
+                        </label>
+                        <input
+                          type="text"
+                          value={reviewLinkDraft}
+                          onChange={(e) => setReviewLinkDraft(e.target.value)}
+                          placeholder="Plak hier de Frame.io-link…"
+                          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          type="text"
+                          value={reviewNoteDraft}
+                          onChange={(e) => setReviewNoteDraft(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter' && !reviewBusy) handleAddReviewRound(selected.id); }}
+                          placeholder="Notitie voor deze map (optioneel), bijv. &quot;na klantfeedback&quot;"
+                          style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleAddReviewRound(selected.id)}
+                          disabled={reviewBusy || !reviewLinkDraft.trim()}
+                          style={{
+                            border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
+                            padding: '8px 16px', whiteSpace: 'nowrap', cursor: reviewBusy || !reviewLinkDraft.trim() ? 'not-allowed' : 'pointer', opacity: reviewBusy || !reviewLinkDraft.trim() ? 0.6 : 1,
+                          }}
+                        >
+                          {rounds.length > 0 ? 'Nieuwe map delen' : 'Delen met klant'}
+                        </button>
+                      </div>
+                      <div style={{ fontSize: 11, color: '#8C8880' }}>
+                        Voegt vandaag ({new Date().toLocaleDateString('nl-NL')}) toe als nieuwe map binnen dezelfde Frame.io-link.
+                      </div>
                     </div>
                   </>
                 );

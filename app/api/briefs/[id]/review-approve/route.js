@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { approveReview, markAdminNotified } from '../../../../../lib/db';
 import { sendReviewApprovedNotification } from '../../../../../lib/email';
-import { sendSlackReviewApprovedPing } from '../../../../../lib/slack';
 
 // Public (like the rest of /api/briefs/*) — the client's private review
 // page uses this to approve the current review round. On approval, the
@@ -26,17 +25,12 @@ export async function POST(request, { params }) {
   } catch (e) {
     rounds = [];
   }
-  const lastRound = Array.isArray(rounds) && rounds.length ? rounds[rounds.length - 1] : null;
+  const approvedRound = Array.isArray(rounds) && rounds.length ? rounds[rounds.length - 1] : null;
 
   try {
-    await sendReviewApprovedNotification(brief, { dashboardUrl, frameioLink: lastRound ? lastRound.frameioLink : '' });
+    await sendReviewApprovedNotification(brief, { dashboardUrl, frameioLink: brief.frameioLink || '', round: approvedRound });
   } catch (err) {
     console.error('[api/briefs/:id/review-approve] sendReviewApprovedNotification failed:', err && err.message);
-  }
-  try {
-    await sendSlackReviewApprovedPing(brief, dashboardUrl);
-  } catch (err) {
-    console.error('[api/briefs/:id/review-approve] sendSlackReviewApprovedPing failed:', err && err.message);
   }
 
   let updated = brief;

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBrief, updateBrief } from '../../../../lib/db';
 import { sendConfirmationEmail, sendTeamNotificationEmail } from '../../../../lib/email';
-import { sendSlackNewBriefPing } from '../../../../lib/slack';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,20 +39,15 @@ export async function PATCH(request, { params }) {
     } catch (err) {
       console.error('[api/briefs/:id] sendConfirmationEmail failed:', err && err.message);
     }
-    // Team-facing "a new brief just came in" pings — Slack + a team inbox
-    // email, both entirely separate from the client's own confirmation
-    // email above and both optional (no-op if unconfigured). Never allowed
+    // Team-facing "a new brief just came in" ping — a team inbox email,
+    // entirely separate from the client's own confirmation email above and
+    // optional (no-op if TEAM_NOTIFY_EMAILS isn't configured). Never allowed
     // to turn a successful submission into a failed request.
     const dashboardUrl = appUrl ? appUrl + '/dashboard' : undefined;
     try {
       await sendTeamNotificationEmail(brief, dashboardUrl);
     } catch (err) {
       console.error('[api/briefs/:id] sendTeamNotificationEmail failed:', err && err.message);
-    }
-    try {
-      await sendSlackNewBriefPing(brief, dashboardUrl);
-    } catch (err) {
-      console.error('[api/briefs/:id] sendSlackNewBriefPing failed:', err && err.message);
     }
   }
 

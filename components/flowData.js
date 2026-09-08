@@ -140,3 +140,28 @@ export function currentReviewRound(brief) {
 export function reviewOverIncludedCap(brief) {
   return parseReviewRounds(brief).length > INCLUDED_REVISIONS;
 }
+
+// Turns a round's 'YYYY-MM-DD' folderDate into a Dutch long date ("8
+// september 2026") — shared by the client review page and the dashboard's
+// Productie tab so both show the same wording for "the dated folder inside
+// the one Frame.io link" a round represents (see the reviewRounds comment
+// in lib/db.js — one link per brief, a new dated folder per round).
+export function formatFolderDate(folderDate) {
+  if (!folderDate) return '';
+  const d = new Date(folderDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return folderDate;
+  try {
+    return new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+  } catch (e) {
+    return folderDate;
+  }
+}
+
+// Short label for a round used wherever it's listed: "Map van 8 september
+// 2026", plus its note in parentheses if the producer added one.
+export function formatRoundLabel(round) {
+  if (!round) return '';
+  const dateLabel = formatFolderDate(round.folderDate);
+  const base = dateLabel ? 'Map van ' + dateLabel : 'Map';
+  return round.note && round.note.trim() ? base + ' — ' + round.note.trim() : base;
+}

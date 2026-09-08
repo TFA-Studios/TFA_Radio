@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { addReviewFeedback } from '../../../../../lib/db';
 import { sendReviewFeedbackNotification } from '../../../../../lib/email';
-import { sendSlackReviewFeedbackPing } from '../../../../../lib/slack';
 
 // Public (like the rest of /api/briefs/*) — the client's private review
 // page uses this to leave feedback on the current review round. Never
@@ -25,15 +24,19 @@ export async function POST(request, { params }) {
   } catch (e) {
     dashboardUrl = undefined;
   }
+
+  let rounds = [];
   try {
-    await sendReviewFeedbackNotification(brief, dashboardUrl);
+    rounds = brief.reviewRounds ? JSON.parse(brief.reviewRounds) : [];
+  } catch (e) {
+    rounds = [];
+  }
+  const lastRound = Array.isArray(rounds) && rounds.length ? rounds[rounds.length - 1] : null;
+
+  try {
+    await sendReviewFeedbackNotification(brief, dashboardUrl, lastRound);
   } catch (err) {
     console.error('[api/briefs/:id/review-feedback] sendReviewFeedbackNotification failed:', err && err.message);
-  }
-  try {
-    await sendSlackReviewFeedbackPing(brief, dashboardUrl);
-  } catch (err) {
-    console.error('[api/briefs/:id/review-feedback] sendSlackReviewFeedbackPing failed:', err && err.message);
   }
 
   return NextResponse.json(brief);

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { parseReviewRounds, currentReviewRound } from '../../../../components/flowData';
+import { parseReviewRounds, currentReviewRound, formatRoundLabel } from '../../../../components/flowData';
 
 // Post-production review — reached via a private link emailed to the
 // client once a producer pastes a Frame.io link from the dashboard (see
@@ -97,13 +97,13 @@ export default function ReviewPage({ params }) {
     <Shell companyName={companyName}>
       <div style={cardStyle}>
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>
-          {rounds.length > 1 ? `Ronde ${rounds.length}` : 'Jouw productie'}
+          {rounds.length > 1 ? formatRoundLabel(round) : 'Jouw productie'}
         </div>
         <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 24, margin: '10px 0 14px', color: '#1D1D1D' }}>
           {isApproved ? 'Goedgekeurd' : 'Klaar om te bekijken'}
         </h1>
         <a
-          href={round.frameioLink}
+          href={brief.frameioLink}
           target="_blank"
           rel="noreferrer"
           className="btn-primary"
@@ -111,6 +111,11 @@ export default function ReviewPage({ params }) {
         >
           Bekijk op Frame.io
         </a>
+        {rounds.length > 1 && (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#8C6D1F' }}>
+            Zelfde link als voorheen — open de {formatRoundLabel(round).replace(/^Map/, 'map')} binnenin.
+          </div>
+        )}
       </div>
 
       {isApproved ? (
