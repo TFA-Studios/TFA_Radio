@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { variationsSummaryLabel, parseReviewRounds as parseReviewRoundsOf, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime } from './flowData';
 
 const RANGES = [
@@ -22,6 +22,19 @@ const STATUS_META = {
   done: { label: 'Klaar', color: '#1D7A46', bg: 'rgba(29,122,70,.12)' },
 };
 const STATUS_ORDER = ['todo', 'pending_customer', 'in_progress', 'done'];
+
+// A brief counts as "new/unchecked" once it's been submitted but no
+// producer has opened it since — i.e. never opened at all, or opened
+// before this particular submission (edge case: a client could in theory
+// resubmit-equivalent flows later; comparing timestamps rather than just
+// checking seenAt's presence keeps this correct either way). Drives the
+// bold row + dot in the dashboard table below; cleared the moment someone
+// opens the brief (see handleOpenBrief).
+function isUnseenBrief(b) {
+  if (!b || !b.submittedAt) return false;
+  if (!b.seenAt) return true;
+  return new Date(b.seenAt).getTime() < new Date(b.submittedAt).getTime();
+}
 
 // The studio engineers a brief can be assigned to — a fixed dropdown instead
 // of free text, since in practice it's always one of these two. Kept as a
@@ -201,6 +214,10 @@ export default function DashboardClient({ briefs }) {
   // at a time, so opening a brief reads as a focused view instead of a wall
   // of cards to scroll past.
   const [modalTab, setModalTab] = useState('overzicht');
+  // The modal's scrollable content area (see the fixed-height dialog
+  // restructure below) — scrolled back to the top on every tab switch so a
+  // producer never lands mid-scroll on a tab they just clicked into.
+  const modalBodyRef = useRef(null);
 
   // Clear any unsent note/review-link draft, and jump back to the first tab,
   // whenever a different brief's modal opens (or the modal closes) —
@@ -265,6 +282,24 @@ export default function DashboardClient({ briefs }) {
     } finally {
       setMetaBusy(false);
     }
+  }
+
+  // Opens a brief's detail overlay and, the first time it's opened since
+  // being submitted, marks it seen — clearing the "new" highlight in the
+  // list. Optimistic (computes the timestamp client-side) same as the
+  // other handlers above, so the bold/dot disappears the instant you
+  // click, not after a round trip.
+  function handleOpenBrief(b) {
+    setSelected(b);
+    if (!isUnseenBrief(b)) return;
+    const now = new Date().toISOString();
+    setRows((cur) => cur.map((row) => (row.id === b.id ? { ...row, seenAt: now } : row)));
+    setSelected((cur) => (cur && cur.id === b.id ? { ...cur, seenAt: now } : cur));
+    fetch(`/api/dashboard/briefs/${b.id}/meta`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ seen: true }),
+    }).catch((err) => console.error('[dashboard] mark-seen failed:', err));
   }
 
   async function handleAddNote(id) {
@@ -463,11 +498,23 @@ export default function DashboardClient({ briefs }) {
             <tbody>
               {pageItems.map((b) => {
                 const due = dueDateMeta(b.dueDate, b.status);
+                const unseen = isUnseenBrief(b);
                 return (
-                  <tr key={b.id} onClick={() => setSelected(b)} className="tfa-dash-row" style={{ borderBottom: '1px solid #F3F1EA', cursor: 'pointer' }}>
-                    <td style={{ padding: '12px 16px', fontWeight: 600, color: b.companyName ? '#1D1D1D' : '#9C9890' }}>
+                  <tr key={b.id} onClick={() => handleOpenBrief(b)} className="tfa-dash-row" style={{ borderBottom: '1px solid #F3F1EA', cursor: 'pointer', background: unseen ? '#FBF9EC' : undefined }}>
+                    <td style={{ padding: '12px 16px', fontWeight: unseen ? 700 : 600, color: b.companyName ? '#1D1D1D' : '#9C9890' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        {unseen && (
+                          <span
+                            title="Nieuw — nog niet bekeken"
+                            style={{ width: 8, height: 8, borderRadius: '50%', background: '#E6C858', flex: 'none', boxShadow: '0 0 0 3px rgba(230,200,88,.35)' }}
+                          />
+                        )}
                         <span>{b.companyName || 'Nog geen bedrijfsnaam'}</span>
+                        {unseen && (
+                          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>
+                            Nieuw
+                          </span>
+                        )}
                         <ProductionBadge brief={b} small />
                       </div>
                     </td>
@@ -505,58 +552,81 @@ export default function DashboardClient({ briefs }) {
           onClick={() => setSelected(null)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(29,29,29,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50 }}
         >
-          <div onClick={(e) => e.stopPropagation()} style={{ background: '#FFFFFF', borderRadius: 16, padding: '26px 28px', maxWidth: 640, width: '100%', maxHeight: '85vh', overflowY: 'auto' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-              <div>
+          {/* Fixed-height dialog, split into a fixed header/tabs block and a
+              scrollable body — this used to just be maxHeight+overflow on
+              the whole thing, so the dialog itself grew or shrank to fit
+              whichever tab's content happened to be showing (a short
+              "Team" tab, then a tall "Creatief" tab), which read as the
+              window "jumping around" every time you switched tabs. Now the
+              dialog is always the same size regardless of tab; only the
+              inner content area scrolls, and it resets to the top on every
+              tab switch (see setModalTab below) so you're never left
+              scrolled halfway down a tab you just arrived at. */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#FFFFFF', borderRadius: 16, maxWidth: 640, width: '100%',
+              height: '82vh', maxHeight: 720, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            }}
+          >
+            <div style={{ padding: '26px 28px 0', flex: 'none' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, margin: 0 }}>{selected.companyName || 'Nog geen bedrijfsnaam'}</h2>
-                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <StatusSelect brief={selected} onChange={handleStatusChange} />
-                  <ProductionBadge brief={selected} />
-                  {/* Always-visible shortcut, regardless of which tab is
-                      open — checking Frame.io was the single most frequent
-                      reason to open a brief, and it used to always cost a
-                      click into "Productie & review" first even though the
-                      link itself never needed the rest of that tab. */}
-                  {selected.frameioLink && (
-                    <a
-                      href={selected.frameioLink}
-                      target="_blank"
-                      rel="noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      style={{
-                        fontSize: 11.5, fontWeight: 600, color: '#1F6F8C', background: 'rgba(31,111,140,.1)',
-                        borderRadius: 999, padding: '4px 10px', textDecoration: 'none', whiteSpace: 'nowrap',
-                      }}
-                    >
-                      🎬 Open Frame.io
-                    </a>
-                  )}
-                </div>
+                <button type="button" onClick={() => setSelected(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer', flex: 'none' }}>✕</button>
               </div>
-              <button type="button" onClick={() => setSelected(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer', flex: 'none' }}>✕</button>
-            </div>
 
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 18, borderBottom: '1px solid #EEECE3', paddingBottom: 10 }}>
-              {MODAL_TABS.map((t) => {
-                const active = modalTab === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setModalTab(t.key)}
+              {/* De-stacked meta row: status + production state sit
+                  together on their own line (what the badges actually
+                  mean), and the Frame.io shortcut — a different kind of
+                  thing, a link not a status — gets its own line below with
+                  room to breathe, instead of all three being crammed into
+                  one wrapping row right under the company name. */}
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <StatusSelect brief={selected} onChange={handleStatusChange} />
+                <ProductionBadge brief={selected} />
+              </div>
+              {selected.frameioLink && (
+                <div style={{ marginTop: 8 }}>
+                  <a
+                    href={selected.frameioLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    onClick={(e) => e.stopPropagation()}
                     style={{
-                      border: 'none', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-                      background: active ? '#1D1D1D' : '#F3F1EA', color: active ? '#FFFFFF' : '#5C5850',
+                      display: 'inline-flex', alignItems: 'center', gap: 6,
+                      fontSize: 11.5, fontWeight: 600, color: '#1F6F8C', background: 'rgba(31,111,140,.1)',
+                      borderRadius: 999, padding: '5px 12px', textDecoration: 'none', whiteSpace: 'nowrap',
                     }}
                   >
-                    {t.label}
-                    {t.key === 'productie' && selected.productionStatus && (
-                      <span style={{ marginLeft: 7 }}><ProductionBadge brief={selected} small /></span>
-                    )}
-                  </button>
-                );
-              })}
+                    🎬 Open Frame.io
+                  </a>
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 16, borderBottom: '1px solid #EEECE3', paddingBottom: 10 }}>
+                {MODAL_TABS.map((t) => {
+                  const active = modalTab === t.key;
+                  return (
+                    <button
+                      key={t.key}
+                      type="button"
+                      onClick={() => { setModalTab(t.key); if (modalBodyRef.current) modalBodyRef.current.scrollTop = 0; }}
+                      style={{
+                        border: 'none', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
+                        background: active ? '#1D1D1D' : '#F3F1EA', color: active ? '#FFFFFF' : '#5C5850',
+                      }}
+                    >
+                      {t.label}
+                      {t.key === 'productie' && selected.productionStatus && (
+                        <span style={{ marginLeft: 7 }}><ProductionBadge brief={selected} small /></span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
+
+            <div ref={modalBodyRef} style={{ flex: 1, overflowY: 'auto', padding: '0 28px 26px' }}>
 
             {modalTab === 'productie' && (
             <div
@@ -794,10 +864,11 @@ export default function DashboardClient({ briefs }) {
             <a
               href={`/api/dashboard/briefs/${selected.id}/pdf`}
               className="btn-primary tfa-btn-glow"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 20, padding: '9px 16px', fontSize: 12.5, textDecoration: 'none' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 20, marginBottom: 4, padding: '9px 16px', fontSize: 12.5, textDecoration: 'none' }}
             >
               ⤓ Download als PDF
             </a>
+            </div>
           </div>
         </div>
       )}

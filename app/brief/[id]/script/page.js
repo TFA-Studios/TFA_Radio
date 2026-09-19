@@ -63,6 +63,13 @@ export default function ScriptPage({ params }) {
   // clears itself after a moment.
   const [savedFlash, setSavedFlash] = useState({});
   const savedFlashTimers = useRef({});
+  // Same "✓ Opgeslagen" confirmation as the per-variation flash below, but
+  // for the main script textarea — this used to save silently on every
+  // debounced edit with no visible feedback at all, which is exactly why a
+  // client could type a change, move to the next step, and have no way to
+  // tell whether it had actually been kept.
+  const [scriptSavedFlash, setScriptSavedFlash] = useState(false);
+  const scriptSavedFlashTimer = useRef(null);
   const scriptFocused = useRef(false);
   const saveTimer = useRef(null);
   // Set the instant an edit is made, cleared only once the debounced PATCH
@@ -205,6 +212,12 @@ export default function ScriptPage({ params }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ editedScript: value }),
       })
+        .then((res) => {
+          if (!res.ok) return;
+          setScriptSavedFlash(true);
+          clearTimeout(scriptSavedFlashTimer.current);
+          scriptSavedFlashTimer.current = setTimeout(() => setScriptSavedFlash(false), 2000);
+        })
         .catch(() => {})
         .finally(() => {
           scriptSavePending.current = false;
@@ -212,7 +225,7 @@ export default function ScriptPage({ params }) {
     }, 350);
   }
 
-  function scheduleVariationsSave(arr) {
+  function scheduleVariationsSave(arr, savedIdx) {
     variationsSavePending.current = true;
     clearTimeout(variationsSaveTimer.current);
     variationsSaveTimer.current = setTimeout(() => {
@@ -221,6 +234,14 @@ export default function ScriptPage({ params }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ variationScripts: JSON.stringify(arr) }),
       })
+        .then((res) => {
+          if (!res.ok || savedIdx === undefined) return;
+          setSavedFlash((f) => ({ ...f, [savedIdx]: true }));
+          clearTimeout(savedFlashTimers.current[savedIdx]);
+          savedFlashTimers.current[savedIdx] = setTimeout(() => {
+            setSavedFlash((f) => ({ ...f, [savedIdx]: false }));
+          }, 2000);
+        })
         .catch(() => {})
         .finally(() => {
           variationsSavePending.current = false;
@@ -229,6 +250,7 @@ export default function ScriptPage({ params }) {
   }
 
   function onScriptChange(e) {
+    setScriptSavedFlash(false);
     setScriptText(e.target.value);
     scheduleScriptSave(e.target.value);
   }
@@ -247,7 +269,7 @@ export default function ScriptPage({ params }) {
     setVariations((current) => {
       const next = current.slice();
       next[idx] = value;
-      scheduleVariationsSave(next);
+      scheduleVariationsSave(next, idx);
       return next;
     });
   }
@@ -263,22 +285,6 @@ export default function ScriptPage({ params }) {
       return next;
     });
   }
-  async function varApprove(idx) {
-    clearTimeout(variationsSaveTimer.current);
-    try {
-      await fetch(`/api/briefs/${id}/edit`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variationScripts: JSON.stringify(variations) }),
-      });
-    } catch (e) {}
-    setSavedFlash((f) => ({ ...f, [idx]: true }));
-    clearTimeout(savedFlashTimers.current[idx]);
-    savedFlashTimers.current[idx] = setTimeout(() => {
-      setSavedFlash((f) => ({ ...f, [idx]: false }));
-    }, 2000);
-  }
-
   async function approveAndContinue() {
     if (!brief || !brief.generatedScript) return;
     // Only the "no variation needed" path actually navigates away (the
@@ -341,7 +347,6 @@ export default function ScriptPage({ params }) {
   const scriptApproved = !!brief.scriptApproved;
   const disclaimerText = brief.disclaimerText && brief.disclaimerText.trim() ? brief.disclaimerText : DEFAULT_DISCLAIMER;
   const hasRealDisclaimer = !!(brief.disclaimerText && brief.disclaimerText.trim());
-  const extraNote = brief.extraNote || '';
 
   let tones = [];
   try {
@@ -480,7 +485,12 @@ export default function ScriptPage({ params }) {
         </div>
       )}
 
-      <div className="box" style={{ marginTop: 14, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 14, padding: '22px 24px' }}>
+      {hasGenerated && (
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F', marginTop: 18 }}>
+          Dit is jouw script
+        </div>
+      )}
+      <div className="box" style={{ marginTop: 8, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 14, padding: '22px 24px' }}>
         <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 16, lineHeight: 1.6, color: generatedText ? '#1D1D1D' : '#9C9890' }}>
           {generatedText || 'Hier verschijnt het scriptvoorstel van TFA, zodra je genoeg velden in je brief hebt ingevuld.'}
         </div>
@@ -492,10 +502,15 @@ export default function ScriptPage({ params }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 26 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '0 0 4px' }}>Wil je iets aanpassen?</h3>
+      <div style={{ marginTop: 30, paddingTop: 22, borderTop: '2px solid #EAE7DE' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C8880' }}>
+          Script aanpassen
+        </div>
+        <h3 style={{ fontSize: 14, fontWeight: 600, margin: '6px 0 4px' }}>Wil je iets aanpassen?</h3>
         <p style={{ fontSize: 12.5, color: '#5C5850', margin: '0 0 10px', lineHeight: 1.5 }}>
-          TFA schreef dit script op basis van jouw brief — pas het hieronder aan waar je wilt. Het moet in {spotLength} seconden passen.
+          Dit vak hieronder is van jou: typ er zelf in om woorden toe te voegen, te wijzigen of te verwijderen — precies
+          zoals je zelf een tekstbericht zou aanpassen. Alles wat je typt wordt automatisch bewaard, je hoeft dus nergens
+          apart op &ldquo;opslaan&rdquo; te klikken. Let er wel op dat het script in {spotLength} seconden moet blijven passen.
         </p>
         <textarea
           style={{ minHeight: 130 }}
@@ -504,6 +519,13 @@ export default function ScriptPage({ params }) {
           onBlur={() => { scriptFocused.current = false; }}
           onChange={onScriptChange}
         />
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: scriptSavedFlash ? '#1D7A46' : '#9C9890' }}>
+          {scriptSavedFlash ? (
+            <>✓ Opgeslagen</>
+          ) : (
+            <>Wordt automatisch opgeslagen terwijl je typt</>
+          )}
+        </div>
         <div style={{ marginTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5C5850' }}>
             <span>Geschatte lengte</span>
@@ -515,15 +537,6 @@ export default function ScriptPage({ params }) {
           <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 500, color: barColor }}>{statusLabel}</div>
         </div>
       </div>
-
-      {extraNote.trim() && (
-        <div style={{ marginTop: 18, display: 'flex', gap: 10, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 12, padding: '12px 14px' }}>
-          <div>
-            <div style={{ fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C8880', fontWeight: 500 }}>Opmerking uit je brief</div>
-            <div style={{ fontSize: 12.5, color: '#5C5850', marginTop: 4, lineHeight: 1.5 }}>{extraNote}</div>
-          </div>
-        </div>
-      )}
 
       <div style={{ marginTop: 24, paddingTop: 20, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         {!unchanged && (
@@ -545,8 +558,11 @@ export default function ScriptPage({ params }) {
           <h3 style={{ fontWeight: 600, fontSize: 18, margin: '8px 0 4px' }}>{variationCount > 1 ? 'Jouw variaties' : 'Jouw variatie'}</h3>
           <p style={{ fontSize: 12.5, color: '#5C5850', margin: '0 0 14px', lineHeight: 1.5 }}>
             Je gaf bij levering aan {variationCount > 1 ? `${variationCount} variaties` : 'ook een variatie'} nodig te hebben. Hieronder staat je zojuist
-            goedgekeurde script {variationCount > 1 ? `${variationCount}x` : 'nogmaals'} — pas {variationCount > 1 ? 'ze' : 'm'} handmatig aan op de punten
-            waar {variationCount > 1 ? 'elke variatie' : 'deze variatie'} moet verschillen.
+            goedgekeurde script {variationCount > 1 ? `${variationCount}x` : 'nogmaals'} — dit is dezelfde tekst als hierboven, klaar om aan te passen.
+            Typ zelf de stukjes tekst aan die {variationCount > 1 ? 'per variatie' : 'in deze variatie'} anders moeten zijn; de rest laat je gewoon staan.
+            {variationCount > 1 ? ' Je kunt gerust tussen de tabbladen hierboven wisselen' : ''}
+            {variationCount > 1 ? ' — elke aanpassing wordt automatisch bewaard zodra je typt, ook als je meteen naar een ander tabblad gaat.' : ' Ook hier wordt elke aanpassing automatisch bewaard zodra je typt.'}
+            {' '}Er is geen aparte knop om op te slaan of goed te keuren — als er &ldquo;✓ Opgeslagen&rdquo; staat, is het klaar.
           </p>
 
           {variationCount > 1 && (
@@ -597,6 +613,9 @@ export default function ScriptPage({ params }) {
                   onBlur={() => { varFocusedMap.current[idx] = false; }}
                   onChange={(e) => onVarChange(idx, e.target.value)}
                 />
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: savedFlash[idx] ? '#1D7A46' : '#9C9890' }}>
+                  {savedFlash[idx] ? <>✓ Opgeslagen</> : <>Wordt automatisch opgeslagen terwijl je typt</>}
+                </div>
                 <div style={{ marginTop: 14 }}>
                   <label className="field-label">Wat is er veranderd?</label>
                   {varUnchanged ? (
@@ -619,11 +638,8 @@ export default function ScriptPage({ params }) {
                   </div>
                   <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 500, color: varBarColor }}>{varStatusLabel}</div>
                 </div>
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  {savedFlash[idx] && (
-                    <span style={{ fontSize: 12.5, color: '#1D7A46', fontWeight: 600 }}>✓ Opgeslagen</span>
-                  )}
-                  {!varUnchanged && (
+                {!varUnchanged && (
+                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
                     <button
                       type="button"
                       className="ghost-btn"
@@ -632,24 +648,23 @@ export default function ScriptPage({ params }) {
                     >
                       ↺ Terugzetten naar origineel
                     </button>
-                  )}
-                  <button type="button" className="btn-primary" onClick={() => varApprove(idx)}>{varUnchanged ? 'Goedkeuren, dit is prima zo' : 'Wijzigingen opslaan en goedkeuren'}</button>
-                </div>
+                  </div>
+                )}
               </div>
             );
           })()}
 
-          <div style={{ marginTop: 20, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            {activeVarIdx > 0 && (
-              <button type="button" className="ghost-btn" style={{ width: 'auto', flex: 'none' }} onClick={() => setActiveVarIdx(activeVarIdx - 1)}>
-                ← Vorige variatie
-              </button>
-            )}
-            {activeVarIdx < variationCount - 1 ? (
-              <button type="button" className="btn-primary" onClick={() => setActiveVarIdx(activeVarIdx + 1)}>Volgende variatie →</button>
-            ) : (
-              <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={continueToVoice}>Doorgaan naar de stem</button>
-            )}
+          {/* One single way forward from here: no separate "goedkeuren"
+              step per variation (autosave already covers it, per the
+              caption under each textarea above) and no separate
+              "volgende variatie" stepper duplicating the tabs above —
+              this used to give a client three overlapping ways to move
+              between/past variations with no clear signal which one
+              "counted", which read as confusing/misleading. Now: use the
+              tabs above (when there's more than one) to look at each
+              variation, then this one button to continue whenever ready. */}
+          <div style={{ marginTop: 20, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
+            <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={continueToVoice}>Doorgaan naar de stem</button>
           </div>
         </div>
       )}

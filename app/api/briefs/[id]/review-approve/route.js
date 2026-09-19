@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { approveReview, markAdminNotified } from '../../../../../lib/db';
-import { sendReviewApprovedNotification } from '../../../../../lib/email';
+import { notifyDelivered } from '../../../../../lib/slack';
 
 // Public (like the rest of /api/briefs/*) — the client's private review
 // page uses this to approve the current review round. On approval, the
-// final Frame.io link is automatically emailed to TFA's admin inbox (see
-// sendReviewApprovedNotification / ADMIN_NOTIFY_EMAIL in lib/email.js).
+// final Frame.io link is automatically posted to Slack (see notifyDelivered
+// in lib/slack.js) — this used to also be a separate ADMIN_NOTIFY_EMAIL
+// email (still defined as sendReviewApprovedNotification in lib/email.js,
+// unused, if ever wanted back), but Karim wants everything internal routed
+// through Slack rather than email.
 export const dynamic = 'force-dynamic';
 
 export async function POST(request, { params }) {
@@ -19,18 +22,10 @@ export async function POST(request, { params }) {
     dashboardUrl = undefined;
   }
 
-  let rounds = [];
   try {
-    rounds = brief.reviewRounds ? JSON.parse(brief.reviewRounds) : [];
-  } catch (e) {
-    rounds = [];
-  }
-  const approvedRound = Array.isArray(rounds) && rounds.length ? rounds[rounds.length - 1] : null;
-
-  try {
-    await sendReviewApprovedNotification(brief, { dashboardUrl, frameioLink: brief.frameioLink || '', round: approvedRound });
+    await notifyDelivered(brief, dashboardUrl, brief.frameioLink || '');
   } catch (err) {
-    console.error('[api/briefs/:id/review-approve] sendReviewApprovedNotification failed:', err && err.message);
+    console.error('[api/briefs/:id/review-approve] notifyDelivered failed:', err && err.message);
   }
 
   let updated = brief;

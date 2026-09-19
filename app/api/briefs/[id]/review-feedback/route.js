@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { addReviewFeedback } from '../../../../../lib/db';
-import { sendReviewFeedbackNotification } from '../../../../../lib/email';
+import { notifyFeedback } from '../../../../../lib/slack';
 
 // Public (like the rest of /api/briefs/*) — the client's private review
 // page uses this to leave feedback on the current review round. Never
@@ -25,18 +25,14 @@ export async function POST(request, { params }) {
     dashboardUrl = undefined;
   }
 
-  let rounds = [];
+  // Slack-only now — this used to also email TEAM_NOTIFY_EMAILS
+  // (sendReviewFeedbackNotification, still defined in lib/email.js if ever
+  // wanted back), but Karim wants Slack to be the one place for internal
+  // "something happened" pings, same as the new-brief and delivered events.
   try {
-    rounds = brief.reviewRounds ? JSON.parse(brief.reviewRounds) : [];
-  } catch (e) {
-    rounds = [];
-  }
-  const lastRound = Array.isArray(rounds) && rounds.length ? rounds[rounds.length - 1] : null;
-
-  try {
-    await sendReviewFeedbackNotification(brief, dashboardUrl, lastRound);
+    await notifyFeedback(brief, dashboardUrl);
   } catch (err) {
-    console.error('[api/briefs/:id/review-feedback] sendReviewFeedbackNotification failed:', err && err.message);
+    console.error('[api/briefs/:id/review-feedback] notifyFeedback failed:', err && err.message);
   }
 
   return NextResponse.json(brief);

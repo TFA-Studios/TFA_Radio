@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBrief, updateBrief } from '../../../../lib/db';
-import { sendConfirmationEmail, sendTeamNotificationEmail } from '../../../../lib/email';
+import { sendConfirmationEmail } from '../../../../lib/email';
+import { notifyNewBrief } from '../../../../lib/slack';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,15 +40,19 @@ export async function PATCH(request, { params }) {
     } catch (err) {
       console.error('[api/briefs/:id] sendConfirmationEmail failed:', err && err.message);
     }
-    // Team-facing "a new brief just came in" ping — a team inbox email,
-    // entirely separate from the client's own confirmation email above and
-    // optional (no-op if TEAM_NOTIFY_EMAILS isn't configured). Never allowed
-    // to turn a successful submission into a failed request.
+    // Team-facing "a new brief just came in" ping. Deliberately Slack-only
+    // now, not email — Karim's call: the team-notification EMAIL
+    // (sendTeamNotificationEmail in lib/email.js, still defined there if
+    // ever wanted back) got dropped in favor of just this Slack ping plus
+    // the dashboard's own "new/unseen" badge (see isUnseenBrief in
+    // DashboardClient.js and app/dashboard/page.js), since the team is
+    // always in Slack anyway and didn't want a second inbox ping on top of
+    // the client's own confirmation email above.
     const dashboardUrl = appUrl ? appUrl + '/dashboard' : undefined;
     try {
-      await sendTeamNotificationEmail(brief, dashboardUrl);
+      await notifyNewBrief(brief, dashboardUrl);
     } catch (err) {
-      console.error('[api/briefs/:id] sendTeamNotificationEmail failed:', err && err.message);
+      console.error('[api/briefs/:id] notifyNewBrief failed:', err && err.message);
     }
   }
 

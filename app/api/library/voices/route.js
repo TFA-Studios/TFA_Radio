@@ -8,5 +8,5 @@ export const dynamic = 'force-dynamic';
 // for the client-facing voice step (step 5).
 export async function GET() {
   const voices = await listVoices();
-  return Response.json(voices);
+  return Response.json(voices.filter((v) => !v.hidden));
 }

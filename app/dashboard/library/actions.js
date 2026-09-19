@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache';
 import {
-  createTrack, deleteTrack, updateTrack, deleteTracksBulk,
-  createVoice, deleteVoice, updateVoice, deleteVoicesBulk,
+  createTrack, deleteTrack, updateTrack, deleteTracksBulk, updateTracksBulk, renameTracksBulk,
+  createVoice, deleteVoice, updateVoice, deleteVoicesBulk, updateVoicesBulk,
 } from '../../../lib/library';
 
 // Audio files are uploaded directly from the browser to Blob storage (see
@@ -117,19 +117,49 @@ export async function removeVoicesBulkAction(formData) {
 // each file to Blob storage client-side first, then stages N items with an
 // editable field set per file, then submits one FormData with indexed keys
 // (track_0_title, track_0_audioUrl, ...) which we loop through here and
-// import one by one.
+// import one by one. An optional `sharedCategory` field applies one category
+// to the whole batch instead of the per-file category picked in the staging
+// UI — the "adding 10 tracks that are all the same category" case.
 export async function addTracksBulkAction(formData) {
   const count = Number(formData.get('count') || 0);
+  const sharedCategory = formData.get('sharedCategory') || '';
   for (let i = 0; i < count; i++) {
     await createTrack({
       title: formData.get(`track_${i}_title`),
       artist: formData.get(`track_${i}_artist`),
-      category: formData.get(`track_${i}_category`),
+      category: sharedCategory || formData.get(`track_${i}_category`),
       fileId: formData.get(`track_${i}_fileId`) || '',
       audioUrl: formData.get(`track_${i}_audioUrl`) || '',
       originalFilename: formData.get(`track_${i}_originalFilename`) || '',
     });
   }
+  revalidatePath('/dashboard/library');
+}
+
+// Batch re-categorize a selected set of tracks in one go.
+export async function setTracksCategoryBulkAction(formData) {
+  const ids = formData.getAll('id').map(String).filter(Boolean);
+  const category = formData.get('category');
+  await updateTracksBulk(ids, { category });
+  revalidatePath('/dashboard/library');
+}
+
+// Hide/unhide a selected set of tracks — pulls them out of the client-facing
+// picker (see app/api/library/tracks/route.js) without deleting them.
+export async function setTracksHiddenBulkAction(formData) {
+  const ids = formData.getAll('id').map(String).filter(Boolean);
+  const hidden = formData.get('hidden') === 'true';
+  await updateTracksBulk(ids, { hidden });
+  revalidatePath('/dashboard/library');
+}
+
+// Batch rename by find/replace across a selected set of tracks — e.g.
+// stripping a shared prefix like "REC_" from a batch of imported titles.
+export async function renameTracksBulkAction(formData) {
+  const ids = formData.getAll('id').map(String).filter(Boolean);
+  const find = formData.get('find') || '';
+  const replace = formData.get('replace') || '';
+  await renameTracksBulk(ids, { find, replace });
   revalidatePath('/dashboard/library');
 }
 
@@ -148,5 +178,13 @@ export async function addVoicesBulkAction(formData) {
       originalFilename: formData.get(`voice_${i}_originalFilename`) || '',
     });
   }
+  revalidatePath('/dashboard/library');
+}
+
+// See setTracksHiddenBulkAction above — voice side.
+export async function setVoicesHiddenBulkAction(formData) {
+  const ids = formData.getAll('id').map(String).filter(Boolean);
+  const hidden = formData.get('hidden') === 'true';
+  await updateVoicesBulk(ids, { hidden });
   revalidatePath('/dashboard/library');
 }

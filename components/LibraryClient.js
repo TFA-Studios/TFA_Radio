@@ -6,6 +6,8 @@ import {
   removeTrackAction, updateTrackAction, removeTracksBulkAction,
   removeVoiceAction, updateVoiceAction, removeVoicesBulkAction,
   addTracksBulkAction, addVoicesBulkAction,
+  setTracksCategoryBulkAction, setTracksHiddenBulkAction, renameTracksBulkAction,
+  setVoicesHiddenBulkAction,
 } from '../app/dashboard/library/actions';
 
 const cardStyle = { background: '#FBF9EC', border: '1.5px solid #EAE3C4', borderRadius: 12, padding: '14px 16px' };
@@ -142,7 +144,16 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // "Apply one category to the whole batch" — for the common case of adding
+  // several tracks that all belong in the same playlist, so the producer
+  // doesn't have to set the category on each staged file one by one.
+  const [batchCategory, setBatchCategory] = useState('');
   const fileInputRef = useRef(null);
+
+  function applyBatchCategory() {
+    if (!batchCategory) return;
+    setStaged((cur) => cur.map((it) => ({ ...it, category: batchCategory })));
+  }
 
   function addFiles(fileList) {
     const files = Array.from(fileList || []).filter((f) => f.type.startsWith('audio/') || /\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f.name));
@@ -220,6 +231,18 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
           <div style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850' }}>
             {staged.length} bestand{staged.length === 1 ? '' : 'en'} klaar om toe te voegen — controleer de velden hieronder:
           </div>
+          {kind === 'music' && staged.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px' }}>
+              <span style={{ fontSize: 12, color: '#5C5850', whiteSpace: 'nowrap' }}>Categorie voor alle {staged.length}:</span>
+              <select value={batchCategory} onChange={(e) => setBatchCategory(e.target.value)} style={{ flex: 1, border: '1px solid #C9C5B9', borderRadius: 6, padding: '6px 8px', fontSize: 12.5, background: '#FFFFFF' }}>
+                <option value="">Kies categorie…</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <button type="button" onClick={applyBatchCategory} disabled={!batchCategory} style={{ border: 'none', borderRadius: 6, background: batchCategory ? '#1D1D1D' : '#EAE7DE', color: batchCategory ? '#FFFFFF' : '#8C8880', fontSize: 12, padding: '6px 12px', cursor: batchCategory ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
+                Toepassen op alle
+              </button>
+            </div>
+          )}
           {staged.map((it) => (
             <div key={it.localId} style={{ position: 'relative', background: '#FFFFFF', border: '1px solid #EEECE3', borderRadius: 10, padding: '12px 40px 12px 14px' }}>
               <button
@@ -478,10 +501,17 @@ function TrackRow({ track, categories, selected, onToggleSelect, activePreviewId
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-      <div style={rowStyle}>
+      <div style={{ ...rowStyle, opacity: track.hidden ? 0.6 : 1 }}>
         <input type="checkbox" checked={selected} onChange={() => onToggleSelect(track.id)} style={{ width: 16, height: 16, accentColor: '#E6C858', cursor: 'pointer', flex: 'none' }} />
         <div style={{ flex: 1, minWidth: 160 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{track.title}</div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {track.title}
+            {track.hidden && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em', padding: '2px 7px', borderRadius: 999, background: '#EAE7DE', color: '#5C5850' }}>
+                Verborgen
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 12, color: '#8C8880' }}>
             {track.artist} · {track.category}{track.fileId ? ` · ID: ${track.fileId}` : ''}
           </div>
@@ -611,10 +641,17 @@ function VoiceRow({ voice, allTags, onAddTag, selected, onToggleSelect, activePr
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
-      <div style={rowStyle}>
+      <div style={{ ...rowStyle, opacity: voice.hidden ? 0.6 : 1 }}>
         <input type="checkbox" checked={selected} onChange={() => onToggleSelect(voice.id)} style={{ width: 16, height: 16, accentColor: '#E6C858', cursor: 'pointer', flex: 'none' }} />
         <div style={{ flex: 1, minWidth: 160 }}>
-          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{voice.name}</div>
+          <div style={{ fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 8 }}>
+            {voice.name}
+            {voice.hidden && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em', padding: '2px 7px', borderRadius: 999, background: '#EAE7DE', color: '#5C5850' }}>
+                Verborgen
+              </span>
+            )}
+          </div>
           <div style={{ fontSize: 12, color: '#8C8880' }}>
             {voice.gender} · {voice.ageRange} · {(voice.tags || []).join(', ')}{voice.fileId ? ` · ID: ${voice.fileId}` : ''}
           </div>
@@ -659,11 +696,61 @@ function VoiceRow({ voice, allTags, onAddTag, selected, onToggleSelect, activePr
   );
 }
 
-// The browse/manage view: search, select-all, bulk delete, and the list
+// Small bulk-action bar shown once at least one item is selected — batch
+// category reassignment (music only), batch hide/unhide, and batch
+// find/replace rename (music only, since voice names are short and rarely
+// share a common prefix worth stripping in bulk).
+function BulkEditBar({ kind, categories, selectedCount, onSetCategory, onSetHidden, onRename, busy }) {
+  const [category, setCategory] = useState('');
+  const [find, setFind] = useState('');
+  const [replace, setReplace] = useState('');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 12px', marginBottom: 10 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#5C5850' }}>
+        Bewerk {selectedCount} geselecteerde item{selectedCount === 1 ? '' : 's'} in één keer:
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        {kind === 'music' && (
+          <>
+            <select value={category} onChange={(e) => setCategory(e.target.value)} style={{ border: '1px solid #C9C5B9', borderRadius: 6, padding: '7px 8px', fontSize: 12.5, background: '#FFFFFF' }}>
+              <option value="">Nieuwe categorie…</option>
+              {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+            <button type="button" disabled={!category || busy} onClick={() => { onSetCategory(category); setCategory(''); }} style={{ border: 'none', borderRadius: 6, background: category ? '#1D1D1D' : '#EAE7DE', color: category ? '#FFFFFF' : '#8C8880', fontSize: 12, padding: '7px 12px', cursor: category && !busy ? 'pointer' : 'not-allowed' }}>
+              Categorie toepassen
+            </button>
+            <span style={{ width: 1, height: 20, background: '#EAE3C4' }} />
+          </>
+        )}
+        <button type="button" disabled={busy} onClick={() => onSetHidden(true)} style={{ border: '1px solid #C9C5B9', borderRadius: 6, background: '#FFFFFF', color: '#1D1D1D', fontSize: 12, padding: '7px 12px', cursor: busy ? 'not-allowed' : 'pointer' }}>
+          Verbergen
+        </button>
+        <button type="button" disabled={busy} onClick={() => onSetHidden(false)} style={{ border: '1px solid #C9C5B9', borderRadius: 6, background: '#FFFFFF', color: '#1D1D1D', fontSize: 12, padding: '7px 12px', cursor: busy ? 'not-allowed' : 'pointer' }}>
+          Zichtbaar maken
+        </button>
+        {kind === 'music' && onRename && (
+          <>
+            <span style={{ width: 1, height: 20, background: '#EAE3C4' }} />
+            <input type="text" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Zoek in titel…" style={{ width: 130, border: '1px solid #C9C5B9', borderRadius: 6, padding: '7px 8px', fontSize: 12.5 }} />
+            <input type="text" value={replace} onChange={(e) => setReplace(e.target.value)} placeholder="Vervang door…" style={{ width: 130, border: '1px solid #C9C5B9', borderRadius: 6, padding: '7px 8px', fontSize: 12.5 }} />
+            <button type="button" disabled={!find || busy} onClick={() => { onRename(find, replace); setFind(''); setReplace(''); }} style={{ border: 'none', borderRadius: 6, background: find ? '#1D1D1D' : '#EAE7DE', color: find ? '#FFFFFF' : '#8C8880', fontSize: 12, padding: '7px 12px', cursor: find && !busy ? 'pointer' : 'not-allowed' }}>
+              Titels aanpassen
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// The browse/manage view: search, select-all, bulk delete/edit, and the list
 // itself — kept separate from AddZone so "adding new stuff" and "managing
 // what's already there" read as two distinct tools instead of one long,
-// blurred scroll.
-function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, setSelectedIds, onBulkDelete, bulkBusy, query, setQuery }) {
+// blurred scroll. Music is grouped by category (matching the categorization
+// clients see) so a growing library stays scannable instead of one long
+// undifferentiated list; voices, which have no such fixed taxonomy, stay flat.
+function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, setSelectedIds, onBulkDelete, bulkBusy, query, setQuery, onBulkSetCategory, onBulkSetHidden, onBulkRename }) {
   // Only one row's preview plays at a time — opening another row's preview
   // (music or voice) stops whichever one was already playing, the same way
   // the client-facing voice/music picker steps behave.
@@ -700,6 +787,29 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
     });
   }
 
+  // Group music into its fixed categories (plus an "Overig" bucket for
+  // anything with an unrecognized/blank category) — voices stay a flat list.
+  let groups = null;
+  if (kind === 'music') {
+    const byCategory = new Map();
+    (categories || []).forEach((c) => byCategory.set(c, []));
+    const other = [];
+    filtered.forEach((it) => {
+      if (byCategory.has(it.category)) byCategory.get(it.category).push(it);
+      else other.push(it);
+    });
+    groups = Array.from(byCategory.entries()).filter(([, list]) => list.length > 0);
+    if (other.length) groups.push(['Overig', other]);
+  }
+
+  const renderRow = (it) => (
+    kind === 'music' ? (
+      <TrackRow key={it.id} track={it} categories={categories} selected={selectedIds.has(it.id)} onToggleSelect={toggleOne} activePreviewId={activePreviewId} onTogglePreview={toggleActivePreview} />
+    ) : (
+      <VoiceRow key={it.id} voice={it} allTags={allTags} onAddTag={onAddTag} selected={selectedIds.has(it.id)} onToggleSelect={toggleOne} activePreviewId={activePreviewId} onTogglePreview={toggleActivePreview} />
+    )
+  );
+
   return (
     <div>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
@@ -729,22 +839,79 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
         </button>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {filtered.map((it) => (
-          kind === 'music' ? (
-            <TrackRow key={it.id} track={it} categories={categories} selected={selectedIds.has(it.id)} onToggleSelect={toggleOne} activePreviewId={activePreviewId} onTogglePreview={toggleActivePreview} />
-          ) : (
-            <VoiceRow key={it.id} voice={it} allTags={allTags} onAddTag={onAddTag} selected={selectedIds.has(it.id)} onToggleSelect={toggleOne} activePreviewId={activePreviewId} onTogglePreview={toggleActivePreview} />
-          )
-        ))}
-        {filtered.length === 0 && items.length > 0 && (
-          <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
-        )}
-        {items.length === 0 && (
-          <div style={{ fontSize: 13, color: '#8C8880' }}>
-            {kind === 'music' ? 'Nog geen tracks — ga naar "Toevoegen" om er een paar toe te voegen.' : 'Nog geen stemmen — ga naar "Toevoegen" om er een paar toe te voegen.'}
-          </div>
-        )}
+      {selectedIds.size > 0 && (
+        <BulkEditBar
+          kind={kind}
+          categories={categories}
+          selectedCount={selectedIds.size}
+          busy={bulkBusy}
+          onSetCategory={onBulkSetCategory}
+          onSetHidden={onBulkSetHidden}
+          onRename={onBulkRename}
+        />
+      )}
+
+      {kind === 'music' && groups ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          {groups.map(([category, list]) => (
+            <div key={category}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880', marginBottom: 8 }}>
+                {category} <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({list.length})</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {list.map(renderRow)}
+              </div>
+            </div>
+          ))}
+          {groups.length === 0 && items.length > 0 && (
+            <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
+          )}
+          {items.length === 0 && (
+            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen tracks — ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {filtered.map(renderRow)}
+          {filtered.length === 0 && items.length > 0 && (
+            <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
+          )}
+          {items.length === 0 && (
+            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen stemmen — ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return '0 MB';
+  const mb = bytes / (1024 * 1024);
+  if (mb < 1024) return `${mb.toFixed(mb < 10 ? 2 : 1)} MB`;
+  return `${(mb / 1024).toFixed(2)} GB`;
+}
+
+// Vercel Blob storage usage against the free "Hobby" tier's 1GB cap — shown
+// right at the top of the library so a producer can see at a glance whether
+// there's room before uploading more, without leaving the page to check the
+// Vercel dashboard. If usage ever exceeds the assumed 1GB (a paid plan with
+// a different limit), the bar simply caps at 100% and the label still shows
+// the real numbers, so nothing looks broken.
+const HOBBY_TIER_BYTES = 1024 * 1024 * 1024;
+function StorageUsageBadge({ storage }) {
+  const pct = Math.min(100, Math.round((storage.totalBytes / HOBBY_TIER_BYTES) * 100));
+  const warn = pct >= 85;
+  return (
+    <div style={{ ...cardStyle, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850', whiteSpace: 'nowrap' }}>
+        Blob-opslag: {formatBytes(storage.totalBytes)} / 1 GB
+      </div>
+      <div style={{ flex: '1 1 140px', minWidth: 100, height: 8, borderRadius: 999, background: '#EAE7DE', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: warn ? '#C2513F' : '#E6C858', transition: 'width .2s ease' }} />
+      </div>
+      <div style={{ fontSize: 11.5, color: '#8C8880', whiteSpace: 'nowrap' }}>
+        {storage.fileCount} bestand{storage.fileCount === 1 ? '' : 'en'} · {pct}%
       </div>
     </div>
   );
@@ -840,8 +1007,78 @@ export default function LibraryClient({ tracks, voices, categories, defaultTags 
     }
   }
 
+  // Bulk-edit handlers for the selected tracks/voices — category reassign,
+  // hide/unhide, and (music only) find/replace rename across the titles.
+  async function bulkSetTracksCategory(category) {
+    if (selectedTrackIds.size === 0) return;
+    setBulkBusyTracks(true);
+    try {
+      const formData = new FormData();
+      selectedTrackIds.forEach((id) => formData.append('id', id));
+      formData.set('category', category);
+      await setTracksCategoryBulkAction(formData);
+    } finally {
+      setBulkBusyTracks(false);
+    }
+  }
+
+  async function bulkSetTracksHidden(hidden) {
+    if (selectedTrackIds.size === 0) return;
+    setBulkBusyTracks(true);
+    try {
+      const formData = new FormData();
+      selectedTrackIds.forEach((id) => formData.append('id', id));
+      formData.set('hidden', String(hidden));
+      await setTracksHiddenBulkAction(formData);
+    } finally {
+      setBulkBusyTracks(false);
+    }
+  }
+
+  async function bulkRenameTracks(find, replace) {
+    if (selectedTrackIds.size === 0) return;
+    setBulkBusyTracks(true);
+    try {
+      const formData = new FormData();
+      selectedTrackIds.forEach((id) => formData.append('id', id));
+      formData.set('find', find);
+      formData.set('replace', replace || '');
+      await renameTracksBulkAction(formData);
+    } finally {
+      setBulkBusyTracks(false);
+    }
+  }
+
+  async function bulkSetVoicesHidden(hidden) {
+    if (selectedVoiceIds.size === 0) return;
+    setBulkBusyVoices(true);
+    try {
+      const formData = new FormData();
+      selectedVoiceIds.forEach((id) => formData.append('id', id));
+      formData.set('hidden', String(hidden));
+      await setVoicesHiddenBulkAction(formData);
+    } finally {
+      setBulkBusyVoices(false);
+    }
+  }
+
+  // Vercel Blob storage usage — fetched once on mount so the producer can
+  // see at a glance how much of the (often 1GB free-tier) quota is used.
+  const [storage, setStorage] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/dashboard/library/storage')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled) setStorage(data); })
+      .catch(() => { if (!cancelled) setStorage(null); });
+    return () => { cancelled = true; };
+  }, []);
+
   return (
     <div>
+      {storage && storage.configured && (
+        <StorageUsageBadge storage={storage} />
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
         <button
           type="button"
@@ -887,6 +1124,9 @@ export default function LibraryClient({ tracks, voices, categories, defaultTags 
             bulkBusy={bulkBusyTracks}
             query={trackQuery}
             setQuery={setTrackQuery}
+            onBulkSetCategory={bulkSetTracksCategory}
+            onBulkSetHidden={bulkSetTracksHidden}
+            onBulkRename={bulkRenameTracks}
           />
         )
       ) : (
@@ -904,6 +1144,7 @@ export default function LibraryClient({ tracks, voices, categories, defaultTags 
             bulkBusy={bulkBusyVoices}
             query={voiceQuery}
             setQuery={setVoiceQuery}
+            onBulkSetHidden={bulkSetVoicesHidden}
           />
         )
       )}

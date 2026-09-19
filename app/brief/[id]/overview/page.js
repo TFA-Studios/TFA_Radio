@@ -215,6 +215,29 @@ export default function OverviewPage({ params }) {
           </a>
         </div>
 
+        {/* Same "permanent record" gap as the confirmation email: before
+            submit this info only ever lived on this page's pre-submit view,
+            which gets replaced by the thank-you view above the moment
+            brief.submittedAt is set — so a client coming back to their one
+            durable link (this page, keyed by brief id) never saw their own
+            required text or the terms again. Shown here unconditionally so
+            it survives exactly as long as the link does. */}
+        {brief.disclaimerText && brief.disclaimerText.trim() && (
+          <div className="box" style={{ background: '#FBF3F1', border: '1.5px solid #E3B8AF', borderRadius: 14, padding: '18px 20px', marginTop: 18 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#8A2E1E' }}>Verplichte tekst / disclaimer</div>
+            <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: '#1D1D1D', whiteSpace: 'pre-wrap' }}>{brief.disclaimerText}</div>
+          </div>
+        )}
+
+        <div className="box" style={{ background: '#F7F6F1', border: '1.5px solid #E3E0D5', borderRadius: 14, padding: '18px 20px', marginTop: 18 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600 }}>Voorwaarden</div>
+          <ul style={{ margin: '9px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.6, color: '#5C5850' }}>
+            <li style={{ marginBottom: 6 }}>Het gebruiksrecht op de gekozen voice-over en muziek geldt uitsluitend voor deze specifieke productie, zonder recht op verlenging of hergebruik in toekomstige producties.</li>
+            <li style={{ marginBottom: 6 }}>Brengt de klant na goedkeuring en opname van het script alsnog wijzigingen aan, dan worden de kosten van de daaruit voortvloeiende heropname(s) apart in rekening gebracht.</li>
+            <li>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
+          </ul>
+        </div>
+
         <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end', gap: 10, flexWrap: 'wrap' }}>
           <a
             href="/"
@@ -380,7 +403,14 @@ export default function OverviewPage({ params }) {
         </div>
       </div>
 
-      <div className="box" style={{ background: '#F7F6F1', border: '1.5px solid #E3E0D5', borderRadius: 14, padding: '18px 20px', marginTop: 22 }}>
+      {brief.disclaimerText && brief.disclaimerText.trim() && (
+        <div className="box" style={{ background: '#FBF3F1', border: '1.5px solid #E3B8AF', borderRadius: 14, padding: '18px 20px', marginTop: 22 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: '#8A2E1E' }}>Verplichte tekst / disclaimer</div>
+          <div style={{ marginTop: 8, fontSize: 13, lineHeight: 1.6, color: '#1D1D1D', whiteSpace: 'pre-wrap' }}>{brief.disclaimerText}</div>
+        </div>
+      )}
+
+      <div className="box" style={{ background: '#F7F6F1', border: '1.5px solid #E3E0D5', borderRadius: 14, padding: '18px 20px', marginTop: brief.disclaimerText && brief.disclaimerText.trim() ? 14 : 22 }}>
         <div style={{ fontSize: 12.5, fontWeight: 600 }}>Voorwaarden</div>
         <ul style={{ margin: '9px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.6, color: '#5C5850' }}>
           <li style={{ marginBottom: 6 }}>Het gebruiksrecht op de gekozen voice-over en muziek geldt uitsluitend voor deze specifieke productie, zonder recht op verlenging of hergebruik in toekomstige producties.</li>

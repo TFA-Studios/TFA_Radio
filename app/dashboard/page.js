@@ -16,8 +16,19 @@ async function HeaderUser() {
   return <UserButton afterSignOutUrl="/" />;
 }
 
+// Mirrors isUnseenBrief() in DashboardClient.js — a brief counts as
+// "new/unchecked" once submitted but not yet opened by a producer since.
+// Duplicated rather than imported since DashboardClient is a client
+// component; kept in sync manually (same one-line rule either way).
+function isUnseenBrief(b) {
+  if (!b || !b.submittedAt) return false;
+  if (!b.seenAt) return true;
+  return new Date(b.seenAt).getTime() < new Date(b.submittedAt).getTime();
+}
+
 export default async function DashboardPage() {
   const briefs = await listBriefs();
+  const unseenCount = briefs.filter(isUnseenBrief).length;
 
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
@@ -32,8 +43,13 @@ export default async function DashboardPage() {
           <SpotFlowLogo size={24} variant="dark" className="tfa-dash-sidebar-brand" />
         </Link>
         <nav className="tfa-dash-nav" style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 4 }}>
-          <Link href="/dashboard" className="tfa-dash-navlink tfa-dash-navlink--active" style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(230,200,88,.12)', color: '#FFFFFF', fontWeight: 600, fontSize: 14, textDecoration: 'none' }}>
-            Dashboard
+          <Link href="/dashboard" className="tfa-dash-navlink tfa-dash-navlink--active" style={{ padding: '10px 12px', borderRadius: 8, background: 'rgba(230,200,88,.12)', color: '#FFFFFF', fontWeight: 600, fontSize: 14, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span>Dashboard</span>
+            {unseenCount > 0 && (
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#1D1D1D', background: '#E6C858', borderRadius: 999, padding: '1px 7px', lineHeight: 1.5 }}>
+                {unseenCount}
+              </span>
+            )}
           </Link>
           <Link href="/dashboard/library" className="tfa-dash-navlink" style={{ padding: '10px 12px', borderRadius: 8, color: '#B9B6AC', fontSize: 14, textDecoration: 'none' }}>
             Bibliotheek
@@ -52,8 +68,13 @@ export default async function DashboardPage() {
       </aside>
 
       <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }}>
-        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: '0 0 24px', color: '#1D1D1D' }}>
+        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: '0 0 24px', color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 12 }}>
           Dashboard
+          {unseenCount > 0 && (
+            <span style={{ fontFamily: "'Geist', system-ui, sans-serif", fontSize: 13, fontWeight: 700, color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 8, padding: '4px 10px' }}>
+              {unseenCount} nieuwe brief{unseenCount === 1 ? '' : 's'}
+            </span>
+          )}
         </h1>
         <DashboardClient briefs={briefs} />
       </main>

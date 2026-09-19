@@ -11,5 +11,5 @@ export const dynamic = 'force-dynamic';
 // every /api/briefs route.
 export async function GET() {
   const tracks = await listTracks();
-  return Response.json(tracks);
+  return Response.json(tracks.filter((t) => !t.hidden));
 }
