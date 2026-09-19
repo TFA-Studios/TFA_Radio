@@ -47,11 +47,20 @@ export function computeReached(brief) {
   };
 }
 
+// Single source of truth for the tone-of-voice vocabulary — used by the
+// client-facing brief-form checkboxes (app/brief/[id]/details/page.js), the
+// AI script-generation prompt (lib/scriptgen.js, which pairs each key with a
+// concrete stylistic instruction in TONE_GUIDE there), the confirmation
+// email (lib/email.js) and the producer's report export (lib/reports.js).
+// All four used to keep their own separate copy of this object — three
+// duplicates drifting independently with no shared import between them —
+// consolidated here so a new tone or label change only has to happen once.
 export const TONE_LABELS = {
   energiek: 'Energiek', rustig: 'Rustig', warm: 'Warm', zakelijk: 'Zakelijk',
   urgent: 'Urgent', premium: 'Premium', speels: 'Speels', grappig: 'Grappig',
   betrouwbaar: 'Betrouwbaar', gedurfd: 'Gedurfd', inspirerend: 'Inspirerend',
-  nostalgisch: 'Nostalgisch',
+  nostalgisch: 'Nostalgisch', droogkomisch: 'Droogkomisch', vriendelijk: 'Vriendelijk',
+  oprecht: 'Oprecht',
 };
 
 // The client-facing voice (step 5) and music (step 6) pages used to pick

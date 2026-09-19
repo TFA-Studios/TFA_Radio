@@ -8,7 +8,7 @@ import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
 import { TONE_LABELS } from '../../../../components/flowData';
 
-const MAX_TONES = 2;
+const MAX_TONES = 3;
 const TONE_ORDER = Object.keys(TONE_LABELS);
 
 // Character caps on the brief's free-text fields — mirrored server-side in
@@ -31,7 +31,6 @@ const FIELD_LIMITS = {
   cta: 150,
   slogan: 150,
   disclaimerText: 2000,
-  extraNote: 1000,
 };
 
 function CharCount({ field, value }) {
@@ -59,7 +58,7 @@ export default function DetailsPage({ params }) {
   // navigation actually happened. Now the preloader takes over immediately.
   const [navigating, setNavigating] = useState(false);
   const [form, setForm] = useState({
-    disclaimerText: '', extraNote: '', product: '', audience: 'b2b', decisionMaker: '',
+    disclaimerText: '', product: '', audience: 'b2b', decisionMaker: '',
     audienceAgeInterests: '', usp: '', price: null, priceDetail: '', mainMessage: '',
     cta: '', slogan: '', toneOfVoice: [],
   });
@@ -76,7 +75,6 @@ export default function DetailsPage({ params }) {
       } catch (e) {}
       setForm({
         disclaimerText: brief.disclaimerText || '',
-        extraNote: brief.extraNote || '',
         product: brief.product || '',
         audience: brief.audience || 'b2b',
         decisionMaker: brief.decisionMaker || '',
@@ -190,7 +188,7 @@ export default function DetailsPage({ params }) {
 
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
         <label className="field-label">
-          Hoe moet de commercial klinken? <span style={{ color: '#8C8880', fontWeight: 400 }}>(kies max. 2)</span>
+          Hoe moet de commercial klinken? <span style={{ color: '#8C8880', fontWeight: 400 }}>(kies max. 3)</span>
         </label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
           {TONE_ORDER.map((v) => {
@@ -225,15 +223,18 @@ export default function DetailsPage({ params }) {
       </div>
 
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
-        <label className="field-label">Verplichte tekst of disclaimers</label>
-        <textarea style={{ minHeight: 56 }} maxLength={FIELD_LIMITS.disclaimerText} value={form.disclaimerText} placeholder="Bijv. 'Vraag naar de voorwaarden'" onChange={(e) => update('disclaimerText', e.target.value)} />
-        <div className="hint" style={{ marginTop: 5 }}>Deze tekst nemen we altijd op in het script — ook als er later wordt aangepast.</div>
-      </div>
-
-      <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
-        <label className="field-label">Extra opmerkingen <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
-        <textarea style={{ minHeight: 56 }} maxLength={FIELD_LIMITS.extraNote} value={form.extraNote} placeholder="Nog iets anders dat we moeten weten?" onChange={(e) => update('extraNote', e.target.value)} />
-        <CharCount field="extraNote" value={form.extraNote} />
+        <label className="field-label">Moet er verplichte wettelijke tekst in? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel — laat leeg als dit niet van toepassing is)</span></label>
+        <textarea
+          style={{ minHeight: 56 }}
+          maxLength={FIELD_LIMITS.disclaimerText}
+          value={form.disclaimerText}
+          placeholder="Bijv. een verplichte zin over voorwaarden, een BTW-vermelding, of een wettelijk verplichte waarschuwing"
+          onChange={(e) => update('disclaimerText', e.target.value)}
+        />
+        <div className="hint" style={{ marginTop: 5 }}>
+          Alleen invullen als er een tekst is die er om wettelijke of contractuele redenen letterlijk in moet staan. Deze
+          tekst wordt woordelijk overgenomen in het script en blijft daarna overal zichtbaar — voor jou en voor TFA.
+        </div>
       </div>
 
 
