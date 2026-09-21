@@ -150,6 +150,17 @@ export function reviewOverIncludedCap(brief) {
   return parseReviewRounds(brief).length > INCLUDED_REVISIONS;
 }
 
+// Shared copy for the "included revision rounds" disclaimer — shown in the
+// overview step's Voorwaarden box (both the pre-submit and the persisted
+// post-submit "thank you" view), mirrored into the confirmation email's own
+// Voorwaarden block (lib/email.js's buildTermsBlock), and shown persistently
+// on the client's review/status page. One shared string so a client sees the
+// same included-rounds expectation wherever they look, not just once in the
+// terms they agreed to before submitting.
+export function revisionDisclaimerText() {
+  return 'Let op: bij deze productie zijn ' + INCLUDED_REVISIONS + ' rondes revisie inbegrepen. Heb je meer nodig? Neem dan contact op met Advision.';
+}
+
 // Turns a round's 'YYYY-MM-DD' folderDate into a Dutch long date ("8
 // september 2026") — shared by the client review page and the dashboard's
 // Productie tab so both show the same wording for "the dated folder inside

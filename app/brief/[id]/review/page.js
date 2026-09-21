@@ -5,7 +5,7 @@ import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import SpotFlowLogo from '../../../../components/SpotFlowLogo';
 import { useBrief } from '../../../../components/useBrief';
-import { parseReviewRounds, currentReviewRound, formatRoundLabel, formatDateTime } from '../../../../components/flowData';
+import { parseReviewRounds, currentReviewRound, formatRoundLabel, formatDateTime, revisionDisclaimerText } from '../../../../components/flowData';
 
 // Post-production review — reached via a private link emailed to the
 // client once a producer pastes a Frame.io link from the dashboard (see
@@ -148,7 +148,7 @@ export default function ReviewPage({ params }) {
               fontSize: 28, background: isApproved ? '#3A6B32' : '#E6C858', color: isApproved ? '#FFFFFF' : '#1D1D1D',
             }}
           >
-            {isApproved ? '✓' : '🎬'}
+            {isApproved ? '✓' : '🎧'}
           </span>
         </div>
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isApproved ? '#3A6B32' : '#8C6D1F' }}>
@@ -177,6 +177,38 @@ export default function ReviewPage({ params }) {
           Gedeeld op {formatDateTime(round.createdAt)}
           {rounds.length > 1 ? ' (zelfde link als voorheen, open de ' + formatRoundLabel(round).replace(/^Map/, 'map') + ' binnenin)' : ''}
         </div>
+        {/* A producer-written note attached to this specific round (typed in
+            the dashboard when the link was shared) — e.g. "we hebben de
+            intro ingekort". Shown as its own clearly-styled block rather
+            than folded into the "Gedeeld op..." caption above, since that's
+            easy to skim past and this is meant to actually be read. */}
+        {round.note && round.note.trim() && (
+          <div
+            style={{
+              marginTop: 16, textAlign: 'left', background: 'rgba(255,255,255,.6)', border: '1px solid ' + (isApproved ? '#A9CF9E' : '#E6C858'),
+              borderRadius: 10, padding: '12px 14px', fontSize: 13, lineHeight: 1.55, color: '#1D1D1D',
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>📝 Notitie van TFA: </span>
+            {round.note.trim()}
+          </div>
+        )}
+        {/* The single question every client asks right after approving:
+            "wat nu?". Answered here directly instead of leaving it implicit
+            — TFA hands the approved audio off to Advision from this point,
+            and it's worth saying so plainly rather than the client having
+            to email and ask. */}
+        {isApproved && (
+          <div
+            style={{
+              marginTop: 16, textAlign: 'left', background: '#FFFFFF', border: '1.5px solid #A9CF9E',
+              borderRadius: 10, padding: '14px 16px', fontSize: 13, lineHeight: 1.6, color: '#1D1D1D',
+            }}
+          >
+            <span style={{ fontWeight: 700 }}>Wat gebeurt er nu? </span>
+            TFA draagt deze goedgekeurde audio nu over aan Advision, zij nemen het vanaf hier over. Neem gerust rechtstreeks contact met hen op voor de verdere afhandeling.
+          </div>
+        )}
       </div>
 
       {/* Two clearly separate actions, not one shared row — this used to be
@@ -277,8 +309,14 @@ export default function ReviewPage({ params }) {
             information. This section is now genuinely just what came
             before, and disappears entirely once there's nothing left to
             show (a brand-new brief with only one round shows no empty
-            "Geschiedenis" heading over nothing). */}
-        {pastRounds.length > 0 && (
+            "Geschiedenis" heading over nothing). It's also dropped
+            entirely once the client has approved — all the back-and-forth
+            of earlier revision rounds is production history that's no
+            longer relevant to the client once the job is done, and this
+            keeps the approved state clean rather than scrolling into old
+            feedback. The full history stays intact in the dashboard's own
+            Productie & review tab for the producer's own reference. */}
+        {!isApproved && pastRounds.length > 0 && (
           <div style={{ marginTop: isApproved ? 0 : 18, paddingTop: isApproved ? 0 : 16, borderTop: isApproved ? 'none' : '1px solid #EEECE3' }}>
             <div style={{ fontSize: 11.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', marginBottom: 10 }}>Eerdere versies</div>
             {pastRounds.map((r) => (
@@ -293,7 +331,7 @@ export default function ReviewPage({ params }) {
                 {r.feedback && r.feedback.length > 0 ? (
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {r.feedback.map((f) => (
-                      <div key={f.id} style={{ fontSize: 13, color: '#5C5850', lineHeight: 1.5 }}>
+                      <div key={f.id} style={{ fontSize: 13, color: '#5C5850', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
                         <span style={{ color: '#9C9890', fontSize: 11.5 }}>{formatDateTime(f.createdAt)}: </span>
                         {f.text}
                       </div>
@@ -488,6 +526,15 @@ function Shell({ companyName, firstName, children }) {
           </div>
         )}
         {children}
+        {/* Shown unconditionally, on every state of this page (busy, in
+            review, approved) — not just once in the Voorwaarden the client
+            agreed to before submitting — so the included-rounds expectation
+            is visible wherever the client actually checks status, per the
+            explicit request that this be clear "everywhere", not buried in
+            terms shown only pre-submit. */}
+        <div style={{ marginTop: 22, fontSize: 11.5, lineHeight: 1.6, color: '#8C8880', textAlign: 'center' }}>
+          {revisionDisclaimerText()}
+        </div>
       </div>
     </div>
   );

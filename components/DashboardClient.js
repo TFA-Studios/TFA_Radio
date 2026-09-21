@@ -168,6 +168,60 @@ function ModalSectionTitle({ children }) {
   return <div style={{ fontSize: 13, fontWeight: 700, color: '#1D1D1D', marginBottom: 10 }}>{children}</div>;
 }
 
+// One round's feedback list, in the dashboard's Productie & review tab.
+// Two things this fixes over the old plain list:
+//  1. `whiteSpace: 'pre-wrap'` on the actual text — a client's line breaks
+//     and "- " bullet points were being silently collapsed onto one run-on
+//     line by normal HTML whitespace rules, even though they typed it with
+//     real formatting.
+//  2. The most recent piece of feedback (the one a producer actually needs
+//     to act on) is shown full-size and highlighted; anything older is
+//     collapsed into a small "+N eerdere reacties" stack that expands on
+//     hover, so the newest is never buried under a scroll of older notes.
+function FeedbackStack({ feedback }) {
+  const [hovered, setHovered] = useState(false);
+  if (!feedback || !feedback.length) return null;
+  const ordered = feedback.slice().reverse(); // newest first
+  const latest = ordered[0];
+  const older = ordered.slice(1);
+  return (
+    <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #F3F1EA' }}>
+      <div style={{ fontSize: 10.5, color: '#9C9890', marginBottom: 3 }}>{formatDateTime(latest.createdAt)} · nieuwste</div>
+      <div
+        style={{
+          fontSize: 12.5, color: '#1D1D1D', lineHeight: 1.55, whiteSpace: 'pre-wrap', fontWeight: 500,
+          background: '#FBF9EC', border: '1px solid #E6C858', borderLeft: '3px solid #E6C858', borderRadius: 6, padding: '7px 9px',
+        }}
+      >
+        {latest.text}
+      </div>
+      {older.length > 0 && (
+        <div onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)} style={{ marginTop: 6 }}>
+          {!hovered ? (
+            <div
+              style={{
+                fontSize: 11, color: '#9C9890', fontStyle: 'italic', padding: '5px 8px', borderRadius: 5, background: '#FCFBF7',
+                boxShadow: '0 2px 0 -1px #EAE3C4, 0 4px 0 -2px #F3F1EA',
+              }}
+            >
+              + {older.length} eerdere reactie{older.length === 1 ? '' : 's'} · hover om te bekijken
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {older.map((f) => (
+                <div key={f.id} style={{ fontSize: 11.5, color: '#8C8880', lineHeight: 1.5, whiteSpace: 'pre-wrap', padding: '5px 7px', background: '#FAFAF7', borderRadius: 5 }}>
+                  <span style={{ color: '#B4B0A5', fontSize: 10.5 }}>{formatDateTime(f.createdAt)}: </span>
+                  {f.text}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Deadline coloring — overdue is only meaningful for a brief that isn't done
 // yet; a finished brief with a past due date isn't a problem.
 function dueDateMeta(dueDate, status) {
@@ -212,6 +266,13 @@ export default function DashboardClient({ briefs }) {
   const [noteError, setNoteError] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
   const [reviewLinkDraft, setReviewLinkDraft] = useState('');
+  // Free-text note that rides along with a shared/re-shared Frame.io round —
+  // e.g. "we hebben de intro ingekort zoals gevraagd". lib/db.js already
+  // stored a `note` per round (used internally for the round's own label),
+  // but there was no actual input for a producer to type one — this is that
+  // input. Cleared after each successful share since it's specific to that
+  // one round, not something that should linger for the next one.
+  const [reviewNoteDraft, setReviewNoteDraft] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
   const [reviewError, setReviewError] = useState(false);
   // Which section of the brief detail modal is showing — see MODAL_TABS
@@ -252,18 +313,20 @@ export default function DashboardClient({ briefs }) {
   async function handleAddReviewRound(id) {
     const frameioLink = reviewLinkDraft.trim();
     if (!frameioLink) return;
+    const note = reviewNoteDraft.trim();
     setReviewBusy(true);
     setReviewError(false);
     try {
       const res = await fetch(`/api/dashboard/briefs/${id}/review-round`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ frameioLink }),
+        body: JSON.stringify({ frameioLink, note }),
       });
       if (!res.ok) throw new Error('add review round failed');
       const brief = await res.json();
       setRows((cur) => cur.map((b) => (b.id === id ? brief : b)));
       setSelected((cur) => (cur && cur.id === id ? brief : cur));
+      setReviewNoteDraft('');
     } catch (err) {
       console.error(err);
       // Was silent before — the input just went back to normal and the
@@ -721,16 +784,7 @@ export default function DashboardClient({ briefs }) {
                                 <span style={{ fontSize: 11, color: '#8C8880' }}>gedeeld {formatDateTime(r.createdAt)}</span>
                               )}
                             </div>
-                            {r.feedback && r.feedback.length > 0 && (
-                              <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #F3F1EA', display: 'flex', flexDirection: 'column', gap: 4 }}>
-                                {r.feedback.map((f) => (
-                                  <div key={f.id} style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5 }}>
-                                    <span style={{ color: '#9C9890', fontSize: 11 }}>{formatDateTime(f.createdAt)}: </span>
-                                    {f.text}
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                            <FeedbackStack feedback={r.feedback} />
                           </div>
                         ))}
                       </div>
@@ -754,7 +808,7 @@ export default function DashboardClient({ briefs }) {
                               onClick={(e) => e.stopPropagation()}
                               style={{ fontSize: 11, fontWeight: 600, color: '#1F6F8C', textDecoration: 'none', whiteSpace: 'nowrap' }}
                             >
-                              🎬 Open Frame.io ↗
+                              🎧 Open Frame.io ↗
                             </a>
                           )}
                         </div>
@@ -779,6 +833,18 @@ export default function DashboardClient({ briefs }) {
                             {rounds.length > 0 ? 'Nieuwe map delen' : 'Delen met klant'}
                           </button>
                         </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, fontWeight: 600, color: '#8C8880', display: 'block', marginBottom: 4 }}>
+                          Notitie voor de klant (optioneel)
+                        </label>
+                        <textarea
+                          value={reviewNoteDraft}
+                          onChange={(e) => setReviewNoteDraft(e.target.value)}
+                          placeholder="Bijv. &quot;we hebben de intro ingekort en de muziek iets zachter gezet&quot;… verschijnt bij deze map op de reviewpagina en in de e-mail."
+                          rows={2}
+                          style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 12.5, fontFamily: 'inherit', resize: 'vertical', background: '#FFFFFF' }}
+                        />
                       </div>
                       <div style={{ fontSize: 11, color: '#8C8880' }}>
                         Voegt nu ({formatDateTime(new Date().toISOString())}) toe als nieuwe map binnen dezelfde Frame.io-link.
@@ -941,14 +1007,6 @@ export default function DashboardClient({ briefs }) {
               </div>
             </div>
             )}
-
-            <a
-              href={`/api/dashboard/briefs/${selected.id}/pdf`}
-              className="btn-primary tfa-btn-glow"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 20, marginBottom: 4, padding: '9px 16px', fontSize: 12.5, textDecoration: 'none' }}
-            >
-              ⤓ Download als PDF
-            </a>
             </div>
           </div>
         </div>

@@ -11,6 +11,21 @@ import { TONE_LABELS } from '../../../../components/flowData';
 const MAX_TONES = 3;
 const TONE_ORDER = Object.keys(TONE_LABELS);
 
+// Shown on the full-screen Preloader while submit() below is actually
+// mid-flight generating the real script (the "await fetch(generate-script)"
+// call happens before router.push, so this loading screen isn't a generic
+// page transition, it's the one moment the client is genuinely waiting on
+// TFA's AI). Personalized with the company name where we have one, so it
+// reads as "working on my brief" rather than a stock loading message.
+function scriptPreloaderMessages(companyName) {
+  const name = companyName && companyName.trim() ? companyName.trim() : 'jouw merk';
+  return [
+    `TFA's AI, getraind op duizenden radioklare scripts, buigt zich nu over de brief van ${name}…`,
+    'Er wordt gezocht naar de juiste invalshoek, geen opsomming van clichés…',
+    `Bijna klaar: het scriptvoorstel voor ${name} wordt verfijnd…`,
+  ];
+}
+
 // Character caps on the brief's free-text fields — mirrored server-side in
 // lib/db.js's FIELD_MAX_LENGTHS (the real enforcement; these maxLength
 // attributes are just the UI's first line of defense). Sized from real
@@ -128,7 +143,8 @@ export default function DetailsPage({ params }) {
     router.push(`/brief/${id}/script`);
   }
 
-  if (showLoader || navigating) return <Preloader />;
+  if (showLoader) return <Preloader />;
+  if (navigating) return <Preloader messages={scriptPreloaderMessages(brief && brief.companyName)} />;
 
   return (
     <StepShell briefId={id} current={3} brief={brief} bigNum="03" kicker="De inhoud" title="Jouw brief" hint="Nog een paar korte vragen over je commercial en je brief." backHref={`/brief/${id}/delivery`} backLabel="Terug naar levering">

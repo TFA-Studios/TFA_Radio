@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Full-screen loading state built from the client's animated brand mark
 // (public/brand/preloader.mp4) instead of a blank page or a generic spinner.
@@ -27,8 +27,25 @@ import { useEffect, useRef } from 'react';
 // once" actually means from the client's side.
 let lastPlaybackTime = 0;
 
-export default function Preloader({ fullScreen = true }) {
+export default function Preloader({ fullScreen = true, messages }) {
   const videoRef = useRef(null);
+  // Optional rotating caption under the brand mark — used for the one
+  // moment in the flow where this generic full-screen loader is actually
+  // standing in for something specific happening (the details step's
+  // "Volgende" click, which triggers the real AI script generation call
+  // before routing to /script), so it's worth telling the client what's
+  // actually going on instead of a silent spinner. Every other call site
+  // omits `messages` and gets the same plain logo-only loader as before.
+  const [msgIdx, setMsgIdx] = useState(0);
+  useEffect(() => {
+    if (!messages || messages.length < 2) return undefined;
+    const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) return undefined;
+    const interval = setInterval(() => {
+      setMsgIdx((i) => (i + 1) % messages.length);
+    }, 2200);
+    return () => clearInterval(interval);
+  }, [messages]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -67,14 +84,37 @@ export default function Preloader({ fullScreen = true }) {
         zIndex: 999,
       }}
     >
-      <video
-        ref={videoRef}
-        src="/brand/preloader.mp4"
-        loop
-        muted
-        playsInline
-        style={{ width: 140, height: 140, objectFit: 'contain' }}
-      />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18, maxWidth: 380, padding: '0 24px' }}>
+        <video
+          ref={videoRef}
+          src="/brand/preloader.mp4"
+          loop
+          muted
+          playsInline
+          style={{ width: 140, height: 140, objectFit: 'contain' }}
+        />
+        {messages && messages.length > 0 && (
+          <div
+            key={msgIdx}
+            className="tfa-preloader-msg-fade"
+            style={{ textAlign: 'center', fontSize: 13.5, lineHeight: 1.55, color: '#DEDCD7' }}
+          >
+            {messages[msgIdx]}
+          </div>
+        )}
+      </div>
+      {messages && messages.length > 0 && (
+        <style jsx>{`
+          @keyframes tfa-preloader-msg-fade {
+            from { opacity: 0; transform: translateY(3px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .tfa-preloader-msg-fade { animation: tfa-preloader-msg-fade .5s ease-out; }
+          @media (prefers-reduced-motion: reduce) {
+            .tfa-preloader-msg-fade { animation: none; }
+          }
+        `}</style>
+      )}
     </div>
   );
 }

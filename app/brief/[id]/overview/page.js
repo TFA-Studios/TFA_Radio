@@ -5,7 +5,7 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { MONTH_NAMES_LOWER, variationsCountOf, PRODUCTION_STATUS_LABELS } from '../../../../components/flowData';
+import { MONTH_NAMES_LOWER, variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
 
 function parseVariationScripts(brief) {
@@ -243,7 +243,8 @@ export default function OverviewPage({ params }) {
           <ul style={{ margin: '9px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.6, color: '#5C5850' }}>
             <li style={{ marginBottom: 6 }}>Het gebruiksrecht op de gekozen voice-over en muziek geldt uitsluitend voor deze specifieke productie, zonder recht op verlenging of hergebruik in toekomstige producties.</li>
             <li style={{ marginBottom: 6 }}>Brengt de klant na goedkeuring en opname van het script alsnog wijzigingen aan, dan worden de kosten van de daaruit voortvloeiende heropname(s) apart in rekening gebracht.</li>
-            <li>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
+            <li style={{ marginBottom: 6 }}>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
+            <li>{revisionDisclaimerText()}</li>
           </ul>
         </div>
 
@@ -424,7 +425,8 @@ export default function OverviewPage({ params }) {
         <ul style={{ margin: '9px 0 0', paddingLeft: 18, fontSize: 12, lineHeight: 1.6, color: '#5C5850' }}>
           <li style={{ marginBottom: 6 }}>Het gebruiksrecht op de gekozen voice-over en muziek geldt uitsluitend voor deze specifieke productie, zonder recht op verlenging of hergebruik in toekomstige producties.</li>
           <li style={{ marginBottom: 6 }}>Brengt de klant na goedkeuring en opname van het script alsnog wijzigingen aan, dan worden de kosten van de daaruit voortvloeiende heropname(s) apart in rekening gebracht.</li>
-          <li>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
+          <li style={{ marginBottom: 6 }}>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
+          <li>{revisionDisclaimerText()}</li>
         </ul>
       </div>
 
