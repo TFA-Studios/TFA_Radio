@@ -56,7 +56,7 @@ export function useBrief(id) {
         setSaveState('Opgeslagen');
         return updated;
       } catch (e) {
-        setSaveState('Niet opgeslagen — controleer je verbinding');
+        setSaveState('Niet opgeslagen, controleer je verbinding');
         return null;
       }
     },

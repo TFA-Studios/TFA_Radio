@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { diffWords, hasDiff, DiffText } from './textDiff';
 
 const cardStyle = { background: '#FFFFFF', borderRadius: 12, padding: '16px 18px', boxShadow: '0 1px 6px rgba(29,29,29,.04)' };
 
@@ -28,6 +29,12 @@ export default function PromptVersionsClient({ initialVersions }) {
   const [editingId, setEditingId] = useState(null);
   const [editLabel, setEditLabel] = useState('');
   const [editContent, setEditContent] = useState('');
+  // Which version (if any) is currently showing a diff against the live
+  // version, instead of its plain text — previously there was no way to
+  // see what actually changed between two prompt versions short of
+  // eyeballing two full text blocks side by side, unlike scripts, which
+  // already reuse this same diff tool.
+  const [compareId, setCompareId] = useState(null);
 
   async function refresh() {
     try {
@@ -131,7 +138,7 @@ export default function PromptVersionsClient({ initialVersions }) {
 
       {!liveVersion && (
         <div style={{ background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: '#383209', marginBottom: 16 }}>
-          Er is momenteel geen live versie — scriptgeneratie gebruikt de ingebouwde standaardinstructies totdat je een versie live zet.
+          Er is momenteel geen live versie: scriptgeneratie gebruikt de ingebouwde standaardinstructies totdat je een versie live zet.
         </div>
       )}
 
@@ -166,7 +173,7 @@ export default function PromptVersionsClient({ initialVersions }) {
             <button type="submit" disabled={busyId === 'new' || !content.trim()} className="btn-primary" style={{ padding: '9px 16px', fontSize: 13, opacity: busyId === 'new' ? 0.7 : 1 }}>
               {busyId === 'new' ? 'Bezig...' : 'Opslaan als nieuwe (inactieve) versie'}
             </button>
-            <span style={{ fontSize: 11.5, color: '#8C8880' }}>Wordt niet meteen live — dat doe je hieronder.</span>
+            <span style={{ fontSize: 11.5, color: '#8C8880' }}>Wordt niet meteen live, dat doe je hieronder.</span>
           </div>
         </form>
       )}
@@ -208,6 +215,20 @@ export default function PromptVersionsClient({ initialVersions }) {
                       <button type="button" disabled={busyId === v.id} onClick={() => startEdit(v)} className="tfa-btn-ghost" style={{ border: '1px solid #C9C5B9', borderRadius: 8, background: '#FFFFFF', padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
                         Bewerken
                       </button>
+                      {liveVersion && liveVersion.id !== v.id && (
+                        <button
+                          type="button"
+                          disabled={busyId === v.id}
+                          onClick={() => setCompareId((cur) => (cur === v.id ? null : v.id))}
+                          className="tfa-btn-ghost"
+                          style={{
+                            border: '1px solid ' + (compareId === v.id ? '#E6C858' : '#C9C5B9'), borderRadius: 8,
+                            background: compareId === v.id ? 'rgba(230,200,88,.14)' : '#FFFFFF', padding: '6px 12px', fontSize: 12, cursor: 'pointer',
+                          }}
+                        >
+                          {compareId === v.id ? 'Verberg vergelijking' : 'Vergelijk met live'}
+                        </button>
+                      )}
                       {v.status === 'live' ? (
                         <button type="button" disabled={busyId === v.id} onClick={() => setAction(v.id, 'deactivate')} className="tfa-btn-ghost" style={{ border: '1px solid #C9C5B9', borderRadius: 8, background: '#FFFFFF', padding: '6px 12px', fontSize: 12, cursor: 'pointer', opacity: busyId === v.id ? 0.6 : 1 }}>
                           {busyId === v.id ? 'Bezig...' : 'Deactiveren'}
@@ -241,9 +262,23 @@ export default function PromptVersionsClient({ initialVersions }) {
                     Opslaan maakt hier een nieuwe versie van (v{(() => {
                       const maxMinor = versions.reduce((m, ver) => Math.max(m, parseInt((ver.version || '1.0').split('.')[1] || '0', 10)), 0);
                       return '1.' + (maxMinor + 1);
-                    })()}) — v{v.version || '1.0'} zelf blijft ongewijzigd bewaard.
+                    })()}), v{v.version || '1.0'} zelf blijft ongewijzigd bewaard.
                   </div>
                 </>
+              ) : compareId === v.id && liveVersion ? (
+                (() => {
+                  const tokens = diffWords(liveVersion.content, v.content);
+                  return (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 6 }}>
+                        Vergeleken met de live versie (v{liveVersion.version || '1.0'}) — verwijderd doorgestreept, toegevoegd gemarkeerd:
+                      </div>
+                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.55, color: '#383209', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '10px 12px', maxHeight: 260, overflowY: 'auto' }}>
+                        {hasDiff(tokens) ? <DiffText tokens={tokens} /> : 'Geen verschil met de live versie.'}
+                      </pre>
+                    </div>
+                  );
+                })()
               ) : (
                 <pre style={{ marginTop: 10, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.55, color: '#383209', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '10px 12px', maxHeight: 160, overflowY: 'auto' }}>
                   {v.content}

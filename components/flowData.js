@@ -172,7 +172,7 @@ export function formatRoundLabel(round) {
   if (!round) return '';
   const dateLabel = formatFolderDate(round.folderDate);
   const base = dateLabel ? 'Map van ' + dateLabel : 'Map';
-  return round.note && round.note.trim() ? base + ' — ' + round.note.trim() : base;
+  return round.note && round.note.trim() ? base + ' (' + round.note.trim() + ')' : base;
 }
 
 // Full date + TIME ("8 sep 2026, 14:32") for an ISO timestamp — used

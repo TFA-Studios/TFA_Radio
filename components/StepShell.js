@@ -61,7 +61,7 @@ function ResumeCard({ briefId, defaultEmail }) {
   return (
     <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid #33301F' }}>
       <div style={{ fontSize: 12, color: '#D8D5CB', lineHeight: 1.5 }}>
-        Je voortgang wordt automatisch opgeslagen — je kunt altijd later verdergaan via deze link.
+        Je voortgang wordt automatisch opgeslagen, je kunt altijd later verdergaan via deze link.
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
         <button

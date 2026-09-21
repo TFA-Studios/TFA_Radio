@@ -190,6 +190,11 @@ export default function DashboardClient({ briefs }) {
   // filters the table below it to just that status; clicking the same tile
   // again (or picking a different one) toggles back to the full overview.
   const [statusFilter, setStatusFilter] = useState(null);
+  // Free-text search across company name, contact person, and contact
+  // email — the range/status filters above narrow by date/workflow stage,
+  // but there was previously no way to just find "that one brief" once the
+  // list grows past a page or two, short of paging through by eye.
+  const [searchQuery, setSearchQuery] = useState('');
 
   function toggleStatusFilter(status) {
     setStatusFilter((cur) => (cur === status ? null : status));
@@ -204,9 +209,11 @@ export default function DashboardClient({ briefs }) {
 
   const [noteDraft, setNoteDraft] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
+  const [noteError, setNoteError] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
   const [reviewLinkDraft, setReviewLinkDraft] = useState('');
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewError, setReviewError] = useState(false);
   // Which section of the brief detail modal is showing — see MODAL_TABS
   // below. Everything used to render stacked in one long scroll (Contact,
   // Levering, Team, Productie & review, Script, Stem, Muziek all on top of
@@ -246,6 +253,7 @@ export default function DashboardClient({ briefs }) {
     const frameioLink = reviewLinkDraft.trim();
     if (!frameioLink) return;
     setReviewBusy(true);
+    setReviewError(false);
     try {
       const res = await fetch(`/api/dashboard/briefs/${id}/review-round`, {
         method: 'POST',
@@ -258,6 +266,10 @@ export default function DashboardClient({ briefs }) {
       setSelected((cur) => (cur && cur.id === id ? brief : cur));
     } catch (err) {
       console.error(err);
+      // Was silent before — the input just went back to normal and the
+      // producer had no way to tell whether the Frame.io link actually got
+      // shared with the client or not. Now it says so.
+      setReviewError(true);
     } finally {
       setReviewBusy(false);
     }
@@ -288,7 +300,13 @@ export default function DashboardClient({ briefs }) {
   // being submitted, marks it seen — clearing the "new" highlight in the
   // list. Optimistic (computes the timestamp client-side) same as the
   // other handlers above, so the bold/dot disappears the instant you
-  // click, not after a round trip.
+  // click, not after a round trip — but unlike a stray earlier version of
+  // this function, it now checks the response the same way
+  // handleMetaChange does above: if the write genuinely fails, the "seen"
+  // state is rolled back instead of quietly pretending it worked. Without
+  // this, a failed write looked identical to a successful one until the
+  // page was refreshed and re-read the (unwritten) database state — which
+  // reads exactly like "the badge goes away, then comes back on refresh."
   function handleOpenBrief(b) {
     setSelected(b);
     if (!isUnseenBrief(b)) return;
@@ -299,13 +317,25 @@ export default function DashboardClient({ briefs }) {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ seen: true }),
-    }).catch((err) => console.error('[dashboard] mark-seen failed:', err));
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`mark-seen failed with status ${res.status}`);
+      })
+      .catch((err) => {
+        console.error('[dashboard] mark-seen failed:', err);
+        // Roll back — the row goes back to looking unseen, matching what
+        // actually happened server-side, instead of lying to the producer
+        // until their next refresh does it for us.
+        setRows((cur) => cur.map((row) => (row.id === b.id ? { ...row, seenAt: b.seenAt || null } : row)));
+        setSelected((cur) => (cur && cur.id === b.id ? { ...cur, seenAt: b.seenAt || null } : cur));
+      });
   }
 
   async function handleAddNote(id) {
     const text = noteDraft.trim();
     if (!text) return;
     setNoteBusy(true);
+    setNoteError(false);
     try {
       const res = await fetch(`/api/dashboard/briefs/${id}/notes`, {
         method: 'POST',
@@ -319,6 +349,10 @@ export default function DashboardClient({ briefs }) {
       setNoteDraft('');
     } catch (err) {
       console.error(err);
+      // Was silent before — deliberately keep noteDraft as-is (not cleared)
+      // so the note text isn't lost, and surface the failure in the UI
+      // instead of the input just quietly going back to normal.
+      setNoteError(true);
     } finally {
       setNoteBusy(false);
     }
@@ -356,8 +390,17 @@ export default function DashboardClient({ briefs }) {
     return filtered.filter((b) => (b.status || 'todo') === statusFilter);
   }, [filtered, statusFilter]);
 
+  const searched = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return visible;
+    return visible.filter((b) => {
+      const haystack = [b.companyName, b.contactPerson, b.contactEmail].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [visible, searchQuery]);
+
   const sorted = useMemo(() => {
-    const list = visible.slice();
+    const list = searched.slice();
     list.sort((a, b) => {
       let av = a[sortField] || '';
       let bv = b[sortField] || '';
@@ -366,7 +409,7 @@ export default function DashboardClient({ briefs }) {
       return 0;
     });
     return list;
-  }, [visible, sortField, sortDir]);
+  }, [searched, sortField, sortDir]);
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -424,7 +467,7 @@ export default function DashboardClient({ briefs }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20, alignItems: 'center' }}>
         {RANGES.map((r) => (
           <button
             key={r.key}
@@ -438,6 +481,32 @@ export default function DashboardClient({ briefs }) {
             {r.label}
           </button>
         ))}
+        {/* Free-text search — filters on top of whichever range/status
+            filter is already active, rather than replacing them, so
+            "find this client within the last month" still works. */}
+        <div style={{ marginLeft: 'auto', position: 'relative', minWidth: 220 }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+            placeholder="Zoek op bedrijf, contactpersoon of e-mail…"
+            style={{ width: '100%', border: '1px solid #C9C5B9', borderRadius: 999, padding: '8px 14px', fontSize: 12.5, background: '#FFFFFF' }}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              title="Zoekopdracht wissen"
+              aria-label="Zoekopdracht wissen"
+              style={{
+                position: 'absolute', top: '50%', right: 8, transform: 'translateY(-50%)', border: 'none', background: 'transparent',
+                color: '#8C8880', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 2,
+              }}
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 26 }} className="tfa-stats-grid">
@@ -505,7 +574,7 @@ export default function DashboardClient({ briefs }) {
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         {unseen && (
                           <span
-                            title="Nieuw — nog niet bekeken"
+                            title="Nieuw: nog niet bekeken"
                             style={{ width: 8, height: 8, borderRadius: '50%', background: '#E6C858', flex: 'none', boxShadow: '0 0 0 3px rgba(230,200,88,.35)' }}
                           />
                         )}
@@ -519,7 +588,7 @@ export default function DashboardClient({ briefs }) {
                       </div>
                     </td>
                     <td style={{ padding: '12px 16px' }}>{b.hoofdspotLength || '20'}″</td>
-                    <td style={{ padding: '12px 16px', color: b.assignedTo ? '#1D1D1D' : '#9C9890' }}>{b.assignedTo || '—'}</td>
+                    <td style={{ padding: '12px 16px', color: b.assignedTo ? '#1D1D1D' : '#9C9890' }}>{b.assignedTo || 'Niet toegewezen'}</td>
                     <td style={{ padding: '12px 16px', color: due.color, fontWeight: due.overdue ? 700 : 400 }}>
                       {due.overdue ? '⚠ ' : ''}{due.label}
                     </td>
@@ -575,33 +644,18 @@ export default function DashboardClient({ briefs }) {
                 <button type="button" onClick={() => setSelected(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer', flex: 'none' }}>✕</button>
               </div>
 
-              {/* De-stacked meta row: status + production state sit
-                  together on their own line (what the badges actually
-                  mean), and the Frame.io shortcut — a different kind of
-                  thing, a link not a status — gets its own line below with
-                  room to breathe, instead of all three being crammed into
-                  one wrapping row right under the company name. */}
+              {/* Minimal header: just the workflow status here — the
+                  approval badge and the Frame.io link both already show up
+                  one tab away (Productie & review carries its own
+                  "Goedgekeurd" badge right on the tab button below, and the
+                  full approval/Frame.io detail lives in that tab's content),
+                  so repeating them again in a standalone stack right under
+                  the company name was pure duplication, not information.
+                  This used to be a 4-row stack (name, status, approved
+                  badge, Frame.io link) before the tabs even started. */}
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <StatusSelect brief={selected} onChange={handleStatusChange} />
-                <ProductionBadge brief={selected} />
               </div>
-              {selected.frameioLink && (
-                <div style={{ marginTop: 8 }}>
-                  <a
-                    href={selected.frameioLink}
-                    target="_blank"
-                    rel="noreferrer"
-                    onClick={(e) => e.stopPropagation()}
-                    style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      fontSize: 11.5, fontWeight: 600, color: '#1F6F8C', background: 'rgba(31,111,140,.1)',
-                      borderRadius: 999, padding: '5px 12px', textDecoration: 'none', whiteSpace: 'nowrap',
-                    }}
-                  >
-                    🎬 Open Frame.io
-                  </a>
-                </div>
-              )}
 
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 16, borderBottom: '1px solid #EEECE3', paddingBottom: 10 }}>
                 {MODAL_TABS.map((t) => {
@@ -671,7 +725,7 @@ export default function DashboardClient({ briefs }) {
                               <div style={{ marginTop: 6, paddingTop: 6, borderTop: '1px solid #F3F1EA', display: 'flex', flexDirection: 'column', gap: 4 }}>
                                 {r.feedback.map((f) => (
                                   <div key={f.id} style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5 }}>
-                                    <span style={{ color: '#9C9890', fontSize: 11 }}>{formatDateTime(f.createdAt)} — </span>
+                                    <span style={{ color: '#9C9890', fontSize: 11 }}>{formatDateTime(f.createdAt)}: </span>
                                     {f.text}
                                   </div>
                                 ))}
@@ -684,9 +738,26 @@ export default function DashboardClient({ briefs }) {
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       <div>
-                        <label style={{ fontSize: 11, fontWeight: 600, color: '#8C8880', display: 'block', marginBottom: 4 }}>
-                          Frame.io-link {rounds.length > 0 ? '(zelfde link, alleen aanpassen indien nodig)' : ''}
-                        </label>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+                          <label style={{ fontSize: 11, fontWeight: 600, color: '#8C8880' }}>
+                            Frame.io-link {rounds.length > 0 ? '(zelfde link, alleen aanpassen indien nodig)' : ''}
+                          </label>
+                          {/* Moved here from the modal header, where it used to sit as its
+                              own standalone row above the tabs — this is where the link
+                              actually lives and gets edited, so opening it from right next
+                              to that field reads clearer than a disconnected header chip. */}
+                          {selected.frameioLink && (
+                            <a
+                              href={selected.frameioLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              style={{ fontSize: 11, fontWeight: 600, color: '#1F6F8C', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                            >
+                              🎬 Open Frame.io ↗
+                            </a>
+                          )}
+                        </div>
                         <div style={{ display: 'flex', gap: 8 }}>
                           <input
                             type="text"
@@ -712,6 +783,11 @@ export default function DashboardClient({ briefs }) {
                       <div style={{ fontSize: 11, color: '#8C8880' }}>
                         Voegt nu ({formatDateTime(new Date().toISOString())}) toe als nieuwe map binnen dezelfde Frame.io-link.
                       </div>
+                      {reviewError && (
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#C2513F' }}>
+                          Delen is niet gelukt, probeer het opnieuw.
+                        </div>
+                      )}
                     </div>
                   </>
                 );
@@ -812,6 +888,11 @@ export default function DashboardClient({ briefs }) {
                       Toevoegen
                     </button>
                   </div>
+                  {noteError && (
+                    <div style={{ marginTop: 8, fontSize: 12, fontWeight: 600, color: '#C2513F' }}>
+                      Opslaan is niet gelukt, probeer het opnieuw.
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -849,7 +930,7 @@ export default function DashboardClient({ briefs }) {
                         <div key={t.id || i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: '#FBF0C8', borderRadius: 8 }}>
                           <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#E6C858', fontSize: 10, fontWeight: 700, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</div>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 700 }}>{t.title || 'Onbekende track'}{t.artist ? ` — ${t.artist}` : ''}</div>
+                            <div style={{ fontSize: 12.5, fontWeight: 700 }}>{t.title || 'Onbekende track'}{t.artist ? ` (${t.artist})` : ''}</div>
                             <div style={{ fontSize: 11, color: '#8C6D1F', fontWeight: 600 }}>{t.playlistName || 'categorie onbekend'}</div>
                           </div>
                         </div>

@@ -191,7 +191,7 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
       await onConfirm(staged);
       setStaged([]);
     } catch (e) {
-      setError('Toevoegen is niet gelukt — probeer het opnieuw.');
+      setError('Toevoegen is niet gelukt, probeer het opnieuw.');
     } finally {
       setBusy(false);
     }
@@ -214,7 +214,7 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
           Sleep {kind === 'music' ? 'muziekbestanden' : 'stem-audio'} hierheen
         </div>
         <div style={{ fontSize: 12.5, color: '#8C8880', marginTop: 4 }}>
-          of klik om te bladeren — kies één bestand of meerdere tegelijk, allebei werkt hier
+          of klik om te bladeren: kies één bestand of meerdere tegelijk, allebei werkt hier
         </div>
         <input
           ref={fileInputRef}
@@ -229,7 +229,7 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
       {staged.length > 0 && (
         <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <div style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850' }}>
-            {staged.length} bestand{staged.length === 1 ? '' : 'en'} klaar om toe te voegen — controleer de velden hieronder:
+            {staged.length} bestand{staged.length === 1 ? '' : 'en'} klaar om toe te voegen, controleer de velden hieronder:
           </div>
           {kind === 'music' && staged.length > 1 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px' }}>
@@ -451,7 +451,7 @@ function TrackRow({ track, categories, selected, onToggleSelect, activePreviewId
       await updateTrackAction(track.id, formData);
       setEditing(false);
     } catch (err) {
-      setSaveError('Opslaan is niet gelukt — probeer het opnieuw.');
+      setSaveError('Opslaan is niet gelukt, probeer het opnieuw.');
     } finally {
       setSaving(false);
     }
@@ -584,7 +584,7 @@ function VoiceRow({ voice, allTags, onAddTag, selected, onToggleSelect, activePr
       await updateVoiceAction(voice.id, formData);
       setEditing(false);
     } catch (err) {
-      setSaveError('Opslaan is niet gelukt — probeer het opnieuw.');
+      setSaveError('Opslaan is niet gelukt, probeer het opnieuw.');
     } finally {
       setSaving(false);
     }
@@ -867,7 +867,7 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
             <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
           )}
           {items.length === 0 && (
-            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen tracks — ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
+            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen tracks, ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
           )}
         </div>
       ) : (
@@ -877,7 +877,7 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
             <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
           )}
           {items.length === 0 && (
-            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen stemmen — ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
+            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen stemmen, ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
           )}
         </div>
       )}

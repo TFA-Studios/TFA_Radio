@@ -223,7 +223,7 @@ export default function DetailsPage({ params }) {
       </div>
 
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
-        <label className="field-label">Moet er verplichte wettelijke tekst in? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel — laat leeg als dit niet van toepassing is)</span></label>
+        <label className="field-label">Moet er verplichte wettelijke tekst in? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel, laat leeg als dit niet van toepassing is)</span></label>
         <textarea
           style={{ minHeight: 56 }}
           maxLength={FIELD_LIMITS.disclaimerText}
@@ -233,14 +233,14 @@ export default function DetailsPage({ params }) {
         />
         <div className="hint" style={{ marginTop: 5 }}>
           Alleen invullen als er een tekst is die er om wettelijke of contractuele redenen letterlijk in moet staan. Deze
-          tekst wordt woordelijk overgenomen in het script en blijft daarna overal zichtbaar — voor jou en voor TFA.
+          tekst wordt woordelijk overgenomen in het script en blijft daarna overal zichtbaar, voor jou en voor TFA.
         </div>
       </div>
 
 
       <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
         <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={submit} disabled={generating}>
-          {generating ? 'Script wordt gegenereerd…' : 'Akkoord — verder naar het scriptvoorstel'}
+          {generating ? 'Script wordt gegenereerd…' : 'Akkoord: verder naar het scriptvoorstel'}
         </button>
       </div>
     </StepShell>

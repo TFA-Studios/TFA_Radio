@@ -274,7 +274,7 @@ export default function VoicePage({ params }) {
       {phase === 'questions' ? (
         <>
           <p style={{ fontSize: 13.5, lineHeight: 1.55, color: '#5C5850', margin: '0 0 26px' }}>
-            Beantwoord een paar korte vragen — TFA stelt daarna twee of drie stemmen voor die daarbij passen.
+            Beantwoord een paar korte vragen, dan stelt TFA daarna twee of drie stemmen voor die daarbij passen.
           </p>
           <div style={{ marginTop: 10 }}>
             <label className="field-label">Geslacht van de stem</label>
@@ -391,7 +391,7 @@ export default function VoicePage({ params }) {
           </div>
           <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
             <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} disabled={!form.selectedVoiceId} onClick={next}>
-              Bevestigen — verder naar de muziek
+              Bevestigen: verder naar de muziek
             </button>
           </div>
         </>

@@ -8,7 +8,7 @@ import useMinDelay from '../../../../components/useMinDelay';
 import { TONE_LABELS, estimateSeconds, wordCountOf, variationsCountOf } from '../../../../components/flowData';
 import { diffWords, DiffPreview } from '../../../../components/textDiff';
 
-const DEFAULT_DISCLAIMER = 'Nog geen verplichte tekst ontvangen — deze verschijnt hier zodra ingevuld in de brief.';
+const DEFAULT_DISCLAIMER = 'Nog geen verplichte tekst ontvangen, deze verschijnt hier zodra ingevuld in de brief.';
 // Mirrors lib/db.js's MAX_SCRIPT_HISTORY — how many script generations a
 // client can request per brief before "Opnieuw genereren" is disabled.
 const MAX_VERSIONS = 3;
@@ -369,15 +369,15 @@ export default function ScriptPage({ params }) {
   const seconds = estimateSeconds(words);
   let statusLabel = 'Past goed binnen ' + target + ' seconden.';
   let barColor = '#1D1D1D';
-  if (seconds > target * 1.2) { statusLabel = 'Te lang — graag inkorten.'; barColor = '#C2513F'; }
-  else if (seconds > target * 1.05) { statusLabel = 'Net iets te lang — bekort het wat.'; barColor = '#383209'; }
+  if (seconds > target * 1.2) { statusLabel = 'Te lang, graag inkorten.'; barColor = '#C2513F'; }
+  else if (seconds > target * 1.05) { statusLabel = 'Net iets te lang, bekort het wat.'; barColor = '#383209'; }
   const barPct = Math.min((seconds / target) * 100, 140) + '%';
   const unchanged = trimmed === generatedText.trim();
 
   let approveLabel;
   if (!hasVariation) approveLabel = unchanged ? 'Goedkeuren, dit is prima zo' : 'Wijzigingen opslaan en goedkeuren';
   else if (!scriptApproved) approveLabel = unchanged ? 'Goedkeuren en verder naar de variatie' + (variationCount > 1 ? 's' : '') : 'Wijzigingen opslaan en verder naar de variatie' + (variationCount > 1 ? 's' : '');
-  else approveLabel = unchanged ? 'Goedgekeurd ✓ — wijzigingen opslaan' : 'Wijzigingen opslaan';
+  else approveLabel = unchanged ? 'Goedgekeurd ✓: wijzigingen opslaan' : 'Wijzigingen opslaan';
 
   return (
     <StepShell
@@ -389,7 +389,7 @@ export default function ScriptPage({ params }) {
       showWipe
       kicker="Klaar voor je review"
       title="Jouw script"
-      hint="Zo vertelt TFA jouw verhaal in je hoofdspot — volledig geschreven op basis van je brief."
+      hint="Zo vertelt TFA jouw verhaal in je hoofdspot, volledig geschreven op basis van je brief."
       backHref={`/brief/${id}/details`}
       backLabel="Terug naar de brief"
     >
@@ -420,7 +420,7 @@ export default function ScriptPage({ params }) {
               display: 'inline-block', animation: 'tfa-script-spin .7s linear infinite', flex: 'none',
             }}
           />
-          TFA&apos;s AI schrijft een scriptvoorstel op basis van je brief — dit kan een paar seconden duren…
+          TFA&apos;s AI schrijft een scriptvoorstel op basis van je brief, dit kan een paar seconden duren…
         </div>
       )}
 
@@ -496,7 +496,7 @@ export default function ScriptPage({ params }) {
         </div>
         <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed #E6C858' }}>
           <div style={{ fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: '#383209', fontWeight: 500 }}>
-            Verplichte tekst uit je brief — TFA neemt dit altijd op
+            Verplichte tekst uit je brief: TFA neemt dit altijd op
           </div>
           <div style={{ fontSize: 12.5, color: hasRealDisclaimer ? '#1D1D1D' : '#9C9890', marginTop: 4, lineHeight: 1.5 }}>&ldquo;{disclaimerText}&rdquo;</div>
         </div>
@@ -508,7 +508,7 @@ export default function ScriptPage({ params }) {
         </div>
         <h3 style={{ fontSize: 14, fontWeight: 600, margin: '6px 0 4px' }}>Wil je iets aanpassen?</h3>
         <p style={{ fontSize: 12.5, color: '#5C5850', margin: '0 0 10px', lineHeight: 1.5 }}>
-          Dit vak hieronder is van jou: typ er zelf in om woorden toe te voegen, te wijzigen of te verwijderen — precies
+          Dit vak hieronder is van jou: typ er zelf in om woorden toe te voegen, te wijzigen of te verwijderen, precies
           zoals je zelf een tekstbericht zou aanpassen. Alles wat je typt wordt automatisch bewaard, je hoeft dus nergens
           apart op &ldquo;opslaan&rdquo; te klikken. Let er wel op dat het script in {spotLength} seconden moet blijven passen.
         </p>
@@ -558,11 +558,11 @@ export default function ScriptPage({ params }) {
           <h3 style={{ fontWeight: 600, fontSize: 18, margin: '8px 0 4px' }}>{variationCount > 1 ? 'Jouw variaties' : 'Jouw variatie'}</h3>
           <p style={{ fontSize: 12.5, color: '#5C5850', margin: '0 0 14px', lineHeight: 1.5 }}>
             Je gaf bij levering aan {variationCount > 1 ? `${variationCount} variaties` : 'ook een variatie'} nodig te hebben. Hieronder staat je zojuist
-            goedgekeurde script {variationCount > 1 ? `${variationCount}x` : 'nogmaals'} — dit is dezelfde tekst als hierboven, klaar om aan te passen.
+            goedgekeurde script {variationCount > 1 ? `${variationCount}x` : 'nogmaals'}: dit is dezelfde tekst als hierboven, klaar om aan te passen.
             Typ zelf de stukjes tekst aan die {variationCount > 1 ? 'per variatie' : 'in deze variatie'} anders moeten zijn; de rest laat je gewoon staan.
             {variationCount > 1 ? ' Je kunt gerust tussen de tabbladen hierboven wisselen' : ''}
-            {variationCount > 1 ? ' — elke aanpassing wordt automatisch bewaard zodra je typt, ook als je meteen naar een ander tabblad gaat.' : ' Ook hier wordt elke aanpassing automatisch bewaard zodra je typt.'}
-            {' '}Er is geen aparte knop om op te slaan of goed te keuren — als er &ldquo;✓ Opgeslagen&rdquo; staat, is het klaar.
+            {variationCount > 1 ? ', elke aanpassing wordt automatisch bewaard zodra je typt, ook als je meteen naar een ander tabblad gaat.' : ' Ook hier wordt elke aanpassing automatisch bewaard zodra je typt.'}
+            {' '}Er is geen aparte knop om op te slaan of goed te keuren: als er &ldquo;✓ Opgeslagen&rdquo; staat, is het klaar.
           </p>
 
           {variationCount > 1 && (
@@ -598,8 +598,8 @@ export default function ScriptPage({ params }) {
             const varSeconds = estimateSeconds(varWords);
             let varStatusLabel = 'Past goed binnen ' + target + ' seconden.';
             let varBarColor = '#1D1D1D';
-            if (varSeconds > target * 1.2) { varStatusLabel = 'Te lang — graag inkorten.'; varBarColor = '#C2513F'; }
-            else if (varSeconds > target * 1.05) { varStatusLabel = 'Net iets te lang — bekort het wat.'; varBarColor = '#383209'; }
+            if (varSeconds > target * 1.2) { varStatusLabel = 'Te lang, graag inkorten.'; varBarColor = '#C2513F'; }
+            else if (varSeconds > target * 1.05) { varStatusLabel = 'Net iets te lang, bekort het wat.'; varBarColor = '#383209'; }
             const varBarPct = Math.min((varSeconds / target) * 100, 140) + '%';
             const varUnchanged = varTrimmed === scriptText.trim();
             const tokens = diffWords(scriptText, varText);
@@ -620,7 +620,7 @@ export default function ScriptPage({ params }) {
                   <label className="field-label">Wat is er veranderd?</label>
                   {varUnchanged ? (
                     <div className="hint">
-                      Nog geen wijzigingen — pas de tekst hierboven aan op het punt waar deze variatie moet verschillen van je hoofdscript.
+                      Nog geen wijzigingen, pas de tekst hierboven aan op het punt waar deze variatie moet verschillen van je hoofdscript.
                     </div>
                   ) : (
                     <div style={{ background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '12px 14px', fontSize: 13.5, lineHeight: 1.65, color: '#1D1D1D' }}>

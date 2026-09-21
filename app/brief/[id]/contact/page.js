@@ -82,8 +82,19 @@ export default function ContactPage({ params }) {
   // "Bedankt, Nog geen bedrijfsnaam!", and a blank/invalid contactEmail
   // means the submission confirmation silently has nowhere to send (see
   // lib/email.js's recipientsFor()) with no error surfaced anywhere.
-  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail.trim());
-  const canContinue = !!form.companyName.trim() && !!form.contactPerson.trim() && emailLooksValid;
+  const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const emailLooksValid = EMAIL_RE.test(form.contactEmail.trim());
+  // Extra contacts had NO validation at all before — a typo'd address here
+  // just meant that person silently never got the confirmation email once
+  // the brief was submitted, with no warning anywhere. Only rows where a
+  // name was actually entered are required to also have a valid email; a
+  // fully blank row (added by accident, never filled in) doesn't block.
+  function additionalContactEmailValid(c) {
+    if (!c.name.trim() && !c.email.trim()) return true;
+    return EMAIL_RE.test(c.email.trim());
+  }
+  const additionalContactsValid = form.additionalContacts.every(additionalContactEmailValid);
+  const canContinue = !!form.companyName.trim() && !!form.contactPerson.trim() && emailLooksValid && additionalContactsValid;
 
   async function next() {
     if (!canContinue) return;
@@ -124,6 +135,11 @@ export default function ContactPage({ params }) {
             <div style={{ flex: 1 }}>
               <label className="field-label">E-mailadres</label>
               <input type="text" value={c.email} placeholder="naam@bedrijf.nl" onChange={(e) => updateContact(i, 'email', e.target.value)} />
+              {!additionalContactEmailValid(c) && (
+                <div style={{ fontSize: 11.5, color: '#C2513F', marginTop: 4 }}>
+                  Vul een geldig e-mailadres in, anders ontvangt deze persoon geen bevestiging.
+                </div>
+              )}
             </div>
             <button
               type="button"
@@ -153,7 +169,9 @@ export default function ContactPage({ params }) {
       <div style={{ marginTop: 36, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         {!canContinue && (
           <div style={{ fontSize: 12, color: '#8C8880' }}>
-            Vul je bedrijfsnaam, contactpersoon en een geldig e-mailadres in om verder te gaan.
+            {!additionalContactsValid && !!form.companyName.trim() && !!form.contactPerson.trim() && emailLooksValid
+              ? 'Vul een geldig e-mailadres in bij elke extra contactpersoon, of laat het naamveld leeg.'
+              : 'Vul je bedrijfsnaam, contactpersoon en een geldig e-mailadres in om verder te gaan.'}
           </div>
         )}
         <button
@@ -163,7 +181,7 @@ export default function ContactPage({ params }) {
           onClick={next}
           disabled={!canContinue}
         >
-          Volgende — verder naar je commercial
+          Volgende: verder naar je commercial
         </button>
       </div>
     </StepShell>

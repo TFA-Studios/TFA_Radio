@@ -330,7 +330,7 @@ export default function MusicPage({ params }) {
                           <button
                             type="button"
                             onClick={(e) => { e.stopPropagation(); toggleTrack(track, pl); }}
-                            title={selected ? 'Track gekozen — klik om te verwijderen' : 'Kies deze track'}
+                            title={selected ? 'Track gekozen, klik om te verwijderen' : 'Kies deze track'}
                             className="tfa-track-select"
                             style={{
                               flex: 'none', width: 26, height: 26, borderRadius: '50%',
@@ -403,7 +403,7 @@ export default function MusicPage({ params }) {
 
       <div style={{ marginTop: 20, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
         <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} disabled={selectedTracks.length === 0} onClick={next}>
-          Bevestigen — verder naar het overzicht
+          Bevestigen: verder naar het overzicht
         </button>
       </div>
       <p style={{ marginTop: 20, fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>Twijfel je tussen twee tracks? Je kunt je keuze altijd nog aanpassen voordat je alles verstuurt.</p>

@@ -110,9 +110,32 @@ function TrendCard({ months }) {
   );
 }
 
-export default async function ReportsPage() {
-  const briefs = await listBriefs();
+// Custom date-range filter — the reports page used to always aggregate the
+// entire brief history with no way to check "how did last quarter go"
+// short of eyeballing the fixed 6-month trend chart. Reads plain
+// `?from=&to=` query params (a native GET form below submits them) so the
+// page stays a server component with no client-side state to manage; the
+// export link is updated to carry the same range through to the CSV.
+function inRange(brief, fromISO, toISO) {
+  if (!brief.createdAt) return !fromISO && !toISO;
+  const created = brief.createdAt.slice(0, 10);
+  if (fromISO && created < fromISO) return false;
+  if (toISO && created > toISO) return false;
+  return true;
+}
+
+export default async function ReportsPage({ searchParams }) {
+  const from = (searchParams && searchParams.from) || '';
+  const to = (searchParams && searchParams.to) || '';
+  const hasRange = !!(from || to);
+
+  const allBriefs = await listBriefs();
+  const briefs = hasRange ? allBriefs.filter((b) => inRange(b, from, to)) : allBriefs;
   const report = buildReportData(briefs);
+
+  const exportHref = hasRange
+    ? `/api/dashboard/reports/export?${from ? `from=${from}&` : ''}${to ? `to=${to}` : ''}`
+    : '/api/dashboard/reports/export';
 
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
@@ -134,26 +157,59 @@ export default async function ReportsPage() {
             Rapporten
           </h1>
           <a
-            href="/api/dashboard/reports/export"
+            href={exportHref}
             style={{
               fontSize: 13, fontWeight: 600, color: '#1D1D1D', background: '#E6C858', textDecoration: 'none',
               borderRadius: 10, padding: '10px 16px', whiteSpace: 'nowrap',
             }}
           >
-            ⬇ Exporteer alle briefs (CSV)
+            ⬇ Exporteer {hasRange ? 'deze periode' : 'alle briefs'} (CSV)
           </a>
         </div>
-        <p style={{ fontSize: 13.5, color: '#5C5850', margin: '0 0 24px', maxWidth: 720, lineHeight: 1.5 }}>
-          Een overzicht over al je briefs — hoeveel er binnenkomen, waar ze in het proces staan, en hoe de AI-scriptgeneratie
+        <p style={{ fontSize: 13.5, color: '#5C5850', margin: '0 0 16px', maxWidth: 720, lineHeight: 1.5 }}>
+          Een overzicht over al je briefs: hoeveel er binnenkomen, waar ze in het proces staan, en hoe de AI-scriptgeneratie
           wordt gebruikt. De CSV-export bevat elke brief als aparte rij, klaar om te openen in Excel of Google Sheets.
         </p>
+
+        {/* Custom date range — a plain GET form, no client JS needed: the
+            browser re-navigates to this same page with ?from=&to= and the
+            server component above filters before building the report. */}
+        <form
+          method="get"
+          style={{
+            display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap', marginBottom: 24,
+            background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', boxShadow: '0 1px 10px rgba(29,29,29,.05)',
+          }}
+        >
+          <div>
+            <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Van</label>
+            <input type="date" name="from" defaultValue={from} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Tot</label>
+            <input type="date" name="to" defaultValue={to} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
+          </div>
+          <button type="submit" style={{ border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600, padding: '9px 16px', cursor: 'pointer' }}>
+            Periode toepassen
+          </button>
+          {hasRange && (
+            <a href="/dashboard/reports" style={{ fontSize: 12.5, color: '#8C8880', textDecoration: 'underline' }}>
+              Wis filter (toon alles)
+            </a>
+          )}
+          {hasRange && (
+            <span style={{ fontSize: 12, color: '#5C5850', marginLeft: 'auto' }}>
+              {report.total} brief{report.total === 1 ? '' : 's'} in deze periode
+            </span>
+          )}
+        </form>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 14 }} className="tfa-stats-grid">
           <StatTile label="Totaal briefs" value={report.total} />
           <StatTile label="Nieuw deze maand" value={report.newThisMonth} color="#1F6F8C" />
           <StatTile
             label="Scripts goedgekeurd"
-            value={report.approvalRate === null ? '—' : `${report.approvalRate}%`}
+            value={report.approvalRate === null ? 'n.v.t.' : `${report.approvalRate}%`}
             color="#1D7A46"
           />
           <StatTile label="Gem. hergeneraties per brief" value={report.avgRegenerations} color="#8C6D1F" />
@@ -162,7 +218,7 @@ export default async function ReportsPage() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 20 }} className="tfa-stats-grid-2">
           <StatTile
             label="Gem. doorlooptijd tot klaar"
-            value={report.avgTurnaroundDays === null ? '—' : `${report.avgTurnaroundDays}d`}
+            value={report.avgTurnaroundDays === null ? 'n.v.t.' : `${report.avgTurnaroundDays}d`}
             color="#1D7A46"
           />
           <StatTile label="Over deadline (nog niet klaar)" value={report.overdueCount} color={report.overdueCount > 0 ? '#C2513F' : '#1D1D1D'} />
@@ -177,7 +233,7 @@ export default async function ReportsPage() {
           <BreakdownCard title="Doelgroep (B2B / B2C)" rows={report.audienceBreakdown} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }} className="tfa-reports-grid">
-          <BreakdownCard title="Scriptgeneratie — bron" rows={report.scriptSourceBreakdown} />
+          <BreakdownCard title="Scriptgeneratie: bron" rows={report.scriptSourceBreakdown} />
           <BreakdownCard title="Variaties gevraagd" rows={report.variationsBreakdown} />
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }} className="tfa-reports-grid">
@@ -190,7 +246,7 @@ export default async function ReportsPage() {
             Muziek & stem
           </h2>
           <p style={{ fontSize: 12.5, color: '#5C5850', margin: 0, maxWidth: 720, lineHeight: 1.5 }}>
-            Wat klanten daadwerkelijk kiezen — handig voor het bijstellen van de playlists en het ontwerpen van nieuwe stemmen.
+            Wat klanten daadwerkelijk kiezen, handig voor het bijstellen van de playlists en het ontwerpen van nieuwe stemmen.
           </p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 14 }} className="tfa-reports-grid">

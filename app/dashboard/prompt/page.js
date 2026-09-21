@@ -28,7 +28,7 @@ export default async function PromptVersionsPage() {
           AI-prompt
         </h1>
         <p style={{ fontSize: 13.5, color: '#5C5850', margin: '0 0 24px', maxWidth: 640, lineHeight: 1.5 }}>
-          Dit stuurt hoe Claude (of Gemini/Ollama) elk scriptvoorstel schrijft — de toon, aanpak en stijl-instructies.
+          Dit stuurt hoe Claude (of Gemini/Ollama) elk scriptvoorstel schrijft: de toon, aanpak en stijl-instructies.
           De klantgegevens zelf en de technische opmaak-eisen blijven altijd hetzelfde; alleen dit gedeelte is aanpasbaar.
           Er is steeds maximaal één versie <b>live</b> tegelijk.
         </p>

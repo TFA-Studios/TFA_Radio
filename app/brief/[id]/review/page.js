@@ -64,6 +64,9 @@ export default function ReviewPage({ params }) {
   }
 
   const isApproved = !!round.approvedAt;
+  // Every round except the current one — see the comment above the
+  // "Geschiedenis" section for why the current round is excluded here.
+  const pastRounds = rounds.filter((r) => r.id !== round.id).slice().reverse();
 
   async function sendFeedback() {
     const text = feedbackText.trim();
@@ -81,7 +84,7 @@ export default function ReviewPage({ params }) {
       setJustSent('feedback');
       await reload();
     } catch (e) {
-      setError('Kon je feedback niet versturen — probeer het nog eens.');
+      setError('Kon je feedback niet versturen, probeer het nog eens.');
     } finally {
       setSubmitting(false);
     }
@@ -111,49 +114,70 @@ export default function ReviewPage({ params }) {
       setJustSent('approved');
       await reload();
     } catch (e) {
-      setError('Kon je goedkeuring niet versturen — probeer het nog eens.');
+      setError('Kon je goedkeuring niet versturen, probeer het nog eens.');
     } finally {
       setSubmitting(false);
     }
   }
 
-  const cardStyle = {
-    background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 16, padding: '28px 30px',
-    boxShadow: '0 10px 32px rgba(230,200,88,.18)', marginBottom: 22,
-  };
-
   return (
     <Shell companyName={companyName} firstName={firstName}>
-      <div style={cardStyle}>
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>
+      {/* One centered "hero" moment instead of a left-aligned status card
+          followed by a whole separate box restating the same thing (the old
+          layout said "Goedgekeurd" in the title, then a full green banner
+          below saying "Je hebt deze versie goedgekeurd..." again). Now the
+          icon, title, timestamp and Frame.io button are one unit, big and
+          centered — a real focal point on the page instead of competing
+          with everything below it — and the approval message lives in the
+          hero's own subtitle rather than getting a second box of its own. */}
+      <div
+        style={{
+          background: isApproved ? '#F0F7EE' : '#FBF9EC',
+          border: '1.5px solid ' + (isApproved ? '#A9CF9E' : '#E6C858'),
+          borderRadius: 20, padding: '38px 30px 32px', marginBottom: 22, textAlign: 'center',
+          boxShadow: isApproved ? '0 10px 32px rgba(58,107,50,.14)' : '0 10px 32px rgba(230,200,88,.18)',
+        }}
+      >
+        <div style={{ position: 'relative', width: 64, height: 64, margin: '0 auto 18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {isApproved && (
+            <span className="tfa-pulse-ring" style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid #6FA85E' }} />
+          )}
+          <span
+            style={{
+              width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 28, background: isApproved ? '#3A6B32' : '#E6C858', color: isApproved ? '#FFFFFF' : '#1D1D1D',
+            }}
+          >
+            {isApproved ? '✓' : '🎬'}
+          </span>
+        </div>
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isApproved ? '#3A6B32' : '#8C6D1F' }}>
           {rounds.length > 1 ? formatRoundLabel(round) : 'Jouw productie'}
         </div>
-        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 24, margin: '10px 0 14px', color: '#1D1D1D' }}>
-          {isApproved ? 'Goedgekeurd' : 'Klaar om te bekijken'}
+        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 28, margin: '10px 0 8px', color: '#1D1D1D' }}>
+          {isApproved ? 'Goedgekeurd, bedankt!' : 'Klaar om te bekijken'}
         </h1>
-        {!isApproved && assignedTo && (
-          <div style={{ fontSize: 12.5, color: '#8C6D1F', marginBottom: 14 }}>🎧 {assignedTo} heeft deze versie voor je klaargezet.</div>
-        )}
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: isApproved ? '#3A6B32' : '#5C5850', margin: '0 auto 20px', maxWidth: 420 }}>
+          {isApproved
+            ? `Je hebt deze versie goedgekeurd op ${formatDateTime(round.approvedAt)}. TFA is op de hoogte en rondt de levering af.`
+            : assignedTo
+              ? `🎧 ${assignedTo} heeft deze versie voor je klaargezet.`
+              : 'Er staat een nieuwe versie voor je klaar om te beluisteren.'}
+        </p>
         <a
           href={brief.frameioLink}
           target="_blank"
           rel="noreferrer"
           className="btn-primary"
-          style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', whiteSpace: 'nowrap', padding: '13px 22px' }}
+          style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', whiteSpace: 'nowrap', padding: '15px 28px', fontSize: 14.5 }}
         >
           Bekijk op Frame.io
         </a>
-        <div style={{ marginTop: 10, fontSize: 12, color: '#8C6D1F' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: isApproved ? '#5C8C52' : '#8C6D1F' }}>
           Gedeeld op {formatDateTime(round.createdAt)}
-          {rounds.length > 1 ? ' — zelfde link als voorheen, open de ' + formatRoundLabel(round).replace(/^Map/, 'map') + ' binnenin.' : ''}
+          {rounds.length > 1 ? ' (zelfde link als voorheen, open de ' + formatRoundLabel(round).replace(/^Map/, 'map') + ' binnenin)' : ''}
         </div>
       </div>
-
-      {isApproved && (
-        <div style={{ background: '#F0F7EE', border: '1.5px solid #A9CF9E', borderRadius: 14, padding: '18px 20px', fontSize: 13.5, color: '#3A6B32', marginBottom: 22 }}>
-          Je hebt deze versie goedgekeurd op {formatDateTime(round.approvedAt)}. TFA is op de hoogte en rondt de levering af.
-        </div>
-      )}
 
       {/* Two clearly separate actions, not one shared row — this used to be
           a single card with a paragraph field and "Feedback versturen" /
@@ -214,7 +238,7 @@ export default function ReviewPage({ params }) {
         {!isApproved && (
           <>
             <div style={{ fontSize: 12, color: '#9C9890', marginBottom: 8 }}>
-              Wil je liever eerst nog iets laten aanpassen? Typ het hieronder — TFA ziet dit direct, en het blijft hier zichtbaar staan. Dit is een aparte stap van goedkeuren hierboven.
+              Wil je liever eerst nog iets laten aanpassen? Typ het hieronder: TFA ziet dit direct, en het blijft hier zichtbaar staan. Dit is een aparte stap van goedkeuren hierboven.
             </div>
             <textarea
               value={feedbackText}
@@ -244,11 +268,20 @@ export default function ReviewPage({ params }) {
 
         {/* Full history, grouped per dated folder (round) — oldest feedback
             and newest feedback both stay visible, split out per round, so
-            it's always clear which feedback belongs to which version. */}
-        {rounds.length > 0 && (
+            it's always clear which feedback belongs to which version. The
+            CURRENT round is deliberately excluded here — it's already
+            shown in full at the top of the page (the hero card above has
+            its date, its approval timestamp, and its Frame.io link), so
+            repeating the exact same "Map van X, gedeeld HH:MM, Goedgekeurd
+            op HH:MM" a second time down here was pure duplication, not new
+            information. This section is now genuinely just what came
+            before, and disappears entirely once there's nothing left to
+            show (a brand-new brief with only one round shows no empty
+            "Geschiedenis" heading over nothing). */}
+        {pastRounds.length > 0 && (
           <div style={{ marginTop: isApproved ? 0 : 18, paddingTop: isApproved ? 0 : 16, borderTop: isApproved ? 'none' : '1px solid #EEECE3' }}>
-            <div style={{ fontSize: 11.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', marginBottom: 10 }}>Geschiedenis</div>
-            {rounds.slice().reverse().map((r) => (
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', marginBottom: 10 }}>Eerdere versies</div>
+            {pastRounds.map((r) => (
               <div key={r.id} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1D1D1D' }}>
                   {formatRoundLabel(r)}
@@ -261,7 +294,7 @@ export default function ReviewPage({ params }) {
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {r.feedback.map((f) => (
                       <div key={f.id} style={{ fontSize: 13, color: '#5C5850', lineHeight: 1.5 }}>
-                        <span style={{ color: '#9C9890', fontSize: 11.5 }}>{formatDateTime(f.createdAt)} — </span>
+                        <span style={{ color: '#9C9890', fontSize: 11.5 }}>{formatDateTime(f.createdAt)}: </span>
                         {f.text}
                       </div>
                     ))}
@@ -279,6 +312,17 @@ export default function ReviewPage({ params }) {
         <div style={{ marginTop: 14, fontSize: 12.5, color: '#8C6D1F' }}>Je feedback is verstuurd naar TFA.</div>
       )}
       {error && <div style={{ marginTop: 14, fontSize: 12.5, color: '#C2513F' }}>{error}</div>}
+
+      <style jsx>{`
+        @keyframes tfa-pulse-ring {
+          0% { transform: scale(1); opacity: .7; }
+          100% { transform: scale(1.7); opacity: 0; }
+        }
+        .tfa-pulse-ring { animation: tfa-pulse-ring 1.8s ease-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .tfa-pulse-ring { animation: none; }
+        }
+      `}</style>
     </Shell>
   );
 }
@@ -296,7 +340,7 @@ export default function ReviewPage({ params }) {
 // any brief, so it needs no per-client data. Skips rotating (shows one
 // fixed line) under prefers-reduced-motion.
 const STUDIO_TIPS = [
-  'Elk script wordt hardop ingelezen voordat het de studio ingaat — zo klinkt het nooit als opgelezen tekst.',
+  'Elk script wordt hardop ingelezen voordat het de studio ingaat, zo klinkt het nooit als opgelezen tekst.',
   'Stem en muziek worden pas op elkaar afgestemd zodra allebei er zijn, nooit andersom.',
   'Zelfs 20 seconden radio doorloopt bij ons script, opname, montage én mix.',
   'We luisteren elk eindresultaat minstens twee keer terug voordat het naar jou toe gaat.',
@@ -322,18 +366,22 @@ function InProductionCard({ brief, assignedTo }) {
 
   return (
     <div>
+      {/* Centered hero, matching the "klaar om te bekijken" / "goedgekeurd"
+          states below (see the main ReviewPage return) so all three states
+          of this page — busy, in review, approved — read as one consistent
+          design instead of this one being a different, left-aligned layout. */}
       <div
         style={{
-          background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 16, padding: '30px 30px 26px',
-          boxShadow: '0 10px 32px rgba(230,200,88,.18)', marginBottom: 22,
+          background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 20, padding: '38px 30px 32px',
+          boxShadow: '0 10px 32px rgba(230,200,88,.18)', marginBottom: 22, textAlign: 'center',
         }}
       >
-        <div className="tfa-waveform" aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', gap: 5, height: 34, marginBottom: 18 }}>
+        <div className="tfa-waveform" aria-hidden="true" style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 5, height: 40, marginBottom: 18 }}>
           {[0, 1, 2, 3, 4, 5, 6].map((i) => (
             <span
               key={i}
               style={{
-                display: 'block', width: 5, borderRadius: 3, background: '#E6C858',
+                display: 'block', width: 6, borderRadius: 3, background: '#E6C858',
                 animation: 'tfa-wave 1.1s ease-in-out infinite',
                 animationDelay: (i * -0.13).toFixed(2) + 's',
               }}
@@ -343,18 +391,18 @@ function InProductionCard({ brief, assignedTo }) {
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>
           TFA is aan het werk
         </div>
-        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 24, margin: '10px 0 10px', color: '#1D1D1D' }}>
+        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 28, margin: '10px 0 10px', color: '#1D1D1D' }}>
           Je {spotLength}″ commercial wordt opgenomen
         </h1>
-        <p style={{ fontSize: 14, lineHeight: 1.6, color: '#5C5850', margin: 0, maxWidth: 480 }}>
-          Er is nog niets te bekijken — en dat is helemaal normaal op dit moment. Zodra de eerste versie klaarstaat, ontvang
+        <p style={{ fontSize: 14, lineHeight: 1.6, color: '#5C5850', margin: '0 auto', maxWidth: 460 }}>
+          Er is nog niets te bekijken, en dat is helemaal normaal op dit moment. Zodra de eerste versie klaarstaat, ontvang
           je automatisch een e-mail met een link om ‘m te beluisteren, feedback te geven of goed te keuren. Deze pagina
-          werkt dan meteen mee — je hoeft ‘m niet te verversen of ergens anders naar te zoeken.
+          werkt dan meteen mee: je hoeft ‘m niet te verversen of ergens anders naar te zoeken.
         </p>
         <div
           key={tipIdx}
           className="tfa-tip-fade"
-          style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed #E6C858', fontSize: 12.5, color: '#8C6D1F', lineHeight: 1.5, maxWidth: 480 }}
+          style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed #E6C858', fontSize: 12.5, color: '#8C6D1F', lineHeight: 1.5, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}
         >
           ✦ {STUDIO_TIPS[tipIdx]}
         </div>
@@ -436,7 +484,7 @@ function Shell({ companyName, firstName, children }) {
         </div>
         {companyName && (
           <div style={{ fontSize: 20, fontWeight: 700, color: '#1D1D1D', marginBottom: 22, lineHeight: 1.4 }}>
-            {firstName ? `Hallo ${firstName} — h` : 'H'}ier is de status van je {companyName}-commercial
+            {firstName ? `Hallo ${firstName}, h` : 'H'}ier is de status van je {companyName}-commercial
           </div>
         )}
         {children}

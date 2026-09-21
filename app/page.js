@@ -25,7 +25,7 @@ export default function HomePage() {
               Van brief tot uitzending, in 7 simpele stappen.
             </h1>
             <p style={{ fontSize: 17, lineHeight: 1.6, color: '#DEDCD7', maxWidth: 620, margin: '0 auto 36px' }}>
-              Vertel ons over je merk, je product en je doelgroep. TFA schrijft het script, kiest de stem en de muziek — jij keurt
+              Vertel ons over je merk, je product en je doelgroep. TFA schrijft het script, kiest de stem en de muziek, en jij keurt
               alles goed voordat het de studio in gaat.
             </p>
             <Link
@@ -37,7 +37,7 @@ export default function HomePage() {
               <span className="tfa-cta-arrow" aria-hidden="true">→</span>
             </Link>
             <div style={{ marginTop: 16, fontSize: 12.5, color: '#8C8880' }}>
-              Geen account nodig — je krijgt direct je eigen brieflink.
+              Geen account nodig: je krijgt direct je eigen brieflink.
             </div>
           </main>
         </div>

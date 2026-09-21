@@ -35,7 +35,7 @@ export default function StartPage() {
   if (error) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#DEDCD7' }}>
-        <p style={{ fontSize: 14, color: '#5C5850' }}>Kon geen nieuwe brief aanmaken — probeer het opnieuw.</p>
+        <p style={{ fontSize: 14, color: '#5C5850' }}>Kon geen nieuwe brief aanmaken, probeer het opnieuw.</p>
       </div>
     );
   }

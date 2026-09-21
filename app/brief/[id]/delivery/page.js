@@ -55,7 +55,18 @@ export default function DeliveryPage({ params }) {
     schedulePatch(patchObj);
   }
 
+  // The custom impressions field used to take any free text at all with no
+  // check — someone could leave it blank or type "geen idee" and it would
+  // flow straight through into the delivery summary and the reports
+  // dashboard as if it were a real number. Only actually gates when "Meer
+  // dan 500.000" is selected, since that's the only case this field means
+  // anything; strips thousands separators (dots/spaces) before checking so
+  // "750.000" still counts as valid.
+  const impressionsCustomValid =
+    form.impressions !== 'meer' || /^\d+$/.test(form.impressionsCustom.trim().replace(/[.\s]/g, ''));
+
   async function next() {
+    if (!impressionsCustomValid) return;
     setNavigating(true);
     flushPending();
     await patch(form);
@@ -94,6 +105,11 @@ export default function DeliveryPage({ params }) {
             <div style={{ marginTop: 10 }}>
               <label className="field-label">Hoeveel ongeveer?</label>
               <input type="text" value={form.impressionsCustom} placeholder="Bijv. 750.000" onChange={(e) => update({ impressionsCustom: e.target.value })} />
+              {!impressionsCustomValid && (
+                <div style={{ fontSize: 11.5, color: '#C2513F', marginTop: 4 }}>
+                  Vul een aantal in cijfers in (bijv. 750.000).
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -109,7 +125,7 @@ export default function DeliveryPage({ params }) {
       <div style={{ marginTop: 20 }}>
         <label className="field-label" style={{ marginBottom: 3 }}>Zijn er ook variaties nodig van de hoofdspot?</label>
         <div className="hint" style={{ marginBottom: 7 }}>
-          Dezelfde commercial, maar met bijvoorbeeld een ander product, filiaal of woord — geen aparte, kortere versie. Wat er
+          Dezelfde commercial, maar met bijvoorbeeld een ander product, filiaal of woord: geen aparte, kortere versie. Wat er
           precies moet verschillen vragen we je pas zodra je het script hebt goedgekeurd.
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -172,7 +188,7 @@ export default function DeliveryPage({ params }) {
         </label>
         {form.dateUnknown && (
           <div className="box" style={{ marginTop: 10 }}>
-            <div className="hint" style={{ marginBottom: 8 }}>Geen probleem — geef ons dan in elk geval een maand, zodat we het project goed kunnen inplannen.</div>
+            <div className="hint" style={{ marginBottom: 8 }}>Geen probleem, geef ons dan in elk geval een maand, zodat we het project goed kunnen inplannen.</div>
             <label className="field-label">Welke maand ongeveer?</label>
             <select value={form.airMonth} onChange={(e) => update({ airMonth: e.target.value })}>
               <option value="">Kies een maand</option>
@@ -185,9 +201,14 @@ export default function DeliveryPage({ params }) {
       </div>
 
 
-      <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={next}>
-          Volgende — verder naar je brief
+      <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        {!impressionsCustomValid && (
+          <div style={{ fontSize: 12, color: '#8C8880' }}>
+            Vul hierboven een geldig aantal impressies in om verder te gaan.
+          </div>
+        )}
+        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={next} disabled={!impressionsCustomValid}>
+          Volgende: verder naar je brief
         </button>
       </div>
     </StepShell>

@@ -29,7 +29,7 @@ function formatAirDate(brief) {
     if (brief.airMonth) {
       const idx = parseInt(brief.airMonth, 10) - 1;
       const name = MONTH_NAMES_LOWER[idx];
-      return name ? 'Nog niet exact bekend — gepland voor ' + name : 'Nog niet bekend';
+      return name ? 'Nog niet exact bekend, gepland voor ' + name : 'Nog niet bekend';
     }
     return 'Nog niet bekend';
   }
@@ -51,6 +51,7 @@ export default function OverviewPage({ params }) {
   const showLoader = useMinDelay(loading, 700);
   const [consentChecked, setConsentChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
   const [voicesPool, setVoicesPool] = useState([]);
   const [tracksPool, setTracksPool] = useState([]);
 
@@ -114,11 +115,19 @@ export default function OverviewPage({ params }) {
   const matchedVoice = brief.selectedVoiceId ? voicesPool.find((v) => v.id === brief.selectedVoiceId) : null;
   const briefReady = !!(brief.editedScript || brief.generatedScript) && !!brief.selectedVoiceId && hasTracks;
 
+  // Checks whether the save actually landed — patch() returns null on any
+  // network/HTTP failure (see useBrief.js). This used to just fire-and-wait
+  // with no check at all: on a genuine failure the button quietly went
+  // back to normal, with nothing telling the client their commercial was
+  // never actually sent. A missed submission here is the worst possible
+  // place for a silent failure in the whole flow.
   async function submit() {
     if (!briefReady || !consentChecked) return;
     setSubmitting(true);
-    await patch({ submitted: true });
+    setSubmitError(false);
+    const result = await patch({ submitted: true });
     setSubmitting(false);
+    if (!result) setSubmitError(true);
   }
 
   if (brief.submittedAt) {
@@ -145,7 +154,7 @@ export default function OverviewPage({ params }) {
       : brief.productionStatus === 'in_revision'
       ? 'TFA verwerkt je laatste feedback.'
       : brief.productionStatus === 'approved'
-      ? 'Je hebt de laatste versie goedgekeurd — TFA rondt de levering af.'
+      ? 'Je hebt de laatste versie goedgekeurd: TFA rondt de levering af.'
       : 'Zodra er een eerste versie klaarstaat, kun je hem hier beluisteren en beoordelen.';
     return (
       <StepShell briefId={id} current={7} brief={brief} bigNum="07" kicker="Verzonden naar TFA" title={'Bedankt, ' + companyName + '!'}>
@@ -168,7 +177,7 @@ export default function OverviewPage({ params }) {
             Je radiocommercial is succesvol verzonden naar TFA.
           </p>
           <p style={{ fontSize: 14, lineHeight: 1.6, color: '#5C5850', margin: 0, maxWidth: 640 }}>
-            Je ontvangt zo een bevestiging per e-mail met een overzicht van al je keuzes — daarin kun je ook altijd
+            Je ontvangt zo een bevestiging per e-mail met een overzicht van al je keuzes. Daarin kun je ook altijd
             reageren als er nog iets aangepast moet worden.
           </p>
         </div>
@@ -287,7 +296,7 @@ export default function OverviewPage({ params }) {
   const featureHeaderStyle = { fontSize: 19, fontWeight: 700 };
 
   return (
-    <StepShell briefId={id} current={7} brief={brief} bigNum="07" kicker="Jouw mandje" title="Alles op een rij" hint="Het script, de stem en de muziek die je hebt gekozen — dit is wat TFA gaat opnemen en produceren." backHref={`/brief/${id}/music`} backLabel="Terug naar de muziek">
+    <StepShell briefId={id} current={7} brief={brief} bigNum="07" kicker="Jouw mandje" title="Alles op een rij" hint="Het script, de stem en de muziek die je hebt gekozen: dit is wat TFA gaat opnemen en produceren." backHref={`/brief/${id}/music`} backLabel="Terug naar de muziek">
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0 16px' }} className="tfa-overview-grid">
         <div style={compactCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -299,7 +308,7 @@ export default function OverviewPage({ params }) {
           <div style={{ fontSize: 13, marginTop: 2, color: brief.contactEmail ? '#1D1D1D' : '#9C9890' }}>{brief.contactEmail || 'Nog geen e-mailadres opgegeven'}</div>
           {additionalContacts.map((c, i) => (
             <div key={i} style={{ fontSize: 12.5, marginTop: 6, paddingTop: 6, borderTop: '1px solid #EEECE3', color: '#5C5850' }}>
-              {(c.name || 'Extra contactpersoon')}{c.email ? ' — ' + c.email : ''}
+              {(c.name || 'Extra contactpersoon')}{c.email ? ' (' + c.email + ')' : ''}
             </div>
           ))}
         </div>
@@ -331,7 +340,7 @@ export default function OverviewPage({ params }) {
                 return (
                   <div key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
                     <div style={{ fontSize: 11.5, fontWeight: 600, color: '#5C5850', textTransform: 'uppercase' }}>
-                      {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{changed ? ' — wat verschilt' : ''}
+                      {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{changed ? ': wat verschilt' : ''}
                     </div>
                     {changed ? (
                       <div style={{ fontSize: 15, lineHeight: 1.7, marginTop: 6 }}>
@@ -435,7 +444,7 @@ export default function OverviewPage({ params }) {
             <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>Verplicht</span>
           </div>
           <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.55, color: '#5C5850' }}>
-            Ik geef TFA het groene licht om dit script, deze stem en deze muziek in productie te nemen — en om deze gegevens
+            Ik geef TFA het groene licht om dit script, deze stem en deze muziek in productie te nemen, en om deze gegevens
             (inclusief het gebruikelijke cookie- en trackingwerk) te gebruiken om dit traject soepel te laten verlopen.
           </div>
         </div>
@@ -443,8 +452,13 @@ export default function OverviewPage({ params }) {
 
       <div style={{ marginTop: 14, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         {briefReady && !consentChecked && <div style={{ fontSize: 12, color: '#B08900', fontWeight: 500 }}>↑ Vink het vakje hierboven aan om te versturen</div>}
+        {submitError && (
+          <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, background: '#FBF3F1', border: '1px solid #C2513F', borderRadius: 8, padding: '8px 12px', maxWidth: 380, textAlign: 'right' }}>
+            Versturen is niet gelukt. Controleer je internetverbinding en probeer het opnieuw, je gegevens zijn nog niet verzonden naar TFA.
+          </div>
+        )}
         <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} disabled={!briefReady || !consentChecked || submitting} onClick={submit}>
-          Bevestigen en versturen naar TFA
+          {submitting ? 'Bezig met versturen…' : 'Bevestigen en versturen naar TFA'}
         </button>
       </div>
 
