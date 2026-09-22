@@ -20,36 +20,25 @@ export default function HomePage() {
             </Link>
           </header>
 
-          <main style={{ maxWidth: 1180, margin: '60px auto 0', padding: '0 20px 90px' }}>
-            {/* Two-column on desktop — copy + CTA on the left, a quiet
-                auto-advancing loop of real studio photos on the right, so
-                the very first thing a new client sees isn't just text on a
-                dark background. Stacks to one column (photo below the CTA)
-                on narrow screens — see .tfa-hero-grid below. */}
-            <div className="tfa-hero-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 440px', gap: 48, alignItems: 'center' }}>
-              <div style={{ textAlign: 'left' }}>
-                <div style={{ fontSize: 13, letterSpacing: '.09em', textTransform: 'uppercase', color: '#E6C858', fontWeight: 600 }}>Radiocommercials, zonder gedoe</div>
-                <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 52, lineHeight: 1.1, margin: '18px 0 20px', color: '#FBF9EC' }}>
-                  Van brief tot uitzending, in 7 simpele stappen.
-                </h1>
-                <p style={{ fontSize: 17, lineHeight: 1.6, color: '#DEDCD7', maxWidth: 520, margin: '0 0 36px' }}>
-                  Vertel ons over je merk, je product en je doelgroep. TFA schrijft het script, kiest de stem en de muziek, en jij keurt
-                  alles goed voordat het de studio in gaat.
-                </p>
-                <Link
-                  href="/start"
-                  className="btn-primary tfa-cta-hero"
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', width: 320, textAlign: 'center' }}
-                >
-                  Start je commercial
-                  <span className="tfa-cta-arrow" aria-hidden="true">→</span>
-                </Link>
-                <div style={{ marginTop: 16, fontSize: 12.5, color: '#8C8880' }}>
-                  Geen account nodig: je krijgt direct je eigen brieflink.
-                </div>
-              </div>
-
-              <StudioPhotoLoop height={440} />
+          <main style={{ maxWidth: 880, margin: '60px auto 0', padding: '0 20px 90px', textAlign: 'center' }}>
+            <div style={{ fontSize: 13, letterSpacing: '.09em', textTransform: 'uppercase', color: '#E6C858', fontWeight: 600 }}>Radiocommercials, zonder gedoe</div>
+            <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 52, lineHeight: 1.1, margin: '18px 0 20px', color: '#FBF9EC' }}>
+              Van brief tot uitzending, in 7 simpele stappen.
+            </h1>
+            <p style={{ fontSize: 17, lineHeight: 1.6, color: '#DEDCD7', maxWidth: 620, margin: '0 auto 36px' }}>
+              Vertel ons over je merk, je product en je doelgroep. TFA schrijft het script, kiest de stem en de muziek, en jij keurt
+              alles goed voordat het de studio in gaat.
+            </p>
+            <Link
+              href="/start"
+              className="btn-primary tfa-cta-hero"
+              style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, textDecoration: 'none', width: 320, textAlign: 'center' }}
+            >
+              Start je commercial
+              <span className="tfa-cta-arrow" aria-hidden="true">→</span>
+            </Link>
+            <div style={{ marginTop: 16, fontSize: 12.5, color: '#8C8880' }}>
+              Geen account nodig: je krijgt direct je eigen brieflink.
             </div>
           </main>
         </div>
@@ -61,6 +50,16 @@ export default function HomePage() {
           reaches the button. Dropped entirely so the page reads as one
           clear pitch + one obvious action, instead of a pitch, a repeat of
           the pitch, then the action. */}
+
+      {/* Studio photos — moved here from beside the hero text (where they
+          were forced into a roughly-square crop) so each photo shows at
+          its real 3:2 rectangle, full width of its own section between the
+          hero's CTA and the footer. variant="slide" swipes to the next
+          photo (shown dimmed, peeking at the edge) instead of crossfading —
+          reads as more "alive" for a section this prominent. */}
+      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '0 20px 64px' }}>
+        <StudioPhotoLoop variant="slide" maxWidth={900} />
+      </section>
 
       <footer style={{ maxWidth: 1180, margin: '0 auto', padding: '56px 20px 40px', borderTop: '1px solid #E3E0D5' }}>
         {/* No repeated logo here — the header already carries it, and
@@ -134,9 +133,6 @@ export default function HomePage() {
         }
         @media (max-width: 620px) {
           .tfa-footer-grid { grid-template-columns: 1fr !important; gap: 24px !important; }
-        }
-        @media (max-width: 860px) {
-          .tfa-hero-grid { grid-template-columns: 1fr !important; }
         }
       `}</style>
     </div>
