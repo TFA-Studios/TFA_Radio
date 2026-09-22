@@ -20,7 +20,12 @@ const DEFAULT_IMAGES = [
 // is exactly the "squared frame" look that didn't work for the landing
 // page hero — kept only for this small use, not exported separately since
 // nothing outside this file needs to name it.
-function CrossfadeLoop({ images, intervalMs, caption, height, borderRadius }) {
+// `sizing` is either { height: <px> } (fixed, crops to fill via
+// object-fit: cover — the small status-page use) or { aspectRatio: <css
+// aspect-ratio value>, maxWidth: <px> } (the landing page's "cinematic"
+// use: full width up to maxWidth, height derived from the ratio, so a 3:2
+// photo is never cropped since the box IS a 3:2 box).
+function CrossfadeLoop({ images, intervalMs, caption, sizing, borderRadius }) {
   const [index, setIndex] = useState(0);
   const [tick, setTick] = useState(0);
 
@@ -33,10 +38,14 @@ function CrossfadeLoop({ images, intervalMs, caption, height, borderRadius }) {
     return () => clearInterval(id);
   }, [images.length, intervalMs]);
 
+  const sizeStyle = sizing.aspectRatio
+    ? { width: '100%', maxWidth: sizing.maxWidth, aspectRatio: sizing.aspectRatio, margin: '0 auto' }
+    : { width: '100%', height: sizing.height };
+
   return (
     <div
       style={{
-        position: 'relative', width: '100%', height, borderRadius,
+        position: 'relative', ...sizeStyle, borderRadius,
         overflow: 'hidden', background: '#111', flex: 'none',
         boxShadow: '0 0 0 1.5px rgba(230,200,88,.45), 0 20px 50px rgba(0,0,0,.4)',
       }}
@@ -166,5 +175,18 @@ export default function StudioPhotoLoop({
   if (variant === 'slide') {
     return <SlideLoop images={images} intervalMs={intervalMs || 5200} caption={caption} maxWidth={maxWidth} borderRadius={borderRadius} />;
   }
-  return <CrossfadeLoop images={images} intervalMs={intervalMs || 4800} caption={caption} height={height} borderRadius={borderRadius} />;
+  if (variant === 'cinematic') {
+    // One big photo at a time, full width up to maxWidth, real 3:2 ratio
+    // (never cropped) — the "drop the side-peek, just go big" option.
+    return (
+      <CrossfadeLoop
+        images={images}
+        intervalMs={intervalMs || 5000}
+        caption={caption}
+        sizing={{ aspectRatio: '3 / 2', maxWidth }}
+        borderRadius={borderRadius}
+      />
+    );
+  }
+  return <CrossfadeLoop images={images} intervalMs={intervalMs || 4800} caption={caption} sizing={{ height }} borderRadius={borderRadius} />;
 }
