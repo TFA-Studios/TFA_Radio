@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import SpotFlowLogo from '../components/SpotFlowLogo';
 import BrandWave from '../components/BrandWave';
-import StudioPhotoLoop from '../components/StudioPhotoLoop';
 import { InstagramIcon, LinkedInIcon, YouTubeIcon } from '../components/SocialIcons';
 
 // Public marketing homepage — general layout/copy inspired by
@@ -51,25 +50,12 @@ export default function HomePage() {
           clear pitch + one obvious action, instead of a pitch, a repeat of
           the pitch, then the action. */}
 
-      {/* Studio photos — moved here from beside the hero text (where they
-          were forced into a roughly-square crop) so each photo shows at
-          its real 3:2 rectangle, full width of its own section between the
-          hero's CTA and the footer. variant="pair": both photos side by
-          side, same size, full color, no dimming/hierarchy trick, static
-          (no auto-loop) — calmer and more "editorial" than the rotating
-          single-photo crossfade or the earlier slide/peek version, at the
-          cost of the "modern loop" motion those had. Subtle hover-zoom
-          per photo on desktop is the only motion left. */}
-      {/* Fades from the hero's solid black straight into the page's own
-          background color, so the photos sit on a smooth gradient instead
-          of the hard black→beige line that used to sit right above them.
-          Starts at pure #1D1D1D — exactly the hero's own background — so
-          there's no visible seam at the top of this wrapper either. */}
-      <div style={{ background: 'linear-gradient(180deg, #1D1D1D 0%, #DEDCD7 60%)' }}>
-        <section style={{ maxWidth: 1180, margin: '0 auto', padding: '70px 20px 70px' }}>
-          <StudioPhotoLoop variant="pair" maxWidth={980} />
-        </section>
-      </div>
+      {/* Studio photos section removed from the landing page for now (client
+          didn't like how it looked through several iterations — cinematic
+          crossfade, slide/peek, static side-by-side pair). StudioPhotoLoop
+          component and the photo files are left in place, untouched, and
+          the small version on the client status page (app/brief/[id]/
+          review/page.js) is unaffected — just not rendered here anymore. */}
 
       <footer style={{ maxWidth: 1180, margin: '0 auto', padding: '56px 20px 40px', borderTop: '1px solid #E3E0D5' }}>
         {/* No repeated logo here — the header already carries it, and
