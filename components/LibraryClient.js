@@ -755,6 +755,26 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
   // (music or voice) stops whichever one was already playing, the same way
   // the client-facing voice/music picker steps behave.
   const [activePreviewId, setActivePreviewId] = useState(null);
+
+  // Music categories fold/collapse — same idea as the accordion-style
+  // playlist cards on the client's own music-picker step (app/brief/[id]/
+  // music/page.js's openPlaylistId), but independent per category (not
+  // "only one open at a time") since a producer managing the library often
+  // needs several open at once — e.g. to bulk-select across categories.
+  // Starts fully collapsed: with several categories, a growing library used
+  // to mean scrolling past every earlier one just to reach the last, which
+  // is exactly what this fixes. Any category matching the current search
+  // is force-expanded regardless of its collapsed state, so searching
+  // still surfaces results without an extra click.
+  const [openCategories, setOpenCategories] = useState(() => new Set());
+  function toggleCategory(category) {
+    setOpenCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+  }
   function toggleActivePreview(id) {
     setActivePreviewId((cur) => (cur === id ? null : id));
   }
@@ -852,17 +872,50 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
       )}
 
       {kind === 'music' && groups ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {groups.map(([category, list]) => (
-            <div key={category}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880', marginBottom: 8 }}>
-                {category} <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0 }}>({list.length})</span>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {list.map(renderRow)}
-              </div>
+        <div>
+          {groups.length > 1 && (
+            <div style={{ display: 'flex', gap: 14, marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={() => setOpenCategories(new Set(groups.map(([category]) => category)))}
+                style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, color: '#8C6D1F', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Alles uitvouwen
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpenCategories(new Set())}
+                style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, color: '#8C8880', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Alles invouwen
+              </button>
             </div>
-          ))}
+          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {groups.map(([category, list]) => {
+              // Force-open on an active search — folding a category shouldn't
+              // hide a match the search just found.
+              const isOpen = query.trim() !== '' || openCategories.has(category);
+              return (
+                <div key={category} style={{ background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 10, overflow: 'hidden' }}>
+                  <div
+                    onClick={() => toggleCategory(category)}
+                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', cursor: 'pointer' }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#5C5850' }}>
+                      {category} <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: '#8C8880' }}>({list.length})</span>
+                    </div>
+                    <span style={{ fontSize: 12, color: '#8C8880', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▾</span>
+                  </div>
+                  {isOpen && (
+                    <div style={{ borderTop: '1px solid #EEECE3', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {list.map(renderRow)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
           {groups.length === 0 && items.length > 0 && (
             <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
           )}
