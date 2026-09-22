@@ -8,15 +8,11 @@ import { InstagramIcon, LinkedInIcon, YouTubeIcon } from '../components/SocialIc
 export default function HomePage() {
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7' }}>
-      {/* Diagonal cut instead of a flat line into the beige section below —
-          the clip-path only trims what gets PAINTED, it doesn't change this
-          div's actual box height, so the section below still starts exactly
-          where this div's rectangle would have ended (no gap to patch with
-          a negative margin). The extra --diag of padding-bottom reserves a
-          buffer below the hero's own content for the slope to cut through,
-          so the diagonal never clips into the headline/button themselves —
-          it only eats into empty space that's there for exactly that. */}
-      <div style={{ position: 'relative', background: '#1D1D1D', overflow: 'hidden' }} className="tfa-hero-diagonal">
+      {/* The diagonal-cut hero bottom (tried previously) is gone — the full-
+          bleed video section below is now the "breaker" between the hero
+          and the footer instead, so the hero goes back to a plain flat
+          bottom edge. */}
+      <div style={{ position: 'relative', background: '#1D1D1D', overflow: 'hidden' }}>
         <BrandWave />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -64,6 +60,29 @@ export default function HomePage() {
           component and the photo files are left in place, untouched, and
           the small version on the client status page (app/brief/[id]/
           review/page.js) is unaffected — just not rendered here anymore. */}
+
+      {/* Looping video "breaker" between the hero and the footer — replaces
+          the diagonal-cut hero bottom tried previously. Full-bleed: the
+          `left: 50%; margin-left: -50vw` trick breaks the video out of
+          every ancestor's centered max-width so it spans the full browser
+          width edge-to-edge, even though the rest of the page stays inside
+          the usual 1180px-max container. Shown as the plain video itself
+          (no dark overlay/tint, not used as a background layer behind any
+          text) — autoplay+loop+muted+playsInline is what makes autoplay
+          allowed at all in every browser; object-fit: cover fills that full
+          width at the video's own 1280:674 aspect ratio without letterboxing
+          bars on the sides. */}
+      <div style={{ position: 'relative', left: '50%', width: '100vw', marginLeft: '-50vw', overflow: 'hidden', background: '#1D1D1D' }}>
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{ display: 'block', width: '100%', aspectRatio: '1280 / 674', objectFit: 'cover' }}
+        >
+          <source src="/video/tfa-banner.mp4" type="video/mp4" />
+        </video>
+      </div>
 
       <footer style={{ maxWidth: 1180, margin: '0 auto', padding: '56px 20px 40px', borderTop: '1px solid #E3E0D5' }}>
         {/* No repeated logo here — the header already carries it, and
@@ -114,14 +133,6 @@ export default function HomePage() {
       </footer>
 
       <style>{`
-        .tfa-hero-diagonal {
-          --diag: 70px;
-          clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - var(--diag)));
-          padding-bottom: var(--diag);
-        }
-        @media (max-width: 640px) {
-          .tfa-hero-diagonal { --diag: 34px; }
-        }
         .tfa-cta-hero {
           transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
           box-shadow: 0 0 0 0 rgba(230,200,88,0);
