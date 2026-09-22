@@ -18,8 +18,15 @@ export default function SpotFlowLogo({ size = 32, variant = 'dark', gap, classNa
   const nameColor = variant === 'dark' ? '#FFFFFF' : '#1D1D1D';
   const fontSize = Math.round(size * 0.75);
 
+  // Icon-to-wordmark gap: tightened from 0.32×size to 0.18×size to match the
+  // brand book's own logo lockup (Brandbook, "Logo" > "Technisch", p.13) —
+  // its clear-space grid shows the wave icon and the "TFA" wordmark sitting
+  // close enough to read as one cohesive mark, not two separate elements
+  // with daylight between them. No caller overrides `gap`, so this one
+  // change applies everywhere the lockup appears (homepage header/footer,
+  // sign-in/sign-up, the client-flow sidebar, every dashboard sidebar).
   return (
-    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: gap != null ? gap : Math.round(size * 0.32) }}>
+    <div className={className} style={{ display: 'flex', alignItems: 'center', gap: gap != null ? gap : Math.round(size * 0.18) }}>
       <BrandMark size={size} />
       <span
         className={textClassName}

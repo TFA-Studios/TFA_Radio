@@ -109,7 +109,7 @@ export default function HomePage() {
         </div>
 
         <div style={{ marginTop: 28, paddingTop: 18, borderTop: '1px solid #E3E0D5', fontSize: 11.5, color: '#9C9890', textAlign: 'center' }}>
-          © {new Date().getFullYear()} Team TFA
+          © {new Date().getFullYear()} Team TFA · Karim Abdelmessih
         </div>
       </footer>
 
