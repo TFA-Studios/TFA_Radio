@@ -57,9 +57,16 @@ export default function HomePage() {
           hero's CTA and the footer. variant="slide" swipes to the next
           photo (shown dimmed, peeking at the edge) instead of crossfading —
           reads as more "alive" for a section this prominent. */}
-      <section style={{ maxWidth: 1180, margin: '0 auto', padding: '0 20px 64px' }}>
-        <StudioPhotoLoop variant="slide" maxWidth={900} />
-      </section>
+      {/* Fades from the hero's solid black straight into the page's own
+          background color, so the photos sit on a smooth gradient instead
+          of the hard black→beige line that used to sit right above them.
+          Starts at pure #1D1D1D — exactly the hero's own background — so
+          there's no visible seam at the top of this wrapper either. */}
+      <div style={{ background: 'linear-gradient(180deg, #1D1D1D 0%, #DEDCD7 60%)' }}>
+        <section style={{ maxWidth: 1180, margin: '0 auto', padding: '70px 20px 70px' }}>
+          <StudioPhotoLoop variant="slide" maxWidth={900} />
+        </section>
+      </div>
 
       <footer style={{ maxWidth: 1180, margin: '0 auto', padding: '56px 20px 40px', borderTop: '1px solid #E3E0D5' }}>
         {/* No repeated logo here — the header already carries it, and

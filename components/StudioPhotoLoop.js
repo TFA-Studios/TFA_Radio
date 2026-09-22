@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // "Us working in the studio" photos, shown two different ways depending on
 // where this sits — see the `variant` prop on the default export below.
@@ -69,80 +69,86 @@ function CrossfadeLoop({ images, intervalMs, caption, height, borderRadius }) {
   );
 }
 
-// variant="slide" — the landing page version. Keeps each photo's real 3:2
-// rectangle uncropped (every slide's aspect-ratio matches the source
-// photos exactly, so object-fit: cover never has to cut anything off) and
-// shows the *next* photo peeking, greyed out, at the right edge — then
-// swipes over to it. The "two visible slides, dimmed peek on the side"
-// look, not a full-bleed crossfade.
-//
-// How the swipe works without ever-growing transforms or a cloned-slide
-// infinite-scroll setup: only ever renders two <div>s — order[0] (current,
-// full color) and order[1] (next, dimmed peek) — recomputed from `index`.
-// Each cycle: (1) turn the CSS transition on and slide the track left by
-// one slot, revealing order[1] in full; (2) the instant that finishes,
-// advance `index` AND, in the same style update, set transition to 'none'
-// and snap the track back to 0 — invisible to the eye since it happens
-// with no transition, but the now-current photo is back to being rendered
-// at position 0. Standard "two-slide" carousel trick, just done with
-// inline styles instead of a library.
+// variant="slide" — the landing page version. The main photo sits dead
+// center of the section at its full real 3:2 rectangle; the next photo
+// sits fully visible (never cropped/clipped) and smaller off to the
+// right, greyed out, flush with the section's right edge. On the next
+// cycle they swap: no overflow/clipping trick at all — both photos stay
+// permanently mounted at fixed DOM positions, and it's their POSITION
+// that swaps (main <-> peek), so the browser just animates the CSS
+// left/width/opacity/filter difference between the two states — the peek
+// photo visibly grows and slides into the center while the old main
+// shrinks and slides out to the right, greying out as it goes.
+// `transform` is only ever `translateY(-50%)` in both states (vertical
+// centering) so it never has to interpolate between different transform
+// functions — only left/width/opacity/filter animate, which is what
+// keeps the swap smooth instead of jumpy.
+const MAIN_POS = { left: '23%', width: '54%' };
+const PEEK_POS = { left: '80%', width: '20%' };
+// Container's own aspect ratio is derived from the main photo's rendered
+// size (54% wide × the photos' real 2:3 height ratio) so there's exactly
+// enough vertical room for it — see the aspectRatio below.
+const CONTAINER_ASPECT = 1 / (0.54 * (2 / 3));
+
 function SlideLoop({ images, intervalMs, caption, maxWidth, borderRadius }) {
   const [index, setIndex] = useState(0);
-  const [sliding, setSliding] = useState(false);
-  const timeoutRef = useRef(null);
-  const SLIDE_PCT = 82; // current slide's width, as % of the viewport
-  const GAP = 20; // px between current and the peeking next slide
-  const TRANSITION_MS = 900;
+  const TRANSITION_MS = 1100;
 
   useEffect(() => {
     if (images.length < 2) return;
-    const id = setInterval(() => {
-      setSliding(true);
-      timeoutRef.current = setTimeout(() => {
-        setIndex((i) => (i + 1) % images.length);
-        setSliding(false);
-      }, TRANSITION_MS);
-    }, intervalMs);
-    return () => {
-      clearInterval(id);
-      clearTimeout(timeoutRef.current);
-    };
+    const id = setInterval(() => setIndex((i) => (i + 1) % images.length), intervalMs);
+    return () => clearInterval(id);
   }, [images.length, intervalMs]);
 
-  const current = images[index];
-  const next = images[(index + 1) % images.length];
-
-  const slideBaseStyle = {
-    position: 'relative', flex: `0 0 ${SLIDE_PCT}%`, aspectRatio: '3 / 2',
-    borderRadius, overflow: 'hidden', background: '#111',
-  };
+  const mainSrc = images[index].src;
 
   return (
     <div style={{ width: '100%', maxWidth, margin: '0 auto' }}>
-      <div style={{ overflow: 'hidden' }}>
-        <div
-          style={{
-            display: 'flex', gap: GAP,
-            transform: sliding ? `translateX(calc(-${SLIDE_PCT}% - ${GAP}px))` : 'translateX(0)',
-            transition: sliding ? `transform ${TRANSITION_MS}ms cubic-bezier(.65,0,.35,1)` : 'none',
-          }}
-        >
-          <div style={{ ...slideBaseStyle, boxShadow: '0 0 0 1.5px rgba(230,200,88,.45), 0 20px 50px rgba(0,0,0,.35)' }}>
-            <img src={current.src} alt={current.alt || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%', background: 'linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0))', pointerEvents: 'none' }} />
-            {caption && (
-              <div style={{ position: 'absolute', left: 18, bottom: 16, fontSize: 12.5, fontWeight: 600, letterSpacing: '.03em', color: '#FBF9EC', textShadow: '0 1px 4px rgba(0,0,0,.5)' }}>
-                {caption}
-              </div>
-            )}
-          </div>
-          {/* The next photo, greyed out and dimmed — a preview of what's
-              coming, not something to look at closely yet. */}
-          <div style={{ ...slideBaseStyle, opacity: 0.4, filter: 'grayscale(65%) brightness(.75)' }}>
-            <img src={next.src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          </div>
-        </div>
+      <div className="tfa-slideloop" style={{ position: 'relative', width: '100%', aspectRatio: String(CONTAINER_ASPECT) }}>
+        {images.map((img, i) => {
+          const isMain = img.src === mainSrc;
+          const pos = isMain ? MAIN_POS : PEEK_POS;
+          return (
+            <div
+              key={img.src}
+              className={isMain ? 'tfa-slideloop-main' : 'tfa-slideloop-peek'}
+              style={{
+                position: 'absolute', top: '50%', left: pos.left, width: pos.width, aspectRatio: '3 / 2',
+                transform: 'translateY(-50%)', borderRadius, overflow: 'hidden', background: '#111',
+                transition: `left ${TRANSITION_MS}ms cubic-bezier(.65,0,.35,1), width ${TRANSITION_MS}ms cubic-bezier(.65,0,.35,1), opacity ${TRANSITION_MS}ms ease, filter ${TRANSITION_MS}ms ease`,
+                opacity: isMain ? 1 : 0.4,
+                filter: isMain ? 'none' : 'grayscale(65%) brightness(.75)',
+                zIndex: isMain ? 2 : 1,
+                boxShadow: isMain ? '0 0 0 1.5px rgba(230,200,88,.45), 0 20px 50px rgba(0,0,0,.35)' : 'none',
+              }}
+            >
+              <img src={img.src} alt={isMain ? (img.alt || '') : ''} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              {isMain && (
+                <>
+                  <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '34%', background: 'linear-gradient(to top, rgba(0,0,0,.5), rgba(0,0,0,0))', pointerEvents: 'none' }} />
+                  {caption && (
+                    <div style={{ position: 'absolute', left: 18, bottom: 16, fontSize: 12.5, fontWeight: 600, letterSpacing: '.03em', color: '#FBF9EC', textShadow: '0 1px 4px rgba(0,0,0,.5)' }}>
+                      {caption}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
+
+      {/* On narrow screens there isn't room for a centered main + a
+          distinct right-hand peek without everything feeling cramped, so
+          the peek photo just hides and the main photo takes the full
+          width instead — still swaps photos on the same interval, just
+          without the side-peek effect. */}
+      <style>{`
+        @media (max-width: 700px) {
+          .tfa-slideloop-peek { display: none !important; }
+          .tfa-slideloop-main { left: 3% !important; width: 94% !important; }
+        }
+      `}</style>
     </div>
   );
 }
