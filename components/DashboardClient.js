@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { variationsSummaryLabel, parseReviewRounds as parseReviewRoundsOf, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime } from './flowData';
+import {
+  variationsSummaryLabel, variationsCountOf, parseVariationScripts, parseReviewRounds as parseReviewRoundsOf,
+  reviewOverIncludedCap, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime,
+  formatAirDate, deliveryDeadlineMeta, TONE_LABELS,
+} from './flowData';
+import { diffWords, hasDiff, DiffPreview } from './textDiff';
+import { SCRIPT_SOURCE_META, IMPRESSIONS_LABELS } from '../lib/reports';
 
 const RANGES = [
   { key: '7d', label: 'Laatste week' },
@@ -42,6 +48,19 @@ function isUnseenBrief(b) {
 // plain display name already (see lib/db.js's updateBriefTeamMeta) — no
 // separate id/label mapping needed.
 const ASSIGNEE_OPTIONS = ['Marco', 'Karim'];
+
+// Which optional dashboard-table columns a producer has chosen to show,
+// persisted per-browser (not per-account — there's no multi-device sync
+// need for this) so the table stays configured the way they left it across
+// visits. 'companyName' and 'status' aren't in here: those two are always
+// shown (see COLUMN_DEFS' `core` flag below) since a row without a company
+// name or a status to act on isn't useful at all.
+const COLUMN_STORAGE_KEY = 'tfa-dashboard-columns-v1';
+// Columns visible out of the box for anyone who's never touched the
+// configurator — deliberately the exact same six the table always showed
+// before this became configurable, so nothing changes for existing users
+// until they actually open "Kolommen" and pick something new.
+const DEFAULT_COLUMN_KEYS = ['hoofdspotLength', 'assignedTo', 'airDate', 'updatedAt'];
 
 // Sections of the brief detail modal — see the `modalTab` state on
 // DashboardClient. Grouped by what a producer actually comes to look at:
@@ -222,16 +241,24 @@ function FeedbackStack({ feedback }) {
   );
 }
 
-// Deadline coloring — overdue is only meaningful for a brief that isn't done
-// yet; a finished brief with a past due date isn't a problem.
-function dueDateMeta(dueDate, status) {
-  if (!dueDate) return { label: 'Geen deadline', color: '#9C9890', overdue: false };
-  const d = new Date(dueDate + 'T00:00:00');
-  if (isNaN(d.getTime())) return { label: dueDate, color: '#9C9890', overdue: false };
-  const label = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
-  const overdue = status !== 'done' && d.getTime() < new Date().setHours(0, 0, 0, 0);
-  return { label, color: overdue ? '#C2513F' : '#1D1D1D', overdue };
-}
+// Sort comparator overrides for table columns whose value on a brief isn't
+// already the plain string/date the generic `a[field] || ''` comparison in
+// the `sorted` useMemo below can handle directly — a computed count, a
+// derived boolean, or (hoofdspotLength) a number stored as text ('20' vs
+// '6' should sort as 6 < 20, not string-lexicographically as '20' < '6').
+// Module-scope since none of these close over component state, just the
+// brief itself.
+const SORT_GETTERS = {
+  hoofdspotLength: (b) => parseInt(b.hoofdspotLength, 10) || 20,
+  variationsCount: (b) => variationsCountOf(b),
+  reviewRoundsCount: (b) => parseReviewRoundsOf(b).length,
+  internalNotesCount: (b) => parseInternalNotes(b).length,
+  tracksCount: (b) => parseSelectedTracks(b).length,
+  daysOpen: (b) => (b.createdAt ? Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 86400000) : -1),
+  isUnseen: (b) => (isUnseenBrief(b) ? 1 : 0),
+  scriptApproved: (b) => (b.scriptApproved ? 1 : 0),
+  overIncludedCap: (b) => (reviewOverIncludedCap(b) ? 1 : 0),
+};
 
 export default function DashboardClient({ briefs }) {
   const [rows, setRows] = useState(briefs);
@@ -249,6 +276,33 @@ export default function DashboardClient({ briefs }) {
   // but there was previously no way to just find "that one brief" once the
   // list grows past a page or two, short of paging through by eye.
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Which optional columns are on, plus whether the "Kolommen" picker
+  // dropdown is open. Starts at DEFAULT_COLUMN_KEYS (matches the table's
+  // pre-configurator look) on every render, including the server-rendered
+  // one, then swaps to whatever's saved in localStorage right after mount
+  // — reading localStorage during render would mismatch server/client
+  // output, so it has to happen in an effect instead.
+  const [visibleColumns, setVisibleColumns] = useState(DEFAULT_COLUMN_KEYS);
+  const [columnsMenuOpen, setColumnsMenuOpen] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(COLUMN_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setVisibleColumns(parsed);
+      }
+    } catch (e) {}
+  }, []);
+  function toggleColumn(key) {
+    setVisibleColumns((cur) => {
+      const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+      try {
+        window.localStorage.setItem(COLUMN_STORAGE_KEY, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+  }
 
   function toggleStatusFilter(status) {
     setStatusFilter((cur) => (cur === status ? null : status));
@@ -441,6 +495,113 @@ export default function DashboardClient({ briefs }) {
     }
   }
 
+  // Every column the dashboard table can show. 'companyName' and 'status'
+  // are `core: true` — always shown, not in the "Kolommen" picker — since
+  // a row without an identifiable company or an actionable status isn't
+  // useful. Everything else is optional and off by default except the four
+  // in DEFAULT_COLUMN_KEYS above, which is exactly what the table already
+  // showed before it became configurable. `sortValue` is only spelled out
+  // here for documentation; the actual lookup happens through SORT_GETTERS
+  // above (module-scope, needed there before this array exists).
+  const COLUMN_DEFS = [
+    {
+      key: 'companyName', core: true, label: 'Bedrijf',
+      cell: (b, ctx) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {ctx.unseen && (
+            <span title="Nieuw: nog niet bekeken" style={{ width: 8, height: 8, borderRadius: '50%', background: '#E6C858', flex: 'none', boxShadow: '0 0 0 3px rgba(230,200,88,.35)' }} />
+          )}
+          <span>{b.companyName || 'Nog geen bedrijfsnaam'}</span>
+          {ctx.unseen && (
+            <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>Nieuw</span>
+          )}
+          <ProductionBadge brief={b} small />
+        </div>
+      ),
+      cellStyle: (b, ctx) => ({ fontWeight: ctx.unseen ? 700 : 600, color: b.companyName ? '#1D1D1D' : '#9C9890' }),
+    },
+    { key: 'hoofdspotLength', label: 'Spot', cell: (b) => <>{b.hoofdspotLength || '20'}″{variationsSummaryLabel(b)}</> },
+    { key: 'assignedTo', label: 'Toegewezen', cell: (b) => b.assignedTo || 'Niet toegewezen', cellStyle: (b) => ({ color: b.assignedTo ? '#1D1D1D' : '#9C9890' }) },
+    {
+      key: 'airDate', label: 'Op de radio',
+      cell: (b, ctx) => <>{ctx.due.overdue ? '⚠ ' : ''}{ctx.due.label}</>,
+      cellStyle: (b, ctx) => ({ color: ctx.due.color, fontWeight: ctx.due.overdue ? 700 : 400 }),
+    },
+    { key: 'updatedAt', label: 'Laatst gewijzigd', cell: (b) => new Date(b.updatedAt).toLocaleString('nl-NL') },
+    {
+      key: 'status', core: true, label: 'Status', sortable: false,
+      cell: (b) => <StatusSelect brief={b} onChange={handleStatusChange} compact />,
+    },
+    { key: 'contactPerson', label: 'Contactpersoon', cell: (b) => b.contactPerson || '—', cellStyle: (b) => ({ color: b.contactPerson ? '#1D1D1D' : '#9C9890' }) },
+    { key: 'contactEmail', label: 'E-mail', cell: (b) => b.contactEmail || '—', cellStyle: (b) => ({ color: b.contactEmail ? '#1D1D1D' : '#9C9890' }) },
+    { key: 'createdAt', label: 'Aangemaakt', cell: (b) => (b.createdAt ? new Date(b.createdAt).toLocaleDateString('nl-NL') : '—') },
+    { key: 'submittedAt', label: 'Verzonden', cell: (b) => (b.submittedAt ? new Date(b.submittedAt).toLocaleDateString('nl-NL') : 'Nog niet'), cellStyle: (b) => ({ color: b.submittedAt ? '#1D1D1D' : '#9C9890' }) },
+    { key: 'audience', label: 'Doelgroep', cell: (b) => (b.audience === 'b2b' ? 'B2B' : b.audience === 'b2c' ? 'B2C' : '—') },
+    { key: 'impressions', label: 'Impressies', cell: (b) => IMPRESSIONS_LABELS[b.impressions || ''] || b.impressions || '—' },
+    { key: 'scriptSource', label: 'Script bron', cell: (b) => (SCRIPT_SOURCE_META[b.scriptSource || ''] || {}).label || b.scriptSource || '—' },
+    {
+      key: 'scriptApproved', label: 'Script goedgekeurd',
+      cell: (b) => (b.scriptApproved ? 'Ja' : 'Nee'),
+      cellStyle: (b) => ({ color: b.scriptApproved ? '#1D7A46' : '#9C9890', fontWeight: b.scriptApproved ? 600 : 400 }),
+    },
+    {
+      // The specific thing that prompted this whole column picker — how
+      // many variations a brief asked for wasn't visible anywhere in the
+      // table at a glance before.
+      key: 'variationsCount', label: 'Variaties',
+      cell: (b) => variationsCountOf(b) || '—',
+    },
+    {
+      // Same story — how many rounds of client feedback a production has
+      // gone through, useful to scan for briefs eating more revision time
+      // than usual (see INCLUDED_REVISIONS/reviewOverIncludedCap).
+      key: 'reviewRoundsCount', label: 'Rondes feedback',
+      cell: (b) => {
+        const n = parseReviewRoundsOf(b).length;
+        return n || '—';
+      },
+    },
+    {
+      key: 'overIncludedCap', label: 'Revisies > inbegrepen',
+      cell: (b) => (reviewOverIncludedCap(b) ? `Ja (${INCLUDED_REVISIONS}+)` : 'Nee'),
+      cellStyle: (b) => (reviewOverIncludedCap(b) ? { color: '#C2513F', fontWeight: 700 } : { color: '#9C9890' }),
+    },
+    { key: 'selectedVoiceLabel', label: 'Stem', cell: (b) => b.selectedVoiceLabel || '—', cellStyle: (b) => ({ color: b.selectedVoiceLabel ? '#1D1D1D' : '#9C9890' }) },
+    { key: 'tracksCount', label: 'Aantal tracks', cell: (b) => parseSelectedTracks(b).length || '—' },
+    {
+      key: 'toneOfVoice', label: 'Tone of voice',
+      cell: (b) => {
+        try {
+          const parsed = b.toneOfVoice ? JSON.parse(b.toneOfVoice) : [];
+          if (!Array.isArray(parsed) || !parsed.length) return '—';
+          return parsed.map((t) => TONE_LABELS[t] || t).join(', ');
+        } catch (e) {
+          return '—';
+        }
+      },
+    },
+    { key: 'internalNotesCount', label: 'Interne notities', cell: (b) => parseInternalNotes(b).length || '—' },
+    {
+      key: 'productionStatus', label: 'Productiestatus',
+      cell: (b) => PRODUCTION_STATUS_LABELS[b.productionStatus || ''] || b.productionStatus || '—',
+    },
+    {
+      key: 'isUnseen', label: 'Nieuw',
+      cell: (b) => (isUnseenBrief(b) ? 'Ja' : 'Nee'),
+      cellStyle: (b) => (isUnseenBrief(b) ? { color: '#8C6D1F', fontWeight: 700 } : { color: '#9C9890' }),
+    },
+    {
+      // How long a brief has been sitting open — handy sorted descending to
+      // surface whatever's been waiting longest without anyone touching it.
+      key: 'daysOpen', label: 'Dagen open',
+      cell: (b) => {
+        const days = SORT_GETTERS.daysOpen(b);
+        return days >= 0 ? days : '—';
+      },
+    },
+  ];
+  const activeColumns = COLUMN_DEFS.filter((c) => c.core || visibleColumns.includes(c.key));
+
   const filtered = useMemo(() => {
     const ms = rangeToMs(range);
     if (!ms) return rows;
@@ -465,8 +626,9 @@ export default function DashboardClient({ briefs }) {
   const sorted = useMemo(() => {
     const list = searched.slice();
     list.sort((a, b) => {
-      let av = a[sortField] || '';
-      let bv = b[sortField] || '';
+      const getter = SORT_GETTERS[sortField];
+      let av = getter ? getter(a) : a[sortField] || '';
+      let bv = getter ? getter(b) : b[sortField] || '';
       if (av < bv) return sortDir === 'asc' ? -1 : 1;
       if (av > bv) return sortDir === 'asc' ? 1 : -1;
       return 0;
@@ -595,76 +757,84 @@ export default function DashboardClient({ briefs }) {
         </button>
       </div>
 
-      {statusFilter && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: -14, marginBottom: 18, fontSize: 12.5, color: '#5C5850' }}>
-          Gefilterd op <b style={{ color: STATUS_META[statusFilter].color }}>{STATUS_META[statusFilter].label}</b>
-          <button type="button" onClick={() => setStatusFilter(null)} style={{ border: '1px solid #C9C5B9', borderRadius: 999, background: '#FFFFFF', padding: '3px 10px', fontSize: 11.5, cursor: 'pointer', color: '#5C5850' }}>
-            ✕ Wis filter
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: -14, marginBottom: 18 }}>
+        {statusFilter ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#5C5850' }}>
+            Gefilterd op <b style={{ color: STATUS_META[statusFilter].color }}>{STATUS_META[statusFilter].label}</b>
+            <button type="button" onClick={() => setStatusFilter(null)} style={{ border: '1px solid #C9C5B9', borderRadius: 999, background: '#FFFFFF', padding: '3px 10px', fontSize: 11.5, cursor: 'pointer', color: '#5C5850' }}>
+              ✕ Wis filter
+            </button>
+          </div>
+        ) : <div />}
+
+        {/* Column picker — which of the optional columns in COLUMN_DEFS
+            show up in the table below, saved per-browser via toggleColumn
+            (see COLUMN_STORAGE_KEY above). 'Bedrijf' and 'Status' aren't
+            listed here since they're core and always shown. */}
+        <div style={{ position: 'relative' }}>
+          <button
+            type="button"
+            onClick={() => setColumnsMenuOpen((o) => !o)}
+            style={{ border: '1px solid #C9C5B9', borderRadius: 8, background: '#FFFFFF', padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 6 }}
+          >
+            ⚙ Kolommen ({activeColumns.length - 2})
           </button>
+          {columnsMenuOpen && (
+            <>
+              <div onClick={() => setColumnsMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+              <div
+                style={{
+                  position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 21, width: 280, maxHeight: 380, overflowY: 'auto',
+                  background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, boxShadow: '0 12px 32px rgba(29,29,29,.16)', padding: '10px 0',
+                }}
+              >
+                <div style={{ padding: '4px 14px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880' }}>
+                  Kies welke kolommen je ziet
+                </div>
+                {COLUMN_DEFS.filter((c) => !c.core).map((c) => (
+                  <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', fontSize: 13, cursor: 'pointer', color: '#1D1D1D' }}>
+                    <input type="checkbox" checked={visibleColumns.includes(c.key)} onChange={() => toggleColumn(c.key)} />
+                    {c.label}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       <div style={{ background: '#FFFFFF', borderRadius: 14, boxShadow: '0 1px 10px rgba(29,29,29,.05)', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 820 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #EEECE3', textAlign: 'left' }}>
-                {[
-                  ['companyName', 'Bedrijf'],
-                  ['hoofdspotLength', 'Spot'],
-                  ['assignedTo', 'Toegewezen'],
-                  ['dueDate', 'Deadline'],
-                  ['updatedAt', 'Laatst gewijzigd'],
-                  ['status', 'Status'],
-                ].map(([field, label]) => (
+                {activeColumns.map((c) => (
                   <th
-                    key={field}
-                    onClick={() => (field === 'status' ? null : toggleSort(field))}
-                    style={{ padding: '12px 16px', cursor: field === 'status' ? 'default' : 'pointer', color: '#5C5850', fontWeight: 600, whiteSpace: 'nowrap' }}
+                    key={c.key}
+                    onClick={() => (c.sortable === false ? null : toggleSort(c.key))}
+                    style={{ padding: '12px 16px', cursor: c.sortable === false ? 'default' : 'pointer', color: '#5C5850', fontWeight: 600, whiteSpace: 'nowrap' }}
                   >
-                    {label} {sortField === field ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+                    {c.label} {sortField === c.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {pageItems.map((b) => {
-                const due = dueDateMeta(b.dueDate, b.status);
-                const unseen = isUnseenBrief(b);
+                const ctx = { due: deliveryDeadlineMeta(b, b.status), unseen: isUnseenBrief(b) };
                 return (
-                  <tr key={b.id} onClick={() => handleOpenBrief(b)} className="tfa-dash-row" style={{ borderBottom: '1px solid #F3F1EA', cursor: 'pointer', background: unseen ? '#FBF9EC' : undefined }}>
-                    <td style={{ padding: '12px 16px', fontWeight: unseen ? 700 : 600, color: b.companyName ? '#1D1D1D' : '#9C9890' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                        {unseen && (
-                          <span
-                            title="Nieuw: nog niet bekeken"
-                            style={{ width: 8, height: 8, borderRadius: '50%', background: '#E6C858', flex: 'none', boxShadow: '0 0 0 3px rgba(230,200,88,.35)' }}
-                          />
-                        )}
-                        <span>{b.companyName || 'Nog geen bedrijfsnaam'}</span>
-                        {unseen && (
-                          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>
-                            Nieuw
-                          </span>
-                        )}
-                        <ProductionBadge brief={b} small />
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>{b.hoofdspotLength || '20'}″</td>
-                    <td style={{ padding: '12px 16px', color: b.assignedTo ? '#1D1D1D' : '#9C9890' }}>{b.assignedTo || 'Niet toegewezen'}</td>
-                    <td style={{ padding: '12px 16px', color: due.color, fontWeight: due.overdue ? 700 : 400 }}>
-                      {due.overdue ? '⚠ ' : ''}{due.label}
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>{new Date(b.updatedAt).toLocaleString('nl-NL')}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <StatusSelect brief={b} onChange={handleStatusChange} compact />
-                    </td>
+                  <tr key={b.id} onClick={() => handleOpenBrief(b)} className="tfa-dash-row" style={{ borderBottom: '1px solid #F3F1EA', cursor: 'pointer', background: ctx.unseen ? '#FBF9EC' : undefined }}>
+                    {activeColumns.map((c) => (
+                      <td key={c.key} style={{ padding: '12px 16px', ...(c.cellStyle ? c.cellStyle(b, ctx) : null) }}>
+                        {c.cell(b, ctx)}
+                      </td>
+                    ))}
                   </tr>
                 );
               })}
               {pageItems.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ padding: '24px 16px', textAlign: 'center', color: '#8C8880' }}>Geen briefs in deze periode.</td>
+                  <td colSpan={activeColumns.length} style={{ padding: '24px 16px', textAlign: 'center', color: '#8C8880' }}>Geen briefs in deze periode.</td>
                 </tr>
               )}
             </tbody>
@@ -880,6 +1050,7 @@ export default function DashboardClient({ briefs }) {
                   <Field label="Hoofdspot">{selected.hoofdspotLength || '20'}″{variationsSummaryLabel(selected)}</Field>
                   <Field label="Aangemaakt">{new Date(selected.createdAt).toLocaleString('nl-NL')}</Field>
                   {selected.submittedAt && <Field label="Verzonden">{new Date(selected.submittedAt).toLocaleString('nl-NL')}</Field>}
+                  <Field label="Op de radio" empty={!selected.airDate && !selected.dateUnknown}>{formatAirDate(selected)}</Field>
                 </div>
               </div>
             </div>
@@ -905,14 +1076,24 @@ export default function DashboardClient({ briefs }) {
                     </select>
                   </div>
                   <div style={{ flex: '1 1 160px' }}>
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Deadline</div>
-                    <input
-                      type="date"
-                      defaultValue={selected.dueDate || ''}
-                      onChange={(e) => handleMetaChange(selected.id, { dueDate: e.target.value })}
-                      disabled={metaBusy}
-                      style={{ width: '100%', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
-                    />
+                    {/* Used to be a free-pick internal deadline here — but
+                        production always works as fast as possible rather
+                        than against a producer-chosen date, so it never
+                        reflected anything real. Read-only now, showing the
+                        one deadline that actually matters: when the client
+                        needs this on air (see formatAirDate in flowData.js).
+                        Set on the client's own delivery step, not editable
+                        by the team. */}
+                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Op de radio</div>
+                    <div
+                      style={{
+                        width: '100%', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13,
+                        background: '#F3F1EA', color: deliveryDeadlineMeta(selected, selected.status).color,
+                        fontWeight: deliveryDeadlineMeta(selected, selected.status).overdue ? 700 : 400,
+                      }}
+                    >
+                      {deliveryDeadlineMeta(selected, selected.status).overdue ? '⚠ ' : ''}{formatAirDate(selected)}
+                    </div>
                   </div>
                 </div>
 
@@ -966,19 +1147,52 @@ export default function DashboardClient({ briefs }) {
 
             {modalTab === 'creatief' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
-              {(selected.editedScript || selected.generatedScript) ? (
-                <div style={refCardStyle}>
-                  <ModalSectionTitle>Script</ModalSectionTitle>
-                  <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 14.5, lineHeight: 1.6, color: '#1D1D1D' }}>
-                    {selected.editedScript !== null && selected.editedScript !== undefined ? selected.editedScript : selected.generatedScript}
+              {(() => {
+                // Was missing the brief's variations entirely — the client
+                // could always see them on their own overview page and in
+                // the confirmation email, but the dashboard's Script card
+                // only ever rendered the main hoofdspot script. Same
+                // "what's different" diff-against-the-main-script treatment
+                // as those client-facing views (see overview/page.js),
+                // since a producer needs to see what makes each variation
+                // different at a glance, not read the whole thing again.
+                const mainText = selected.editedScript !== null && selected.editedScript !== undefined ? selected.editedScript : selected.generatedScript;
+                const variationCount = variationsCountOf(selected);
+                const variationScripts = parseVariationScripts(selected);
+                return (
+                  <div style={refCardStyle}>
+                    <ModalSectionTitle>Script{variationCount > 0 ? ' · hoofdspot' : ''}</ModalSectionTitle>
+                    <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: mainText ? 'italic' : 'normal', fontSize: 14.5, lineHeight: 1.6, color: mainText ? '#1D1D1D' : '#9C9890' }}>
+                      {mainText || 'Nog geen script goedgekeurd.'}
+                    </div>
+                    {variationCount > 0 && (
+                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #EAE3C4' }}>
+                        {Array.from({ length: variationCount }).map((_, idx) => {
+                          const varText = variationScripts[idx] !== undefined ? variationScripts[idx] : mainText;
+                          const tokens = diffWords(mainText || '', varText || '');
+                          const changed = hasDiff(tokens);
+                          return (
+                            <div key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
+                              <div style={{ fontSize: 11, fontWeight: 600, color: '#5C5850', textTransform: 'uppercase', letterSpacing: '.03em' }}>
+                                {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{changed ? ': wat verschilt' : ''}
+                              </div>
+                              {changed ? (
+                                <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 14.5, lineHeight: 1.6, marginTop: 6 }}>
+                                  <DiffPreview tokens={tokens} />
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: 13, color: '#8C8880', marginTop: 6, fontStyle: 'italic' }}>
+                                  Nog identiek aan het hoofdscript.
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ) : (
-                <div style={refCardStyle}>
-                  <ModalSectionTitle>Script</ModalSectionTitle>
-                  <div style={{ fontSize: 13.5, color: '#9C9890' }}>Nog geen script goedgekeurd.</div>
-                </div>
-              )}
+                );
+              })()}
 
               <div style={refCardStyle}>
                 <ModalSectionTitle>Stem</ModalSectionTitle>

@@ -3,14 +3,17 @@ import { getBrief, updateBriefTeamMeta } from '../../../../../../lib/db';
 import { notifyAssigned } from '../../../../../../lib/slack';
 
 // Producer-only — gated by middleware.js, same as the status route.
-// Updates the team-only assignedTo / dueDate fields on a brief.
+// Updates the team-only assignedTo field on a brief. dueDate used to be
+// settable here too, but the dashboard no longer offers a manual internal
+// deadline (see the comment above formatAirDate in components/flowData.js)
+// — the DB column is left in place for old data, just nothing writes to it
+// anymore.
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(request, { params }) {
   const body = await request.json().catch(() => ({}));
   const patch = {};
   if (Object.prototype.hasOwnProperty.call(body || {}, 'assignedTo')) patch.assignedTo = body.assignedTo;
-  if (Object.prototype.hasOwnProperty.call(body || {}, 'dueDate')) patch.dueDate = body.dueDate;
   // Fired once, the first time a producer opens a brief's detail view (see
   // DashboardClient.js's row click handler) — stamps seenAt so the "new,
   // unchecked brief" highlight on the list disappears. Never a way to

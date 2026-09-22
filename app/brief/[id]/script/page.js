@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
-import { TONE_LABELS, estimateSeconds, wordCountOf, variationsCountOf } from '../../../../components/flowData';
+import { TONE_LABELS, estimateSeconds, wordCountOf, variationsCountOf, parseVariationScripts } from '../../../../components/flowData';
 import { diffWords, DiffPreview } from '../../../../components/textDiff';
 
 const DEFAULT_DISCLAIMER = 'Nog geen verplichte tekst ontvangen, deze verschijnt hier zodra ingevuld in de brief.';
@@ -20,15 +20,6 @@ function briefHasEnoughContent(b) {
 function parseHistory(brief) {
   try {
     const parsed = brief && brief.scriptHistory ? JSON.parse(brief.scriptHistory) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
-}
-
-function parseVariationScripts(brief) {
-  try {
-    const parsed = brief && brief.variationScripts ? JSON.parse(brief.variationScripts) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch (e) {
     return [];

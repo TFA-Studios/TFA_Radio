@@ -77,6 +77,57 @@ export const AGE_LABELS = { '18-34': '18–34', '35-54': '35–54', '55+': '55+'
 export const MONTH_NAMES = ['Januari', 'Februari', 'Maart', 'April', 'Mei', 'Juni', 'Juli', 'Augustus', 'September', 'Oktober', 'November', 'December'];
 export const MONTH_NAMES_LOWER = MONTH_NAMES.map((m) => m.toLowerCase());
 
+// The client's requested air/broadcast date from the delivery step (step 2)
+// — airDate, or a rough airMonth if they didn't know the exact date yet
+// (dateUnknown). This is THE real delivery deadline for a brief: previously
+// the dashboard also had a separate, manually-typed-in "internal deadline"
+// (dueDate) on the Team tab, but since production always works "as fast as
+// possible" rather than against a producer-picked date, that field never
+// reflected anything real. It's been replaced everywhere (Levering card,
+// Team tab, the dashboard table's Deadline column, the reports "overdue"
+// stat and CSV export) with this — the client's own date — so "overdue"
+// now means what it should: the brief is now expected on air and isn't
+// done yet. Was previously three near-identical copies of this same
+// formatting (overview step, confirmation email, PDF export); consolidated
+// here for the same reason as TONE_LABELS above.
+export function formatAirDate(brief) {
+  if (!brief) return 'Nog niet opgegeven';
+  if (brief.dateUnknown) {
+    if (brief.airMonth) {
+      const idx = parseInt(brief.airMonth, 10) - 1;
+      const name = MONTH_NAMES_LOWER[idx];
+      return name ? 'Nog niet exact bekend, gepland voor ' + name : 'Nog niet bekend';
+    }
+    return 'Nog niet bekend';
+  }
+  if (brief.airDate) {
+    const d = new Date(brief.airDate + 'T00:00:00');
+    if (!isNaN(d.getTime())) return d.getDate() + ' ' + MONTH_NAMES_LOWER[d.getMonth()] + ' ' + d.getFullYear();
+    return brief.airDate;
+  }
+  return 'Nog niet opgegeven';
+}
+
+// Dashboard-table/Team-tab display of the delivery deadline above: a short
+// label, a color, and whether it's overdue (client's air date has passed
+// and the brief isn't done yet — a finished brief with a past air date
+// isn't a problem). Deliberately ignores dateUnknown/airMonth for the
+// overdue check — a rough "sometime in September" can't be judged overdue
+// the way an exact date can, so those just render neutrally.
+export function deliveryDeadlineMeta(brief, status) {
+  if (!brief || (!brief.airDate && !brief.dateUnknown)) {
+    return { label: 'Nog niet opgegeven', color: '#9C9890', overdue: false };
+  }
+  if (brief.dateUnknown) {
+    return { label: formatAirDate(brief), color: '#9C9890', overdue: false };
+  }
+  const d = new Date(brief.airDate + 'T00:00:00');
+  if (isNaN(d.getTime())) return { label: brief.airDate, color: '#9C9890', overdue: false };
+  const label = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
+  const overdue = status !== 'done' && d.getTime() < new Date().setHours(0, 0, 0, 0);
+  return { label, color: overdue ? '#C2513F' : '#1D1D1D', overdue };
+}
+
 export function estimateSeconds(words) {
   return (words / 2.7) * 1.05;
 }
@@ -107,6 +158,26 @@ export function variationsSummaryLabel(brief) {
   const n = variationsCountOf(brief);
   if (!n) return '';
   return n === 1 ? ' + 1x variatie' : ' + ' + n + 'x variaties';
+}
+
+// variationScripts holds one entry per requested variation — index i is
+// what a client (or producer, on the dashboard) actually approved/edited
+// for variation i+1, falling back to the main hoofdspot script wherever a
+// slot hasn't been individually edited yet (see EDIT_FIELDS in lib/db.js).
+// Was four separate copies of this exact parse (script step, overview step,
+// confirmation email, PDF export) — none of them reached the dashboard's
+// own Script card, which is why producers couldn't see a brief's variations
+// there even though clients could always see them on their own overview
+// page and in their confirmation email. Consolidated here so anywhere new
+// that needs a brief's variations (the dashboard included) gets them for
+// free instead of silently missing this the way the dashboard did.
+export function parseVariationScripts(brief) {
+  try {
+    const parsed = brief && brief.variationScripts ? JSON.parse(brief.variationScripts) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
 }
 
 // ---------------------------------------------------------------------------

@@ -6,6 +6,7 @@ import useMinDelay from '../../../../components/useMinDelay';
 import SpotFlowLogo from '../../../../components/SpotFlowLogo';
 import { useBrief } from '../../../../components/useBrief';
 import { parseReviewRounds, currentReviewRound, formatRoundLabel, formatDateTime, revisionDisclaimerText } from '../../../../components/flowData';
+import StudioPhotoLoop from '../../../../components/StudioPhotoLoop';
 
 // Post-production review — reached via a private link emailed to the
 // client once a producer pastes a Frame.io link from the dashboard (see
@@ -525,6 +526,13 @@ function Shell({ companyName, firstName, children }) {
             {firstName ? `Hallo ${firstName}, h` : 'H'}ier is de status van je {companyName}-commercial
           </div>
         )}
+        {/* Small personal touch, shown on every state of this page — a
+            quiet reminder that a real studio in Amsterdam is working on
+            this, not just a status tracker. Same component/photos as the
+            landing page hero, just smaller and without pulling focus from
+            the actual status content below it. */}
+        <StudioPhotoLoop height={140} borderRadius={14} caption={null} />
+        <div style={{ height: 22 }} />
         {children}
         {/* Shown unconditionally, on every state of this page (busy, in
             review, approved) — not just once in the Voorwaarden the client

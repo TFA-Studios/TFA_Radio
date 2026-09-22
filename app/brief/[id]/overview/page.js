@@ -5,17 +5,8 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { MONTH_NAMES_LOWER, variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText } from '../../../../components/flowData';
+import { variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, formatAirDate, parseVariationScripts } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
-
-function parseVariationScripts(brief) {
-  try {
-    const parsed = brief && brief.variationScripts ? JSON.parse(brief.variationScripts) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
-}
 
 function formatImpressions(brief) {
   const v = brief.impressions;
@@ -24,23 +15,6 @@ function formatImpressions(brief) {
   const n = parseInt(v, 10);
   return (isNaN(n) ? v : n.toLocaleString('nl-NL')) + ' impressies';
 }
-function formatAirDate(brief) {
-  if (brief.dateUnknown) {
-    if (brief.airMonth) {
-      const idx = parseInt(brief.airMonth, 10) - 1;
-      const name = MONTH_NAMES_LOWER[idx];
-      return name ? 'Nog niet exact bekend, gepland voor ' + name : 'Nog niet bekend';
-    }
-    return 'Nog niet bekend';
-  }
-  if (brief.airDate) {
-    const d = new Date(brief.airDate + 'T00:00:00');
-    if (!isNaN(d.getTime())) return d.getDate() + ' ' + MONTH_NAMES_LOWER[d.getMonth()] + ' ' + d.getFullYear();
-    return brief.airDate;
-  }
-  return 'Nog niet opgegeven';
-}
-
 // Step 7 — mirrors public/overview.html. CRITICAL: this is the ONLY place
 // in the whole flow that sends {submitted:true} — no other step may ever
 // send it, since that flag means "the whole 7-step flow is done, fire the
