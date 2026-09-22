@@ -8,7 +8,15 @@ import { InstagramIcon, LinkedInIcon, YouTubeIcon } from '../components/SocialIc
 export default function HomePage() {
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7' }}>
-      <div style={{ position: 'relative', background: '#1D1D1D', overflow: 'hidden' }}>
+      {/* Diagonal cut instead of a flat line into the beige section below —
+          the clip-path only trims what gets PAINTED, it doesn't change this
+          div's actual box height, so the section below still starts exactly
+          where this div's rectangle would have ended (no gap to patch with
+          a negative margin). The extra --diag of padding-bottom reserves a
+          buffer below the hero's own content for the slope to cut through,
+          so the diagonal never clips into the headline/button themselves —
+          it only eats into empty space that's there for exactly that. */}
+      <div style={{ position: 'relative', background: '#1D1D1D', overflow: 'hidden' }} className="tfa-hero-diagonal">
         <BrandWave />
 
         <div style={{ position: 'relative', zIndex: 1 }}>
@@ -106,6 +114,14 @@ export default function HomePage() {
       </footer>
 
       <style>{`
+        .tfa-hero-diagonal {
+          --diag: 70px;
+          clip-path: polygon(0 0, 100% 0, 100% 100%, 0 calc(100% - var(--diag)));
+          padding-bottom: var(--diag);
+        }
+        @media (max-width: 640px) {
+          .tfa-hero-diagonal { --diag: 34px; }
+        }
         .tfa-cta-hero {
           transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
           box-shadow: 0 0 0 0 rgba(230,200,88,0);
