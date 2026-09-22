@@ -54,11 +54,12 @@ export default function HomePage() {
       {/* Studio photos — moved here from beside the hero text (where they
           were forced into a roughly-square crop) so each photo shows at
           its real 3:2 rectangle, full width of its own section between the
-          hero's CTA and the footer. variant="cinematic": one big photo at
-          a time, slow crossfade + Ken Burns zoom — went back to this after
-          the "slide/peek" version (main photo centered, next one dimmed
-          and peeking on the side) didn't land right in practice, even
-          though it was built exactly as originally asked for. */}
+          hero's CTA and the footer. variant="pair": both photos side by
+          side, same size, full color, no dimming/hierarchy trick, static
+          (no auto-loop) — calmer and more "editorial" than the rotating
+          single-photo crossfade or the earlier slide/peek version, at the
+          cost of the "modern loop" motion those had. Subtle hover-zoom
+          per photo on desktop is the only motion left. */}
       {/* Fades from the hero's solid black straight into the page's own
           background color, so the photos sit on a smooth gradient instead
           of the hard black→beige line that used to sit right above them.
@@ -66,7 +67,7 @@ export default function HomePage() {
           there's no visible seam at the top of this wrapper either. */}
       <div style={{ background: 'linear-gradient(180deg, #1D1D1D 0%, #DEDCD7 60%)' }}>
         <section style={{ maxWidth: 1180, margin: '0 auto', padding: '70px 20px 70px' }}>
-          <StudioPhotoLoop variant="cinematic" maxWidth={980} />
+          <StudioPhotoLoop variant="pair" maxWidth={980} />
         </section>
       </div>
 

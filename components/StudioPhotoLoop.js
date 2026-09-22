@@ -162,6 +162,55 @@ function SlideLoop({ images, intervalMs, caption, maxWidth, borderRadius }) {
   );
 }
 
+// variant="pair" — no loop at all. Both photos sit side by side, same
+// size, full color, no greying/dimming/hierarchy trick between them —
+// a calm "editorial" pair instead of a rotating spotlight on one photo
+// at a time. Only motion is a subtle hover-zoom per photo on pointer
+// devices (a plain CSS :hover scale on the <img>, so it costs nothing
+// on touch/no-hover devices where the media query below just no-ops).
+function PairRow({ images, caption, maxWidth, borderRadius }) {
+  return (
+    <div style={{ width: '100%', maxWidth, margin: '0 auto' }}>
+      <div
+        className="tfa-studio-pair"
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${images.length}, 1fr)`, gap: 20 }}
+      >
+        {images.map((img) => (
+          <div
+            key={img.src}
+            style={{
+              position: 'relative', width: '100%', aspectRatio: '3 / 2', borderRadius,
+              overflow: 'hidden', background: '#111',
+              boxShadow: '0 0 0 1.5px rgba(230,200,88,.35), 0 16px 40px rgba(0,0,0,.28)',
+            }}
+          >
+            <img
+              src={img.src}
+              alt={img.alt || ''}
+              className="tfa-studio-pair-img"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          </div>
+        ))}
+      </div>
+      {caption && (
+        <div style={{ marginTop: 14, fontSize: 12, fontWeight: 600, letterSpacing: '.03em', color: '#5C5850', textAlign: 'center' }}>
+          {caption}
+        </div>
+      )}
+      <style>{`
+        .tfa-studio-pair-img { transition: transform .5s ease; will-change: transform; }
+        @media (hover: hover) and (pointer: fine) {
+          .tfa-studio-pair-img:hover { transform: scale(1.045); }
+        }
+        @media (max-width: 640px) {
+          .tfa-studio-pair { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 export default function StudioPhotoLoop({
   images = DEFAULT_IMAGES,
   variant = 'crossfade',
@@ -172,6 +221,9 @@ export default function StudioPhotoLoop({
   borderRadius = 20,
 }) {
   if (!images || images.length === 0) return null;
+  if (variant === 'pair') {
+    return <PairRow images={images} caption={caption} maxWidth={maxWidth} borderRadius={borderRadius} />;
+  }
   if (variant === 'slide') {
     return <SlideLoop images={images} intervalMs={intervalMs || 5200} caption={caption} maxWidth={maxWidth} borderRadius={borderRadius} />;
   }
