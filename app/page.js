@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import SpotFlowLogo from '../components/SpotFlowLogo';
 import BrandWave from '../components/BrandWave';
-import StudioPhotoLoop from '../components/StudioPhotoLoop';
+import StudioCarousel from '../components/StudioCarousel';
 import { InstagramIcon, LinkedInIcon, YouTubeIcon } from '../components/SocialIcons';
 
 // Public marketing homepage — general layout/copy inspired by
@@ -171,18 +171,24 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Replaced the two-photo "peek" loop with a centered, continuously
+            auto-advancing carousel — reference for the interaction (big
+            centered card, cropped neighbours peeking at the edges, smooth
+            slide, bottom-left play/pause + progress bar) was a clip Karim
+            recorded; the photos, copy, tags and styling here are TFA's own,
+            not copied from that reference. Click any peeking neighbour to
+            jump straight to it. Add more entries to `images` below as more
+            real photos come in — sizing/spacing is all relative. */}
         <div style={{ padding: '48px 0 80px' }}>
-          <StudioPhotoLoop
-            variant="slide"
-            intervalMs={1500}
-            maxWidth={1040}
+          <StudioCarousel
+            intervalMs={4000}
+            maxWidth={1180}
             borderRadius={20}
-            caption={null}
             images={[
-              { src: '/studio/studio-1.jpg', alt: 'TFA Studio — controlekamer' },
-              { src: '/studio/studio-2.jpg', alt: 'TFA Studio — opnamehokje' },
-              { src: '/studio/studio-3.jpg', alt: 'TFA Studio — entree' },
-              { src: '/studio/studio-4.jpg', alt: 'TFA Studio — lounge' },
+              { src: '/studio/studio-1.jpg', alt: 'TFA Studio — controlekamer', tag: 'Controlekamer' },
+              { src: '/studio/studio-2.jpg', alt: 'TFA Studio — opnamehokje', tag: 'Opnamehokje' },
+              { src: '/studio/studio-3.jpg', alt: 'TFA Studio — entree', tag: 'Entree' },
+              { src: '/studio/studio-4.jpg', alt: 'TFA Studio — lounge', tag: 'Lounge' },
             ]}
           />
         </div>
