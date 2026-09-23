@@ -14,6 +14,11 @@ export async function PATCH(request, { params }) {
   const body = await request.json().catch(() => ({}));
   const patch = {};
   if (Object.prototype.hasOwnProperty.call(body || {}, 'assignedTo')) patch.assignedTo = body.assignedTo;
+  // Which of the client's (up to 3) candidate music tracks actually ended up
+  // in the final production — see finalTrackOf() in components/flowData.js.
+  // Set from the Muziek card in the dashboard's Creatief tab once there's
+  // more than one candidate to disambiguate.
+  if (Object.prototype.hasOwnProperty.call(body || {}, 'usedTrackId')) patch.usedTrackId = body.usedTrackId;
   // Fired once, the first time a producer opens a brief's detail view (see
   // DashboardClient.js's row click handler) — stamps seenAt so the "new,
   // unchecked brief" highlight on the list disappears. Never a way to

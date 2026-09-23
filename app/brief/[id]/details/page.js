@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
@@ -64,6 +64,12 @@ function CharCount({ field, value }) {
 export default function DetailsPage({ params }) {
   const { id } = params;
   const router = useRouter();
+  // See the identical comment in contact/page.js. When editing the brief
+  // from an overview "Wijzig" link, saving should NOT silently re-trigger a
+  // fresh AI script generation (that would quietly invalidate an
+  // already-approved script the client never asked to redo) — it just
+  // saves the fields and returns to the overview instead.
+  const returnToOverview = useSearchParams().get('from') === 'overview';
   const { brief, loading, schedulePatch, flushPending, patch } = useBrief(id);
   const showLoader = useMinDelay(loading, 700);
   // Set the instant "Akkoord" is clicked, not after the save (and, on this
@@ -133,6 +139,10 @@ export default function DetailsPage({ params }) {
     // done, send the confirmation email", which only happens on the
     // overview step's final submit.
     await patch({ ...form, toneOfVoice: JSON.stringify(form.toneOfVoice) });
+    if (returnToOverview) {
+      router.push(`/brief/${id}/overview`);
+      return;
+    }
     setGenerating(true);
     try {
       await fetch(`/api/briefs/${id}/generate-script`, { method: 'POST' });
@@ -144,7 +154,7 @@ export default function DetailsPage({ params }) {
   }
 
   if (showLoader) return <Preloader />;
-  if (navigating) return <Preloader messages={scriptPreloaderMessages(brief && brief.companyName)} />;
+  if (navigating) return generating ? <Preloader messages={scriptPreloaderMessages(brief && brief.companyName)} /> : <Preloader />;
 
   return (
     <StepShell briefId={id} current={3} brief={brief} bigNum="03" kicker="De inhoud" title="Jouw brief" hint="Nog een paar korte vragen over je commercial en je brief." backHref={`/brief/${id}/delivery`} backLabel="Terug naar levering">
@@ -176,7 +186,7 @@ export default function DetailsPage({ params }) {
       </div>
 
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
-        <label className="field-label">Waarom kiezen klanten voor jou, en niet voor een concurrent?</label>
+        <label className="field-label">Waarom kiezen klanten voor jou en niet voor een concurrent?</label>
         <textarea style={{ minHeight: 64 }} maxLength={FIELD_LIMITS.usp} value={form.usp} placeholder="Jouw belangrijkste voordeel" onChange={(e) => update('usp', e.target.value)} />
         <CharCount field="usp" value={form.usp} />
       </div>
@@ -256,7 +266,7 @@ export default function DetailsPage({ params }) {
 
       <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
         <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={submit} disabled={generating}>
-          {generating ? 'Script wordt gegenereerd…' : 'Akkoord: verder naar het scriptvoorstel'}
+          {generating ? 'Script wordt gegenereerd…' : returnToOverview ? 'Terug naar overzicht' : 'Akkoord: verder naar het scriptvoorstel'}
         </button>
       </div>
     </StepShell>

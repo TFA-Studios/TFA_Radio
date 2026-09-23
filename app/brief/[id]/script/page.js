@@ -1,12 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
-import { TONE_LABELS, estimateSeconds, wordCountOf, variationsCountOf, parseVariationScripts } from '../../../../components/flowData';
-import { diffWords, DiffPreview } from '../../../../components/textDiff';
+import { TONE_LABELS, estimateSeconds, wordCountOf, variationsCountOf } from '../../../../components/flowData';
 
 const DEFAULT_DISCLAIMER = 'Nog geen verplichte tekst ontvangen, deze verschijnt hier zodra ingevuld in de brief.';
 // Mirrors lib/db.js's MAX_SCRIPT_HISTORY — how many script generations a
@@ -27,11 +26,19 @@ function parseHistory(brief) {
 }
 
 // Step 4 — mirrors public/script.html: generation, live "estimated
-// seconds" bar, hand-edit, approve, and (once approved + variation(s)
-// wanted) one variation panel per requested variation.
+// seconds" bar, hand-edit, approve. Once approved (and if the client asked
+// for variation(s) back on the delivery step), approving navigates on to
+// the dedicated variations subpage instead of revealing anything further
+// down this same page — see app/brief/[id]/script/variations/page.js and
+// StepShell's showVariationsSubnav for the matching sidebar entry.
 export default function ScriptPage({ params }) {
   const { id } = params;
   const router = useRouter();
+  // See the identical comment in contact/page.js. Only applies to the
+  // "no variations needed" path below — when variations ARE needed, the
+  // client still has to go through the variations subpage first (its own
+  // "Doorgaan naar de stem" step honors the same flag for the same reason).
+  const returnToOverview = useSearchParams().get('from') === 'overview';
   const [brief, setBrief] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState(null); // { message, debugId } | null
@@ -42,23 +49,11 @@ export default function ScriptPage({ params }) {
   // resolves — see the identical comment in contact/page.js.
   const [navigating, setNavigating] = useState(false);
   const [scriptText, setScriptText] = useState('');
-  // One entry per requested variation (length driven by variationsCount).
-  const [variations, setVariations] = useState([]);
-  // Which variation is currently shown — with more than one, they're
-  // reviewed one at a time (same page, no navigation) instead of all
-  // stacked underneath each other, which got unwieldy past two.
-  const [activeVarIdx, setActiveVarIdx] = useState(0);
-  // Per-variation "just saved" confirmation — the approve button used to
-  // give no feedback at all (it just fires a PATCH), which reads as "this
-  // button does nothing". Flips true right after a successful save, then
-  // clears itself after a moment.
-  const [savedFlash, setSavedFlash] = useState({});
-  const savedFlashTimers = useRef({});
-  // Same "✓ Opgeslagen" confirmation as the per-variation flash below, but
-  // for the main script textarea — this used to save silently on every
-  // debounced edit with no visible feedback at all, which is exactly why a
-  // client could type a change, move to the next step, and have no way to
-  // tell whether it had actually been kept.
+  // Same "✓ Opgeslagen" confirmation the variations subpage also uses for
+  // its own textareas — this used to save silently on every debounced edit
+  // with no visible feedback at all, which is exactly why a client could
+  // type a change, move to the next step, and have no way to tell whether
+  // it had actually been kept.
   const [scriptSavedFlash, setScriptSavedFlash] = useState(false);
   const scriptSavedFlashTimer = useRef(null);
   const scriptFocused = useRef(false);
@@ -70,19 +65,6 @@ export default function ScriptPage({ params }) {
   // not-yet-saved server value, which looks exactly like the client's edit
   // was silently discarded.
   const scriptSavePending = useRef(false);
-  // Per-variation focus (keyed by index) — which variation textarea(s) are
-  // currently being typed in, so the sync effect below never clobbers one
-  // mid-edit.
-  const varFocusedMap = useRef({});
-  const variationsSaveTimer = useRef(null);
-  const variationsSavePending = useRef(false);
-  // The main script text the variations were last synced against — lets the
-  // sync effect tell "this variation was never customized, so it should
-  // keep mirroring the main script" apart from "this variation was
-  // hand-edited, leave it alone". Without this, fixing a typo in the main
-  // script after approval silently stopped applying to any variation that
-  // was still an untouched copy of it.
-  const prevMainRef = useRef('');
 
   const fetchBrief = useCallback(async () => {
     try {
@@ -144,8 +126,7 @@ export default function ScriptPage({ params }) {
       setFirstLoadDone(true);
     })();
     const interval = setInterval(async () => {
-      const anyVarFocused = Object.values(varFocusedMap.current).some(Boolean);
-      if (scriptFocused.current || anyVarFocused) return;
+      if (scriptFocused.current) return;
       await fetchBrief();
     }, 2000);
     return () => {
@@ -155,43 +136,13 @@ export default function ScriptPage({ params }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // Sync local text fields from brief, but never clobber what's focused or
-  // has an unsaved edit in flight.
+  // Sync local text from brief, but never clobber what's focused or has an
+  // unsaved edit in flight.
   useEffect(() => {
     if (!brief) return;
     const generatedText = brief.generatedScript || '';
     const text = brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript : generatedText;
     if (!scriptFocused.current && !scriptSavePending.current) setScriptText(text);
-
-    const count = variationsCountOf(brief);
-    const stored = parseVariationScripts(brief);
-    const prevMain = prevMainRef.current;
-    if (!variationsSavePending.current) {
-      setVariations((current) => {
-        const next = [];
-        for (let idx = 0; idx < count; idx++) {
-          if (varFocusedMap.current[idx]) {
-            next.push(current[idx] !== undefined ? current[idx] : (stored[idx] !== undefined ? stored[idx] : text));
-            continue;
-          }
-          const storedVal = stored[idx];
-          if (storedVal === undefined) {
-            // Brand-new variation slot (count just went up, or nothing saved
-            // yet) — start it as a copy of the main script.
-            next.push(text);
-          } else if (storedVal === prevMain) {
-            // Never hand-edited relative to the main script — keep it
-            // mirroring the main script's own edits.
-            next.push(text);
-          } else {
-            // Customized by the client — leave it alone.
-            next.push(storedVal);
-          }
-        }
-        return next;
-      });
-    }
-    prevMainRef.current = text;
   }, [brief]);
 
   function scheduleScriptSave(value) {
@@ -216,30 +167,6 @@ export default function ScriptPage({ params }) {
     }, 350);
   }
 
-  function scheduleVariationsSave(arr, savedIdx) {
-    variationsSavePending.current = true;
-    clearTimeout(variationsSaveTimer.current);
-    variationsSaveTimer.current = setTimeout(() => {
-      fetch(`/api/briefs/${id}/edit`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variationScripts: JSON.stringify(arr) }),
-      })
-        .then((res) => {
-          if (!res.ok || savedIdx === undefined) return;
-          setSavedFlash((f) => ({ ...f, [savedIdx]: true }));
-          clearTimeout(savedFlashTimers.current[savedIdx]);
-          savedFlashTimers.current[savedIdx] = setTimeout(() => {
-            setSavedFlash((f) => ({ ...f, [savedIdx]: false }));
-          }, 2000);
-        })
-        .catch(() => {})
-        .finally(() => {
-          variationsSavePending.current = false;
-        });
-    }, 350);
-  }
-
   function onScriptChange(e) {
     setScriptSavedFlash(false);
     setScriptText(e.target.value);
@@ -255,33 +182,15 @@ export default function ScriptPage({ params }) {
     setBrief((b) => (b ? { ...b, editedScript: null } : b));
   }
 
-  function onVarChange(idx, value) {
-    setSavedFlash((f) => (f[idx] ? { ...f, [idx]: false } : f));
-    setVariations((current) => {
-      const next = current.slice();
-      next[idx] = value;
-      scheduleVariationsSave(next, idx);
-      return next;
-    });
-  }
-  function resetVar(idx) {
-    setVariations((current) => {
-      const next = current.slice();
-      next[idx] = scriptText;
-      fetch(`/api/briefs/${id}/edit`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variationScripts: JSON.stringify(next) }),
-      }).catch(() => {});
-      return next;
-    });
-  }
   async function approveAndContinue() {
     if (!brief || !brief.generatedScript) return;
-    // Only the "no variation needed" path actually navigates away (the
-    // variation path just reveals the variation panel(s) further down this
-    // same page) — so only that path shows the preloader.
-    if (!brief.needsVariations) setNavigating(true);
+    // Approving now always navigates somewhere — either on to the voice
+    // step, or on to the dedicated variations subpage
+    // (app/brief/[id]/script/variations) — instead of the old behavior of
+    // silently revealing a variations section further down this same page,
+    // which read as the page just "growing" with no real transition. See
+    // StepShell's showVariationsSubnav for the matching sidebar entry.
+    setNavigating(true);
     clearTimeout(saveTimer.current);
     try {
       await fetch(`/api/briefs/${id}/edit`, {
@@ -293,30 +202,17 @@ export default function ScriptPage({ params }) {
 
     if (brief.needsVariations) {
       try {
-        const res = await fetch(`/api/briefs/${id}`, {
+        await fetch(`/api/briefs/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ scriptApproved: true }),
         });
-        if (res.ok) setBrief(await res.json());
       } catch (e) {}
+      router.push(`/brief/${id}/script/variations${returnToOverview ? '?from=overview' : ''}`);
       return;
     }
 
-    router.push(`/brief/${id}/voice`);
-  }
-
-  async function continueToVoice() {
-    setNavigating(true);
-    clearTimeout(variationsSaveTimer.current);
-    try {
-      await fetch(`/api/briefs/${id}/edit`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variationScripts: JSON.stringify(variations) }),
-      });
-    } catch (e) {}
-    router.push(`/brief/${id}/voice`);
+    router.push(returnToOverview ? `/brief/${id}/overview` : `/brief/${id}/voice`);
   }
 
   if (showLoader || navigating) return <Preloader />;
@@ -366,9 +262,9 @@ export default function ScriptPage({ params }) {
   const unchanged = trimmed === generatedText.trim();
 
   let approveLabel;
-  if (!hasVariation) approveLabel = unchanged ? 'Goedkeuren, dit is prima zo' : 'Wijzigingen opslaan en goedkeuren';
+  if (!hasVariation) approveLabel = returnToOverview ? 'Wijzigingen opslaan: terug naar overzicht' : (unchanged ? 'Goedkeuren, dit is prima zo' : 'Wijzigingen opslaan en goedkeuren');
   else if (!scriptApproved) approveLabel = unchanged ? 'Goedkeuren en verder naar de variatie' + (variationCount > 1 ? 's' : '') : 'Wijzigingen opslaan en verder naar de variatie' + (variationCount > 1 ? 's' : '');
-  else approveLabel = unchanged ? 'Goedgekeurd ✓: wijzigingen opslaan' : 'Wijzigingen opslaan';
+  else approveLabel = unchanged ? 'Goedgekeurd ✓: bekijk je variatie' + (variationCount > 1 ? 's' : '') : 'Wijzigingen opslaan';
 
   return (
     <StepShell
@@ -544,119 +440,17 @@ export default function ScriptPage({ params }) {
       </div>
 
       {hasVariation && scriptApproved && (
-        <div style={{ marginTop: 34, paddingTop: 26, borderTop: '1px solid #EAE3C4' }}>
-          <div style={{ fontSize: 13, letterSpacing: '.09em', textTransform: 'uppercase', color: '#383209', fontWeight: 500 }}>Script goedgekeurd</div>
-          <h3 style={{ fontWeight: 600, fontSize: 18, margin: '8px 0 4px' }}>{variationCount > 1 ? 'Jouw variaties' : 'Jouw variatie'}</h3>
-          <p style={{ fontSize: 12.5, color: '#5C5850', margin: '0 0 14px', lineHeight: 1.5 }}>
-            Je gaf bij levering aan {variationCount > 1 ? `${variationCount} variaties` : 'ook een variatie'} nodig te hebben. Hieronder staat je zojuist
-            goedgekeurde script {variationCount > 1 ? `${variationCount}x` : 'nogmaals'}: dit is dezelfde tekst als hierboven, klaar om aan te passen.
-            Typ zelf de stukjes tekst aan die {variationCount > 1 ? 'per variatie' : 'in deze variatie'} anders moeten zijn; de rest laat je gewoon staan.
-            {variationCount > 1 ? ' Je kunt gerust tussen de tabbladen hierboven wisselen' : ''}
-            {variationCount > 1 ? ', elke aanpassing wordt automatisch bewaard zodra je typt, ook als je meteen naar een ander tabblad gaat.' : ' Ook hier wordt elke aanpassing automatisch bewaard zodra je typt.'}
-            {' '}Er is geen aparte knop om op te slaan of goed te keuren: als er &ldquo;✓ Opgeslagen&rdquo; staat, is het klaar.
-          </p>
-
-          {variationCount > 1 && (
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 18 }}>
-              {Array.from({ length: variationCount }).map((_, i) => {
-                const vt = variations[i] !== undefined ? variations[i] : scriptText;
-                const customized = (vt || '').trim() !== scriptText.trim();
-                const isActive = i === activeVarIdx;
-                return (
-                  <button
-                    key={i}
-                    type="button"
-                    onClick={() => setActiveVarIdx(i)}
-                    style={{
-                      border: '1.5px solid ' + (isActive ? '#E6C858' : '#C9C5B9'),
-                      background: isActive ? '#FBF0C8' : '#FFFFFF',
-                      borderRadius: 999, padding: '6px 13px', fontSize: 12, fontWeight: isActive ? 700 : 500,
-                      color: '#1D1D1D', cursor: 'pointer',
-                    }}
-                  >
-                    Variatie {i + 1}{customized ? ' ✓' : ''}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {(() => {
-            const idx = activeVarIdx;
-            const varText = variations[idx] !== undefined ? variations[idx] : scriptText;
-            const varTrimmed = (varText || '').trim();
-            const varWords = wordCountOf(varTrimmed);
-            const varSeconds = estimateSeconds(varWords);
-            let varStatusLabel = 'Past goed binnen ' + target + ' seconden.';
-            let varBarColor = '#1D1D1D';
-            if (varSeconds > target * 1.2) { varStatusLabel = 'Te lang, graag inkorten.'; varBarColor = '#C2513F'; }
-            else if (varSeconds > target * 1.05) { varStatusLabel = 'Net iets te lang, bekort het wat.'; varBarColor = '#383209'; }
-            const varBarPct = Math.min((varSeconds / target) * 100, 140) + '%';
-            const varUnchanged = varTrimmed === scriptText.trim();
-            const tokens = diffWords(scriptText, varText);
-
-            return (
-              <div>
-                <textarea
-                  style={{ minHeight: 90 }}
-                  value={varText}
-                  onFocus={() => { varFocusedMap.current[idx] = true; }}
-                  onBlur={() => { varFocusedMap.current[idx] = false; }}
-                  onChange={(e) => onVarChange(idx, e.target.value)}
-                />
-                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: savedFlash[idx] ? '#1D7A46' : '#9C9890' }}>
-                  {savedFlash[idx] ? <>✓ Opgeslagen</> : <>Wordt automatisch opgeslagen terwijl je typt</>}
-                </div>
-                <div style={{ marginTop: 14 }}>
-                  <label className="field-label">Wat is er veranderd?</label>
-                  {varUnchanged ? (
-                    <div className="hint">
-                      Nog geen wijzigingen, pas de tekst hierboven aan op het punt waar deze variatie moet verschillen van je hoofdscript.
-                    </div>
-                  ) : (
-                    <div style={{ background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '12px 14px', fontSize: 13.5, lineHeight: 1.65, color: '#1D1D1D' }}>
-                      <DiffPreview tokens={tokens} />
-                    </div>
-                  )}
-                </div>
-                <div style={{ marginTop: 10 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5C5850' }}>
-                    <span>Geschatte lengte</span>
-                    <span style={{ fontWeight: 500, color: varBarColor }}>{varSeconds.toFixed(1)}s van {target}″</span>
-                  </div>
-                  <div style={{ marginTop: 6, height: 8, borderRadius: 4, background: '#EAE7DE', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', borderRadius: 4, width: varBarPct, background: varBarColor }} />
-                  </div>
-                  <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 500, color: varBarColor }}>{varStatusLabel}</div>
-                </div>
-                {!varUnchanged && (
-                  <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button
-                      type="button"
-                      className="ghost-btn"
-                      onClick={() => resetVar(idx)}
-                      style={{ width: 'auto', flex: 'none', border: '1.5px solid #B06156', color: '#B06156' }}
-                    >
-                      ↺ Terugzetten naar origineel
-                    </button>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* One single way forward from here: no separate "goedkeuren"
-              step per variation (autosave already covers it, per the
-              caption under each textarea above) and no separate
-              "volgende variatie" stepper duplicating the tabs above —
-              this used to give a client three overlapping ways to move
-              between/past variations with no clear signal which one
-              "counted", which read as confusing/misleading. Now: use the
-              tabs above (when there's more than one) to look at each
-              variation, then this one button to continue whenever ready. */}
-          <div style={{ marginTop: 20, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={continueToVoice}>Doorgaan naar de stem</button>
+        <div style={{ marginTop: 30, padding: '16px 18px', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12.5, color: '#5C5850' }}>
+            Script goedgekeurd. Je variatie{variationCount > 1 ? 's staan' : ' staat'} klaar om aan te passen.
           </div>
+          <a
+            href={`/brief/${id}/script/variations`}
+            className="btn-primary"
+            style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', whiteSpace: 'nowrap', padding: '11px 20px', flex: 'none' }}
+          >
+            Bekijk variatie{variationCount > 1 ? 's' : ''} →
+          </a>
         </div>
       )}
 

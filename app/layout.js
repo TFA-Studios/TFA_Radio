@@ -2,7 +2,7 @@ import { ClerkProvider } from '@clerk/nextjs';
 
 export const metadata = {
   title: 'TFA SpotFlow',
-  description: 'Radiocommercials: van brief tot uitzending.',
+  description: 'Commercials: van brief tot uitzending.',
   manifest: '/manifest.webmanifest',
   // iOS Safari ignores the manifest above — this is what it reads instead
   // when the user does Share → "Add to Home Screen".

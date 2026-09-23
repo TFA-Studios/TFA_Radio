@@ -5,7 +5,7 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, formatAirDate, parseVariationScripts } from '../../../../components/flowData';
+import { variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
 
 function formatImpressions(brief) {
@@ -110,9 +110,12 @@ export default function OverviewPage({ params }) {
       { n: '2', label: 'Montage & mix', detail: 'Stem, muziek en eventuele varianten worden samengevoegd.' },
       {
         n: '3', label: 'Review & goedkeuring',
-        detail: 'Zodra er een eerste versie klaarstaat, ontvang je een e-mail met een link om ‘m te beluisteren, feedback te geven of goed te keuren.',
+        detail: 'Zodra er een eerste versie klaarstaat, ontvang je een e-mail met een link om deze te beluisteren, feedback te geven of goed te keuren.',
       },
-      { n: '4', label: 'Levering', detail: 'Na jouw goedkeuring ontvang je de eindbestanden, klaar voor uitzending.' },
+      // Final delivery goes to Advision Media, not straight to the client —
+      // see the identical "Wat gebeurt er nu?" note on the review/status
+      // page (app/brief/[id]/review/page.js) once a round is approved.
+      { n: '4', label: 'Levering', detail: 'Na jouw goedkeuring levert TFA de eindbestanden op aan Advision Media, klaar voor uitzending.' },
     ];
     // One always-visible "status" line + button to the review page — not
     // conditional on whether a round exists yet, deliberately: a client
@@ -148,7 +151,7 @@ export default function OverviewPage({ params }) {
             ✓
           </div>
           <p style={{ fontSize: 16, lineHeight: 1.65, color: '#383209', margin: '0 0 6px', fontWeight: 500, maxWidth: 640 }}>
-            Je radiocommercial is succesvol verzonden naar TFA.
+            Je commercial is succesvol verzonden naar TFA.
           </p>
           <p style={{ fontSize: 14, lineHeight: 1.6, color: '#5C5850', margin: 0, maxWidth: 640 }}>
             Je ontvangt zo een bevestiging per e-mail met een overzicht van al je keuzes. Daarin kun je ook altijd
@@ -218,6 +221,7 @@ export default function OverviewPage({ params }) {
             <li style={{ marginBottom: 6 }}>Het gebruiksrecht op de gekozen voice-over en muziek geldt uitsluitend voor deze specifieke productie, zonder recht op verlenging of hergebruik in toekomstige producties.</li>
             <li style={{ marginBottom: 6 }}>Brengt de klant na goedkeuring en opname van het script alsnog wijzigingen aan, dan worden de kosten van de daaruit voortvloeiende heropname(s) apart in rekening gebracht.</li>
             <li style={{ marginBottom: 6 }}>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
+            <li style={{ marginBottom: 6 }}>{ipRightsDisclaimerText()}</li>
             <li>{revisionDisclaimerText()}</li>
           </ul>
         </div>
@@ -276,7 +280,7 @@ export default function OverviewPage({ params }) {
         <div style={compactCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div style={compactHeaderStyle}>Jouw gegevens</div>
-            <a href={`/brief/${id}/contact`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
+            <a href={`/brief/${id}/contact?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
           <div style={{ fontSize: 13, marginTop: 9 }}>{companyName}</div>
           <div style={{ fontSize: 13, marginTop: 2, color: brief.contactPerson ? '#1D1D1D' : '#9C9890' }}>{brief.contactPerson || 'Nog geen contactpersoon opgegeven'}</div>
@@ -291,7 +295,7 @@ export default function OverviewPage({ params }) {
         <div style={compactCardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div style={compactHeaderStyle}>Levering</div>
-            <a href={`/brief/${id}/delivery`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
+            <a href={`/brief/${id}/delivery?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
           <div style={{ fontSize: 13, marginTop: 9 }}>Hoofdspot · {spotLength}″{variationCount > 0 ? (variationCount === 1 ? ' + 1 variatie' : ` + ${variationCount} variaties`) : ''}</div>
           <div style={{ fontSize: 13, marginTop: 2 }}>{formatImpressions(brief)}</div>
@@ -301,7 +305,7 @@ export default function OverviewPage({ params }) {
         <div style={{ ...featureCardStyle, gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div style={featureHeaderStyle}>Script · hoofdspot {spotLength}″</div>
-            <a href={`/brief/${id}/script`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
+            <a href={`/brief/${id}/script?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
           <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: mainText ? 'italic' : 'normal', fontSize: 17.5, lineHeight: 1.7, marginTop: 16, color: mainText ? '#1D1D1D' : '#9C9890' }}>
             {mainText || 'Nog geen script goedgekeurd.'}
@@ -336,7 +340,7 @@ export default function OverviewPage({ params }) {
         <div style={{ ...standardCardStyle, gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div style={standardHeaderStyle}>Stem</div>
-            <a href={`/brief/${id}/voice`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
+            <a href={`/brief/${id}/voice?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
           {voiceLabel ? (
             <>
@@ -358,7 +362,7 @@ export default function OverviewPage({ params }) {
         <div style={{ ...standardCardStyle, gridColumn: '1 / -1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <div style={standardHeaderStyle}>Muziek</div>
-            <a href={`/brief/${id}/music`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
+            <a href={`/brief/${id}/music?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
           {hasTracks ? (
             <>
@@ -400,6 +404,7 @@ export default function OverviewPage({ params }) {
           <li style={{ marginBottom: 6 }}>Het gebruiksrecht op de gekozen voice-over en muziek geldt uitsluitend voor deze specifieke productie, zonder recht op verlenging of hergebruik in toekomstige producties.</li>
           <li style={{ marginBottom: 6 }}>Brengt de klant na goedkeuring en opname van het script alsnog wijzigingen aan, dan worden de kosten van de daaruit voortvloeiende heropname(s) apart in rekening gebracht.</li>
           <li style={{ marginBottom: 6 }}>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
+          <li style={{ marginBottom: 6 }}>{ipRightsDisclaimerText()}</li>
           <li>{revisionDisclaimerText()}</li>
         </ul>
       </div>
@@ -420,8 +425,9 @@ export default function OverviewPage({ params }) {
             <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>Verplicht</span>
           </div>
           <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.55, color: '#5C5850' }}>
-            Ik geef TFA het groene licht om dit script, deze stem en deze muziek in productie te nemen, en om deze gegevens
-            (inclusief het gebruikelijke cookie- en trackingwerk) te gebruiken om dit traject soepel te laten verlopen.
+            Hierbij geef ik TFA formeel akkoord om het script, de stem en de muziek in productie te nemen. Daarnaast ga ik
+            akkoord met het gebruik van de benodigde gegevens en de inzet van de gebruikelijke cookies en trackingtools om
+            de voortgang van dit traject te waarborgen.
           </div>
         </div>
       </div>

@@ -9,7 +9,7 @@ export default function manifest() {
   return {
     name: 'TFA SpotFlow',
     short_name: 'SpotFlow',
-    description: 'Radiocommercials: van brief tot uitzending.',
+    description: 'Commercials: van brief tot uitzending.',
     start_url: '/',
     display: 'standalone',
     background_color: '#DEDCD7',

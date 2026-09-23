@@ -180,6 +180,41 @@ export function parseVariationScripts(brief) {
   }
 }
 
+// The client's up-to-3 candidate music picks from the Muziek step (step 6) —
+// see MAX_TRACKS in app/brief/[id]/music/page.js. Same parsing repeated
+// verbatim in a few places (computeReached above, lib/db.js's rowToBrief
+// consumers, DashboardClient.js) — kept here too as the one shared version
+// for anything new that needs the parsed array rather than the raw JSON.
+export function parseSelectedTracks(brief) {
+  try {
+    const parsed = brief && brief.selectedTracks ? JSON.parse(brief.selectedTracks) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Which ONE of the client's (up to 3) candidate tracks actually ended up in
+// the final production — needed because the client is only ever asked to
+// narrow it down to a handful of options, not commit to one, so nothing
+// upstream tells you which one TFA actually used. If there's only one
+// candidate there's no ambiguity; with more than one, a producer has to
+// explicitly mark the used one from the dashboard (brief.usedTrackId, set
+// via updateBriefTeamMeta) — this returns null (not a guess) until they do,
+// since silently picking "the first one" would be actively wrong here: this
+// feeds both the final delivery email to Advision/whoever and, eventually,
+// the accountant's invoice, and both need the real answer, not a fallback.
+export function finalTrackOf(brief) {
+  const tracks = parseSelectedTracks(brief);
+  if (!tracks.length) return null;
+  if (tracks.length === 1) return tracks[0];
+  if (brief && brief.usedTrackId) {
+    const match = tracks.find((t) => t.id === brief.usedTrackId);
+    if (match) return match;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Post-production review workflow (client review page + dashboard "Productie
 // & review" section) — see the parseReviewRounds comment in lib/db.js for
@@ -228,8 +263,16 @@ export function reviewOverIncludedCap(brief) {
 // on the client's review/status page. One shared string so a client sees the
 // same included-rounds expectation wherever they look, not just once in the
 // terms they agreed to before submitting.
+// Fixed legal/IP clause added to the Voorwaarden list everywhere it's shown
+// (overview step, confirmation email, producer PDF, review/status page) —
+// per TFA's explicit legal wording, so it stays a single source of truth
+// rather than four independent copies drifting apart.
+export function ipRightsDisclaimerText() {
+  return 'Alle intellectuele eigendomsrechten – waaronder begrepen maar niet beperkt tot auteursrechten, naburige rechten, merkrechten en modelrechten – met betrekking tot de commercial en alle daarvoor ontwikkelde (tussentijdse) materialen, concepten, scripts, beelden en audio, berusten uitsluitend en volledig bij TFA.';
+}
+
 export function revisionDisclaimerText() {
-  return 'Let op: bij deze productie zijn ' + INCLUDED_REVISIONS + ' rondes revisie inbegrepen. Heb je meer nodig? Neem dan contact op met Advision.';
+  return 'Let op: bij deze productie zijn ' + INCLUDED_REVISIONS + ' rondes revisie inbegrepen. Heb je meer nodig? Neem dan contact op met Advision Media.';
 }
 
 // Turns a round's 'YYYY-MM-DD' folderDate into a Dutch long date ("8

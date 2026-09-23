@@ -27,6 +27,15 @@ import { useEffect, useRef, useState } from 'react';
 // once" actually means from the client's side.
 let lastPlaybackTime = 0;
 
+// Shown only once loading has clearly overrun a normal, snappy wait — see
+// the `longWait` state below. Deliberately generic/reassuring rather than
+// naming a cause (we genuinely don't always know why a given wait is slow),
+// so it applies equally to a sluggish network, a slow AI provider response,
+// or just a cold server function — the client only needs to know TFA hasn't
+// frozen, not the technical reason.
+const LONG_WAIT_MESSAGE = 'Dit duurt iets langer dan normaal, even geduld…';
+const LONG_WAIT_MS = 4000;
+
 export default function Preloader({ fullScreen = true, messages }) {
   const videoRef = useRef(null);
   // Optional rotating caption under the brand mark — used for the one
@@ -45,6 +54,21 @@ export default function Preloader({ fullScreen = true, messages }) {
       setMsgIdx((i) => (i + 1) % messages.length);
     }, 2200);
     return () => clearInterval(interval);
+  }, [messages]);
+
+  // Every OTHER call site (no `messages` prop) used to give no feedback at
+  // all beyond the spinning brand mark, however long the wait actually
+  // ran — a fast save felt instant, but a slow one (a cold serverless
+  // function, a sluggish connection) looked identical to a frozen page.
+  // This fires once, after LONG_WAIT_MS, purely as a reassurance — it says
+  // nothing about progress (there isn't any real percentage to report),
+  // just that TFA is still there. Skipped whenever `messages` is already
+  // rotating its own copy, so the two captions never fight for the same spot.
+  const [longWait, setLongWait] = useState(false);
+  useEffect(() => {
+    if (messages && messages.length > 0) return undefined;
+    const timer = setTimeout(() => setLongWait(true), LONG_WAIT_MS);
+    return () => clearTimeout(timer);
   }, [messages]);
 
   useEffect(() => {
@@ -102,8 +126,13 @@ export default function Preloader({ fullScreen = true, messages }) {
             {messages[msgIdx]}
           </div>
         )}
+        {(!messages || messages.length === 0) && longWait && (
+          <div className="tfa-preloader-msg-fade" style={{ textAlign: 'center', fontSize: 13.5, lineHeight: 1.55, color: '#DEDCD7' }}>
+            {LONG_WAIT_MESSAGE}
+          </div>
+        )}
       </div>
-      {messages && messages.length > 0 && (
+      {((messages && messages.length > 0) || longWait) && (
         <style jsx>{`
           @keyframes tfa-preloader-msg-fade {
             from { opacity: 0; transform: translateY(3px); }

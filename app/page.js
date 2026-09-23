@@ -30,7 +30,7 @@ export default function HomePage() {
               site runs its hero type noticeably bigger and bolder than this
               did, which is the proportion this now matches. */}
           <main style={{ maxWidth: 940, margin: '60px auto 0', padding: '0 20px 90px', textAlign: 'center' }}>
-            <div style={{ fontSize: 14, letterSpacing: '.09em', textTransform: 'uppercase', color: '#E6C858', fontWeight: 600 }}>Radiocommercials, zonder gedoe</div>
+            <div style={{ fontSize: 14, letterSpacing: '.09em', textTransform: 'uppercase', color: '#E6C858', fontWeight: 600 }}>Commercials, zonder gedoe</div>
             <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 64, lineHeight: 1.08, margin: '20px 0 22px', color: '#FBF9EC' }}>
               Van brief tot uitzending, in 7 simpele stappen.
             </h1>
@@ -67,66 +67,69 @@ export default function HomePage() {
           the small version on the client status page (app/brief/[id]/
           review/page.js) is unaffected — just not rendered here anymore. */}
 
-      {/* Looping video "breaker" between the hero and the footer — replaces
-          the diagonal-cut hero bottom tried previously. Full-bleed: the
-          `left: 50%; margin-left: -50vw` trick breaks the video out of
-          every ancestor's centered max-width so it spans the full browser
-          width edge-to-edge, even though the rest of the page stays inside
-          the usual 1180px-max container. Shown as the plain video itself
-          (no dark overlay/tint, not used as a background layer behind any
-          text) — autoplay+loop+muted+playsInline is what makes autoplay
-          allowed at all in every browser; object-fit: cover fills that full
-          width at the video's own 1280:674 aspect ratio without letterboxing
-          bars on the sides.
-          maxHeight caps how tall this gets on wide screens — at its native
-          1280:674 ratio, "100vw wide" alone means the video's height keeps
-          growing with the browser's width (over 1000px tall on a big
-          desktop monitor), which is what made it feel oversized next to the
-          hero text/footer around it. Capping the height and letting
-          object-fit: cover crop the sides keeps it full-bleed width-wise
-          while staying proportionate to the rest of the page. */}
+      {/* Photo carousel "breaker" between the hero and the footer — replaces
+          the looping banner video that used to sit here (video file/section
+          removed entirely; the carousel takes its exact spot, same
+          full-bleed treatment and same capped height, so nothing about the
+          surrounding layout had to change). Full-bleed: the
+          `left: 50%; margin-left: -50vw` trick breaks it out of every
+          ancestor's centered max-width so it spans the full browser width
+          edge-to-edge, even though the rest of the page stays inside the
+          usual 1180px-max container. Height capped via `.tfa-carousel-row`
+          below (560px desktop / 260px mobile) — the same cap the video used,
+          for the same reason: at this component's native photo aspect ratio,
+          "100vw wide" alone would let it keep growing taller with the
+          browser's width.
+
+          PHOTOS — four distinct studio shots exist in public/studio today
+          (studio-1..4). The two "engineer" photos Karim asked for turned out,
+          on close comparison, to already BE studio-1 (Karim, the oud/Dolby
+          Atmos room) and studio-2 (Marco, the green room) — every image sent
+          across both rounds matched one of these four rooms pixel-for-pixel,
+          none were a genuinely new fifth/sixth shot. So this is four, not
+          six, until two more distinct photos come through; flagged back to
+          Karim rather than guessing. Once two new ones land, add them here
+          as additional entries — no other changes needed, sizing/order are
+          driven entirely by this array.
+          TAGS deliberately describe the room, not the person at the desk
+          (Karim asked for no names on the site) — "Dolby Atmos studio" /
+          "Mixstudio" cover studio-1 / studio-2 without naming Karim/Marco.
+          ORDER is arranged for visual variety (wide control room → dramatic
+          Atmos room → intimate booth → mix room) rather than strictly
+          "engineers first" — Karim left the exact arrangement up to us. */}
       <div style={{ position: 'relative', left: '50%', width: '100vw', marginLeft: '-50vw', overflow: 'hidden', background: '#1D1D1D' }}>
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
-          className="tfa-banner-video"
-          style={{ display: 'block', width: '100%', aspectRatio: '1280 / 674', objectFit: 'cover' }}
-        >
-          <source src="/video/tfa-banner.mp4" type="video/mp4" />
-        </video>
+        <StudioCarousel
+          intervalMs={4000}
+          maxWidth="100%"
+          borderRadius={20}
+          images={[
+            { src: '/studio/studio-3.jpg', alt: 'TFA Studio — controlekamer', tag: 'Controlekamer' },
+            { src: '/studio/studio-1.jpg', alt: 'TFA Studio — Dolby Atmos studio', tag: 'Dolby Atmos studio' },
+            { src: '/studio/studio-4.jpg', alt: 'TFA Studio — opnamehokje', tag: 'Opnamehokje' },
+            { src: '/studio/studio-2.jpg', alt: 'TFA Studio — mixstudio', tag: 'Mixstudio' },
+          ]}
+        />
       </div>
 
-      {/* "Kom langs" / visit-the-studio section — sits between the banner
-          video and the footer, same #1D1D1D background as both so the
-          whole bottom of the page reads as one continuous dark close
-          rather than a new card bolted on. Revised per Karim's voice-note
-          feedback on the first pass:
-          — "Liever face to face?" now sits on its own line above the bold
-            headline instead of running into it (separate question + statement).
-          — Map is no longer a small boxed-off card: it's the full right
-            column, stretched (via grid `alignItems: stretch`) to match the
-            exact height of the left column, top to bottom — its top edge
-            lines up with "Kom langs", its bottom edge lines up with the
-            "Route plannen" button. Real Google Maps embed (no API key
-            needed for a basic place/search iframe).
-          — Paragraph copy rewritten: dropped "meeluisteren in de
-            opnamestudio" (implied you could sit in on a live recording,
-            which isn't something we want people assuming is on offer right
-            now) in favour of studio tour / sitting down with the team /
-            coffee — keeps the "always welcome" warmth without over-promising.
-          — Dotted connector to the gallery is gone entirely (Karim: drop it).
-          — Gallery is no longer a static side-scroll strip: it's
-            StudioPhotoLoop's "slide" variant — one big hero photo with the
-            next photo peeking smaller/greyed-out beside it, swapping on a
-            ~1.5s loop with a smooth slide animation. Four real photos now
-            (public/studio/studio-1..4.jpg — the last two are the new lobby
-            + lounge shots Karim sent); add more to the `images` array below
-            as they come in, the loop just picks them up. All source photos
-            were re-compressed (~1400-1600px wide, quality ~74-76) to keep
-            page weight down. */}
-      <section style={{ background: '#1D1D1D', padding: '72px 20px 0', position: 'relative' }}>
+      {/* "Kom langs" / visit-the-studio section — sits between the carousel
+          and the footer, same #1D1D1D background as both so the whole
+          bottom of the page reads as one continuous dark close rather than
+          a new card bolted on. Unchanged content-wise (address, map, "Route
+          plannen") — the studio photo carousel that used to live at the
+          bottom of this section has moved up to replace the banner video
+          above instead (see the carousel block right before this one), so
+          this section is back to just the "Kom langs" copy + map, with its
+          own bottom padding restored now that it's no longer relying on the
+          carousel's padding underneath it for spacing.
+          — "Liever face to face?" sits on its own line above the bold
+            headline (separate question + statement).
+          — Map is the full right column, stretched (via grid
+            `alignItems: stretch`) to match the exact height of the left
+            column, top to bottom — its top edge lines up with "Kom langs",
+            its bottom edge lines up with the "Route plannen" button. Real
+            Google Maps embed (no API key needed for a basic place/search
+            iframe). */}
+      <section style={{ background: '#1D1D1D', padding: '72px 20px 80px', position: 'relative' }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 48, alignItems: 'stretch' }} className="tfa-visit-columns">
             <div>
@@ -170,48 +173,6 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-
-        {/* Centered, continuously auto-advancing carousel — reference for
-            the interaction (big centered card, cropped neighbours peeking
-            at the edges, smooth slide) was a clip Karim recorded; the
-            photos, copy, tags and styling here are TFA's own, not copied
-            from that reference. Click any peeking neighbour to jump
-            straight to it.
-            Per follow-up notes: no play/pause button or progress bar
-            anymore (StudioCarousel no longer renders one), and it now runs
-            FULL-BLEED edge-to-edge like the banner video above — same
-            `left: 50%; width: 100vw; margin-left: -50vw` trick, and the
-            row's height is capped the same way the video's is (see
-            `.tfa-carousel-row` below: 560px desktop / 260px mobile).
-
-            TAGS & ORDER: both live right here, in the `images` array a few
-            lines down — `tag` is the little label shown on the active
-            photo, order in the array is the order they cycle in. Move a
-            line to reorder; edit its `tag` to relabel. (This replaces an
-            earlier mislabeling: studio-1/2/3 are actually three different
-            control rooms, not a control room + booth + entrance — I had
-            the wrong rooms tagged. studio-4 is the vocal booth. Fixed
-            below.)
-
-            MISSING PHOTOS: the lobby/entrance shot and the red lounge-room
-            shot you sent earlier never actually saved as separate files on
-            my end (only two new uploads came through, and they turned out
-            to be two more control-room angles, not those two) — so they're
-            not in this carousel yet. Could you resend those two? I'll drop
-            them straight into this array once they're in. */}
-        <div style={{ position: 'relative', left: '50%', width: '100vw', marginLeft: '-50vw', padding: '48px 0 80px', overflow: 'hidden' }}>
-          <StudioCarousel
-            intervalMs={4000}
-            maxWidth="100%"
-            borderRadius={20}
-            images={[
-              { src: '/studio/studio-1.jpg', alt: 'TFA Studio — controlekamer', tag: 'Controlekamer' },
-              { src: '/studio/studio-2.jpg', alt: 'TFA Studio — mixage', tag: 'Mixage' },
-              { src: '/studio/studio-3.jpg', alt: 'TFA Studio — editsuite', tag: 'Editsuite' },
-              { src: '/studio/studio-4.jpg', alt: 'TFA Studio — opnamehokje', tag: 'Opnamehokje' },
-            ]}
-          />
-        </div>
       </section>
 
       {/* Footer rebuilt to match the original tfa.studio site's structure —
@@ -236,17 +197,32 @@ export default function HomePage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Truly centered — not just "left-aligned inside the middle
+                grid track" (which reads as off-center relative to the whole
+                footer, since the track's own left edge isn't the visual
+                center). alignItems: 'center' + textAlign: 'center' centers
+                both the heading and the links themselves within this
+                column, so the column's content sits on the exact horizontal
+                center of the footer, not just somewhere inside its cell. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', textAlign: 'center' }} className="tfa-footer-col-center">
               <div className="tfa-footer-heading">Snel naar</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 12.5, alignItems: 'center' }}>
                 <Link href="/start" style={{ color: '#B9B6AC', textDecoration: 'none' }}>Start je commercial</Link>
                 <Link href="/sign-in" style={{ color: '#B9B6AC', textDecoration: 'none' }}>Admin login</Link>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* Pushed flush to the RIGHT edge of this column's own grid
+                cell (alignItems: 'flex-end') rather than sitting at the
+                cell's left edge the way every other column's content does
+                by default — that's what made it read as "still on the left
+                of the right column" before. The right edge this lines up
+                with is the same 1180px container the footer's own
+                border-top line spans, so "Volg ons" now aligns with that
+                line's right end, not the raw edge of the browser window. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end', textAlign: 'right' }} className="tfa-footer-col-right">
               <div className="tfa-footer-heading">Volg ons</div>
-              <div style={{ display: 'flex', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
                 <a href="https://www.instagram.com/tfa.studio" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="tfa-footer-icon">
                   <InstagramIcon />
                 </a>
@@ -282,10 +258,6 @@ export default function HomePage() {
         .tfa-cta-hero:active { transform: translateY(0) scale(0.99); }
         .tfa-cta-arrow { display: inline-block; transition: transform .18s ease; }
         .tfa-cta-hero:hover .tfa-cta-arrow { transform: translateX(4px); }
-        .tfa-banner-video { max-height: 560px; }
-        @media (max-width: 640px) {
-          .tfa-banner-video { max-height: 260px; }
-        }
         .tfa-carousel-row { aspect-ratio: 1280 / 674; max-height: 560px; }
         @media (max-width: 640px) {
           .tfa-carousel-row { max-height: 260px; }
@@ -304,6 +276,21 @@ export default function HomePage() {
         }
         @media (max-width: 460px) {
           .tfa-footer-grid { grid-template-columns: 1fr !important; }
+          /* Once the grid collapses to one stacked column, "centered" and
+             "right-aligned" no longer mean anything relative to each other
+             — every column is the full width, so keep all three reading
+             the same, plain left-aligned way the Contact column already
+             does, rather than an odd stack of left/center/right blocks. */
+          .tfa-footer-col-center,
+          .tfa-footer-col-right {
+            align-items: flex-start !important;
+            text-align: left !important;
+          }
+          .tfa-footer-col-center > div,
+          .tfa-footer-col-right > div {
+            align-items: flex-start !important;
+            justify-content: flex-start !important;
+          }
         }
 
         /* Right column's map fills the grid row's full height (the grid's

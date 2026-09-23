@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
@@ -11,6 +11,12 @@ import { useBrief } from '../../../../components/useBrief';
 export default function ContactPage({ params }) {
   const { id } = params;
   const router = useRouter();
+  // Set on the "Wijzig" links from the overview step (app/brief/[id]/
+  // overview/page.js) — a client editing one field from there used to have
+  // to click "Volgende" all the way through every later step again just to
+  // get back to the overview. When this flag is present, "Volgende" below
+  // becomes "Terug naar overzicht" and goes straight there instead.
+  const returnToOverview = useSearchParams().get('from') === 'overview';
   const { brief, loading, schedulePatch, flushPending, patch } = useBrief(id);
   const showLoader = useMinDelay(loading, 700);
   const [form, setForm] = useState({ companyName: '', contactPerson: '', contactEmail: '', additionalContacts: [] });
@@ -101,7 +107,7 @@ export default function ContactPage({ params }) {
     setNavigating(true);
     flushPending();
     await patch({ ...form, additionalContacts: JSON.stringify(form.additionalContacts) });
-    router.push(`/brief/${id}/delivery`);
+    router.push(returnToOverview ? `/brief/${id}/overview` : `/brief/${id}/delivery`);
   }
 
   if (showLoader || navigating) return <Preloader />;
@@ -181,7 +187,7 @@ export default function ContactPage({ params }) {
           onClick={next}
           disabled={!canContinue}
         >
-          Volgende: verder naar je commercial
+          {returnToOverview ? 'Terug naar overzicht' : 'Volgende: verder naar je commercial'}
         </button>
       </div>
     </StepShell>

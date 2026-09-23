@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
@@ -27,6 +27,8 @@ function formatTime(sec) {
 export default function VoicePage({ params }) {
   const { id } = params;
   const router = useRouter();
+  // See the identical comment in contact/page.js.
+  const returnToOverview = useSearchParams().get('from') === 'overview';
   const { brief, loading, schedulePatch, flushPending, patch } = useBrief(id);
   const showLoader = useMinDelay(loading, 700);
   // See the identical comment in contact/page.js.
@@ -254,7 +256,7 @@ export default function VoicePage({ params }) {
     setPlayingId(null);
     flushPending();
     await patch({ ...form, voiceStyleTags: form.voiceStyleTags.join(',') });
-    router.push(`/brief/${id}/music`);
+    router.push(returnToOverview ? `/brief/${id}/overview` : `/brief/${id}/music`);
   }
 
   if (showLoader || navigating) return <Preloader />;
@@ -391,7 +393,7 @@ export default function VoicePage({ params }) {
           </div>
           <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
             <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} disabled={!form.selectedVoiceId} onClick={next}>
-              Bevestigen: verder naar de muziek
+              {returnToOverview ? 'Terug naar overzicht' : 'Bevestigen: verder naar de muziek'}
             </button>
           </div>
         </>

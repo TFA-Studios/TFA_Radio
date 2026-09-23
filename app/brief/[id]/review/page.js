@@ -207,7 +207,7 @@ export default function ReviewPage({ params }) {
             }}
           >
             <span style={{ fontWeight: 700 }}>Wat gebeurt er nu? </span>
-            TFA draagt deze goedgekeurde audio nu over aan Advision, zij nemen het vanaf hier over. Neem gerust rechtstreeks contact met hen op voor de verdere afhandeling.
+            TFA draagt deze goedgekeurde audio nu over aan Advision Media, zij nemen het vanaf hier over. Neem gerust rechtstreeks contact met hen op voor de verdere afhandeling.
           </div>
         )}
       </div>
@@ -271,7 +271,7 @@ export default function ReviewPage({ params }) {
         {!isApproved && (
           <>
             <div style={{ fontSize: 12, color: '#9C9890', marginBottom: 8 }}>
-              Wil je liever eerst nog iets laten aanpassen? Typ het hieronder: TFA ziet dit direct, en het blijft hier zichtbaar staan. Dit is een aparte stap van goedkeuren hierboven.
+              Wil je liever eerst nog iets laten aanpassen? Typ het hieronder: TFA ziet dit direct en het blijft hier zichtbaar staan. Dit is een aparte stap van goedkeuren hierboven.
             </div>
             <textarea
               value={feedbackText}
@@ -383,7 +383,7 @@ const STUDIO_TIPS = [
   'Stem en muziek worden pas op elkaar afgestemd zodra allebei er zijn, nooit andersom.',
   'Zelfs 20 seconden radio doorloopt bij ons script, opname, montage én mix.',
   'We luisteren elk eindresultaat minstens twee keer terug voordat het naar jou toe gaat.',
-  'Timing is alles: een goede radiocommercial wordt vaker geknipt dan je zou denken.',
+  'Timing is alles: een goede commercial wordt vaker geknipt dan je zou denken.',
 ];
 
 function InProductionCard({ brief, assignedTo }) {
@@ -392,9 +392,11 @@ function InProductionCard({ brief, assignedTo }) {
   useEffect(() => {
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (reduceMotion) return;
+    // Slowed down from 5000ms — the tips were rotating faster than a client
+    // could comfortably read them, per Karim's feedback.
     const interval = setInterval(() => {
       setTipIdx((i) => (i + 1) % STUDIO_TIPS.length);
-    }, 5000);
+    }, 9000);
     return () => clearInterval(interval);
   }, []);
   const stages = [
@@ -434,9 +436,9 @@ function InProductionCard({ brief, assignedTo }) {
           Je {spotLength}″ commercial wordt opgenomen
         </h1>
         <p style={{ fontSize: 14, lineHeight: 1.6, color: '#5C5850', margin: '0 auto', maxWidth: 460 }}>
-          Er is nog niets te bekijken, en dat is helemaal normaal op dit moment. Zodra de eerste versie klaarstaat, ontvang
-          je automatisch een e-mail met een link om ‘m te beluisteren, feedback te geven of goed te keuren. Deze pagina
-          werkt dan meteen mee: je hoeft ‘m niet te verversen of ergens anders naar te zoeken.
+          Er is nog niets te bekijken en dat is helemaal normaal op dit moment. Zodra de eerste versie klaarstaat, ontvang
+          je automatisch een e-mail met een link om deze te beluisteren, feedback te geven of goed te keuren. Deze pagina
+          werkt dan meteen mee: je hoeft deze niet te verversen of ergens anders naar te zoeken.
         </p>
         <div
           key={tipIdx}

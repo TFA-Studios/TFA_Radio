@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
@@ -25,6 +25,8 @@ function formatTime(sec) {
 export default function MusicPage({ params }) {
   const { id } = params;
   const router = useRouter();
+  // See the identical comment in contact/page.js.
+  const returnToOverview = useSearchParams().get('from') === 'overview';
   const { brief, loading, schedulePatch, flushPending, patch } = useBrief(id);
   const showLoader = useMinDelay(loading, 700);
   // See the identical comment in contact/page.js.
@@ -227,6 +229,9 @@ export default function MusicPage({ params }) {
     await patch({ selectedTracks: JSON.stringify(selectedTracks) });
     router.push(`/brief/${id}/overview`);
   }
+  // Note: music is the last step before the overview anyway, so
+  // returnToOverview doesn't change where "next" goes here — it's read only
+  // for the button label below, kept consistent with every other step.
 
   if (showLoader || navigating) return <Preloader />;
 
@@ -403,7 +408,7 @@ export default function MusicPage({ params }) {
 
       <div style={{ marginTop: 20, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
         <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} disabled={selectedTracks.length === 0} onClick={next}>
-          Bevestigen: verder naar het overzicht
+          {returnToOverview ? 'Terug naar overzicht' : 'Bevestigen: verder naar het overzicht'}
         </button>
       </div>
       <p style={{ marginTop: 20, fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>Twijfel je tussen twee tracks? Je kunt je keuze altijd nog aanpassen voordat je alles verstuurt.</p>

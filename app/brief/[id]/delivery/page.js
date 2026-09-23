@@ -1,19 +1,26 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
 import { MONTH_NAMES } from '../../../../components/flowData';
 
-const VARIATION_COUNT_OPTIONS = ['1', '2', '3', '4', '5', '6'];
+// Used to be a fixed row of segmented buttons capped at 6 — some
+// productions genuinely need 12 or more variations, so this is now a plain
+// numeric input instead of an enumerated list. 1 is the practical floor
+// (this section only shows once "Ja" is picked above); there's no real
+// upper bound, so the input just accepts anything sane a client types.
+const MAX_VARIATIONS_COUNT = 50;
 
 // Step 2 — mirrors public/delivery.html.
 export default function DeliveryPage({ params }) {
   const { id } = params;
   const router = useRouter();
+  // See the identical comment in contact/page.js.
+  const returnToOverview = useSearchParams().get('from') === 'overview';
   const { brief, loading, schedulePatch, flushPending, patch } = useBrief(id);
   const showLoader = useMinDelay(loading, 700);
   // See the identical comment in contact/page.js: set the instant "Volgende"
@@ -64,13 +71,18 @@ export default function DeliveryPage({ params }) {
   // "750.000" still counts as valid.
   const impressionsCustomValid =
     form.impressions !== 'meer' || /^\d+$/.test(form.impressionsCustom.trim().replace(/[.\s]/g, ''));
+  // Since the variation count is now a free numeric input rather than a
+  // fixed set of buttons, it can be left blank/invalid mid-typing — gate
+  // continuing the same way impressionsCustomValid does above.
+  const variationsCountValid = !form.needsVariations || /^\d+$/.test(String(form.variationsCount).trim());
+  const canContinue = impressionsCustomValid && variationsCountValid;
 
   async function next() {
-    if (!impressionsCustomValid) return;
+    if (!canContinue) return;
     setNavigating(true);
     flushPending();
     await patch(form);
-    router.push(`/brief/${id}/details`);
+    router.push(returnToOverview ? `/brief/${id}/overview` : `/brief/${id}/details`);
   }
 
   if (showLoader || navigating) return <Preloader />;
@@ -147,18 +159,21 @@ export default function DeliveryPage({ params }) {
         {form.needsVariations && (
           <div style={{ marginTop: 12 }}>
             <label className="field-label" style={{ marginBottom: 6 }}>Hoeveel variaties heb je nodig?</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              {VARIATION_COUNT_OPTIONS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={'seg-btn' + (form.variationsCount === n ? ' selected' : '')}
-                  onClick={() => update({ variationsCount: n })}
-                >
-                  {n}
-                </button>
-              ))}
-            </div>
+            <input
+              type="number"
+              min={1}
+              max={MAX_VARIATIONS_COUNT}
+              step={1}
+              value={form.variationsCount}
+              style={{ maxWidth: 140 }}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === '') { update({ variationsCount: '' }); return; }
+                const n = Math.max(1, Math.min(MAX_VARIATIONS_COUNT, parseInt(raw, 10) || 1));
+                update({ variationsCount: String(n) });
+              }}
+            />
+            <div className="hint" style={{ marginTop: 6 }}>Ook 10 of meer variaties kan, TFA schaalt gewoon mee.</div>
           </div>
         )}
       </div>
@@ -202,13 +217,15 @@ export default function DeliveryPage({ params }) {
 
 
       <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-        {!impressionsCustomValid && (
+        {!canContinue && (
           <div style={{ fontSize: 12, color: '#8C8880' }}>
-            Vul hierboven een geldig aantal impressies in om verder te gaan.
+            {!impressionsCustomValid
+              ? 'Vul hierboven een geldig aantal impressies in om verder te gaan.'
+              : 'Vul hierboven een geldig aantal variaties in om verder te gaan.'}
           </div>
         )}
-        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={next} disabled={!impressionsCustomValid}>
-          Volgende: verder naar je brief
+        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={next} disabled={!canContinue}>
+          {returnToOverview ? 'Terug naar overzicht' : 'Volgende: verder naar je brief'}
         </button>
       </div>
     </StepShell>

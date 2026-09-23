@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import SpotFlowLogo from './SpotFlowLogo';
-import { STEPS, computeReached } from './flowData';
+import { STEPS, computeReached, variationsCountOf } from './flowData';
 
 function WaveIcon({ dim }) {
   const fill = dim ? '#514E44' : '#E6C858';
@@ -123,6 +124,17 @@ function ResumeCard({ briefId, defaultEmail }) {
 export default function StepShell({ briefId, current, brief, subtitle, bigNum, kicker, title, hint, backHref, backLabel, children, showWipe = false }) {
   const reached = computeReached(brief);
   const companyName = brief && brief.companyName && brief.companyName.trim() ? brief.companyName : null;
+  const pathname = usePathname();
+  // Once the main script is approved AND the client asked for variation(s),
+  // "Variaties" is its own reachable subpage (see
+  // app/brief/[id]/script/variations/page.js) rather than a section buried
+  // further down the Script step's own page — so it needs its own row in
+  // the sidebar, indented directly under Script, the same way a client
+  // would expect a sub-item to read. Only shown once it actually exists
+  // (script approved + variations wanted), same gating the old inline
+  // section used.
+  const showVariationsSubnav = !!(brief && brief.scriptApproved && variationsCountOf(brief) > 0);
+  const onVariationsPage = pathname ? pathname.endsWith('/script/variations') : false;
 
   // Mobile rail: it starts collapsed to a slim strip of step numbers (see
   // the mobile media query below). Tapping it the first time only EXPANDS
@@ -275,17 +287,44 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
                 <span className="tfa-step-label" style={labelStyle}>{step.label}</span>
               </>
             );
+            // The "Variaties" sub-row sits right under Script's own row,
+            // whichever way that row renders (link or plain div) — always
+            // shown once it exists (see showVariationsSubnav above), not
+            // gated on isDone/isCurrent the way the main steps are, since
+            // it's reachable as soon as it exists regardless of which main
+            // step the client happens to be viewing right now.
+            const variationsSubRow = step.n === 4 && showVariationsSubnav && briefId ? (
+              <Link
+                key="script-variations"
+                href={`/brief/${briefId}/script/variations`}
+                className="tfa-step-item tfa-step-row tfa-sidebar-extra"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px 7px 30px', marginTop: -2,
+                  borderRadius: '0 6px 6px 0', textDecoration: 'none', fontSize: 13, cursor: 'pointer',
+                  color: onVariationsPage ? '#FFFFFF' : '#B9B6AC', fontWeight: onVariationsPage ? 600 : 500,
+                  ...(onVariationsPage ? { borderLeft: '2px solid #E6C858', background: 'rgba(230,200,88,.10)' } : null),
+                }}
+              >
+                ↳ Variaties
+              </Link>
+            ) : null;
             if (isDone && briefId) {
               return (
-                <Link key={step.n} href={`/brief/${briefId}/${step.path}`} style={rowStyle} className="tfa-step-item tfa-step-row">
-                  {inner}
-                </Link>
+                <span key={step.n} style={{ display: 'contents' }}>
+                  <Link href={`/brief/${briefId}/${step.path}`} style={rowStyle} className="tfa-step-item tfa-step-row">
+                    {inner}
+                  </Link>
+                  {variationsSubRow}
+                </span>
               );
             }
             return (
-              <div key={step.n} style={rowStyle} className="tfa-step-item">
-                {inner}
-              </div>
+              <span key={step.n} style={{ display: 'contents' }}>
+                <div style={rowStyle} className="tfa-step-item">
+                  {inner}
+                </div>
+                {variationsSubRow}
+              </span>
             );
           })}
         </div>

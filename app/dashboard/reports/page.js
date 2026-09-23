@@ -156,7 +156,7 @@ export default async function ReportsPage({ searchParams }) {
           </a>
         </div>
         <p style={{ fontSize: 13.5, color: '#5C5850', margin: '0 0 16px', maxWidth: 720, lineHeight: 1.5 }}>
-          Een overzicht over al je briefs: hoeveel er binnenkomen, waar ze in het proces staan, en hoe de AI-scriptgeneratie
+          Een overzicht over al je briefs: hoeveel er binnenkomen, waar ze in het proces staan en hoe de AI-scriptgeneratie
           wordt gebruikt. De CSV-export bevat elke brief als aparte rij, klaar om te openen in Excel of Google Sheets.
         </p>
 

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   variationsSummaryLabel, variationsCountOf, parseVariationScripts, parseReviewRounds as parseReviewRoundsOf,
   reviewOverIncludedCap, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime,
-  formatAirDate, deliveryDeadlineMeta, TONE_LABELS,
+  formatAirDate, deliveryDeadlineMeta, TONE_LABELS, finalTrackOf,
 } from './flowData';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
 import { SCRIPT_SOURCE_META, IMPRESSIONS_LABELS } from '../lib/reports';
@@ -77,6 +77,17 @@ const MODAL_TABS = [
   { key: 'creatief', label: 'Creatief' },
   { key: 'team', label: 'Team' },
 ];
+// Appended only once the client has approved (see modalTabsFor below) — the
+// final WAV hand-off to whoever needs it (Advision Media today, potentially
+// someone else later) makes no sense to show before there's anything
+// approved to hand off. "Uitlevering" (release/dispatch) rather than
+// "Levering" deliberately — "Levering" is already the client-facing step 2
+// (the air-date question); reusing it here for a completely different,
+// producer-only thing would read as the same feature.
+const DELIVERY_TAB = { key: 'uitlevering', label: 'Uitlevering' };
+function modalTabsFor(brief) {
+  return brief && brief.reviewApprovedAt ? MODAL_TABS.concat([DELIVERY_TAB]) : MODAL_TABS;
+}
 
 function rangeToMs(key) {
   const days = { '7d': 7, '30d': 30, '182d': 182, '365d': 365 }[key];
@@ -315,10 +326,38 @@ export default function DashboardClient({ briefs }) {
     setRows(briefs);
   }, [briefs]);
 
+  // Fetched once, not per-brief — the remembered delivery-recipient address
+  // book is shared across every brief's "Uitlevering" tab (see the
+  // deliveryRecipients comment above). Best-effort: an empty/stale list just
+  // means no suggestions yet, never blocks the tab from working.
+  useEffect(() => {
+    fetch('/api/dashboard/delivery-recipients')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((list) => setDeliveryRecipients(Array.isArray(list) ? list : []))
+      .catch(() => {});
+  }, []);
+
   const [noteDraft, setNoteDraft] = useState('');
   const [noteBusy, setNoteBusy] = useState(false);
   const [noteError, setNoteError] = useState(false);
+  // Click-to-edit state for an existing internal note — editingNoteId is
+  // the note currently open for editing (only one at a time), editNoteDraft
+  // its in-progress text. Separate from noteDraft/noteBusy/noteError above,
+  // which are for the "add a new note" input.
+  const [editingNoteId, setEditingNoteId] = useState(null);
+  const [editNoteDraft, setEditNoteDraft] = useState('');
+  const [editNoteBusy, setEditNoteBusy] = useState(false);
+  const [editNoteError, setEditNoteError] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
+  // Final delivery ("Uitlevering" tab) — deliveryLinkDraft/deliveryEmailDraft
+  // are the two input fields, deliveryRecipients the remembered address book
+  // (fetched once, not per-brief — it's shared across every brief's
+  // delivery, see GET /api/dashboard/delivery-recipients).
+  const [deliveryLinkDraft, setDeliveryLinkDraft] = useState('');
+  const [deliveryEmailDraft, setDeliveryEmailDraft] = useState('');
+  const [deliveryBusy, setDeliveryBusy] = useState(false);
+  const [deliveryError, setDeliveryError] = useState(false);
+  const [deliveryRecipients, setDeliveryRecipients] = useState([]);
   const [reviewLinkDraft, setReviewLinkDraft] = useState('');
   // Free-text note that rides along with a shared/re-shared Frame.io round —
   // e.g. "we hebben de intro ingekort zoals gevraagd". lib/db.js already
@@ -354,6 +393,13 @@ export default function DashboardClient({ briefs }) {
     // shouldn't have to retype it, just add a note for the new folder and
     // share again. Still editable in case the link itself ever needs fixing.
     setReviewLinkDraft((selected && selected.frameioLink) || '');
+    // Same prefill idea as the Frame.io link above — if a delivery already
+    // went out, show what was actually sent rather than a blank field, but
+    // both stay editable in case a resend to a different/updated address
+    // is needed.
+    setDeliveryLinkDraft((selected && selected.deliveryLink) || '');
+    setDeliveryEmailDraft((selected && selected.deliveryRecipientEmail) || '');
+    setDeliveryError(false);
     // Default straight to Productie & review once a brief is actually IN
     // that stage — a producer opening a brief mid-production almost always
     // wants the Frame.io link/feedback, not the client's own answers, and
@@ -389,6 +435,37 @@ export default function DashboardClient({ briefs }) {
       setReviewError(true);
     } finally {
       setReviewBusy(false);
+    }
+  }
+
+  async function handleSendDelivery(id) {
+    const link = deliveryLinkDraft.trim();
+    const recipientEmail = deliveryEmailDraft.trim();
+    if (!link || !recipientEmail) return;
+    setDeliveryBusy(true);
+    setDeliveryError(false);
+    try {
+      const res = await fetch(`/api/dashboard/briefs/${id}/delivery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ link, recipientEmail }),
+      });
+      if (!res.ok) throw new Error('send delivery failed');
+      const brief = await res.json();
+      setRows((cur) => cur.map((b) => (b.id === id ? brief : b)));
+      setSelected((cur) => (cur && cur.id === id ? brief : cur));
+      // Newly-used address, remembered server-side by saveDelivery — refetch
+      // so it shows up as a suggestion right away instead of only after the
+      // next dashboard load.
+      fetch('/api/dashboard/delivery-recipients')
+        .then((r) => (r.ok ? r.json() : []))
+        .then((list) => setDeliveryRecipients(Array.isArray(list) ? list : []))
+        .catch(() => {});
+    } catch (err) {
+      console.error(err);
+      setDeliveryError(true);
+    } finally {
+      setDeliveryBusy(false);
     }
   }
 
@@ -472,6 +549,45 @@ export default function DashboardClient({ briefs }) {
       setNoteError(true);
     } finally {
       setNoteBusy(false);
+    }
+  }
+
+  function startEditNote(note) {
+    setEditingNoteId(note.id);
+    setEditNoteDraft(note.text);
+    setEditNoteError(false);
+  }
+
+  function cancelEditNote() {
+    setEditingNoteId(null);
+    setEditNoteDraft('');
+    setEditNoteError(false);
+  }
+
+  async function handleEditNote(id, noteId) {
+    const text = editNoteDraft.trim();
+    if (!text) return;
+    setEditNoteBusy(true);
+    setEditNoteError(false);
+    try {
+      const res = await fetch(`/api/dashboard/briefs/${id}/notes`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId, text }),
+      });
+      if (!res.ok) throw new Error('edit note failed');
+      const brief = await res.json();
+      setRows((cur) => cur.map((b) => (b.id === id ? brief : b)));
+      setSelected((cur) => (cur && cur.id === id ? brief : cur));
+      setEditingNoteId(null);
+      setEditNoteDraft('');
+    } catch (err) {
+      console.error(err);
+      // Same "keep the draft, surface the error" approach as handleAddNote
+      // — don't silently drop what the producer just typed.
+      setEditNoteError(true);
+    } finally {
+      setEditNoteBusy(false);
     }
   }
 
@@ -891,7 +1007,7 @@ export default function DashboardClient({ briefs }) {
               </div>
 
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 16, borderBottom: '1px solid #EEECE3', paddingBottom: 10 }}>
-                {MODAL_TABS.map((t) => {
+                {modalTabsFor(selected).map((t) => {
                   const active = modalTab === t.key;
                   return (
                     <button
@@ -906,6 +1022,11 @@ export default function DashboardClient({ briefs }) {
                       {t.label}
                       {t.key === 'productie' && selected.productionStatus && (
                         <span style={{ marginLeft: 7 }}><ProductionBadge brief={selected} small /></span>
+                      )}
+                      {t.key === 'uitlevering' && (
+                        <span style={{ marginLeft: 7, fontSize: 11, fontWeight: 700, color: selected.deliveredAt ? '#8FE0B0' : '#E6C858' }}>
+                          {selected.deliveredAt ? '✓' : '●'}
+                        </span>
                       )}
                     </button>
                   );
@@ -1031,6 +1152,88 @@ export default function DashboardClient({ briefs }) {
             </div>
             )}
 
+            {modalTab === 'uitlevering' && selected.reviewApprovedAt && (
+            <div
+              style={{
+                marginTop: 16, background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 14, padding: '16px 18px',
+                boxShadow: '0 4px 18px rgba(230,200,88,.18)',
+              }}
+            >
+              {/* Deliberately generic, not Advision-specific — this same tab
+                  is meant to work unchanged the day TFA delivers to a
+                  different agency or straight to a client. The recipient
+                  field is a free-text + datalist combo so a producer can
+                  either pick a previously-used address (remembered
+                  automatically by saveDelivery in lib/db.js, shared across
+                  every brief, not just this one) or type a brand new one. */}
+              {selected.deliveredAt ? (
+                <div style={{ marginBottom: 12 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1D7A46' }}>
+                    ✓ Verzonden naar {selected.deliveryRecipientEmail} op {formatDateTime(selected.deliveredAt)}
+                  </span>
+                </div>
+              ) : (
+                <div style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850', marginBottom: 12 }}>
+                  Nog niet uitgeleverd
+                </div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#8C8880', display: 'block', marginBottom: 4 }}>
+                    Frame.io-link (WAV-masters)
+                  </label>
+                  <input
+                    type="text"
+                    value={deliveryLinkDraft}
+                    onChange={(e) => setDeliveryLinkDraft(e.target.value)}
+                    placeholder="Plak hier de Frame.io-link met de WAV-bestanden…"
+                    style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#8C8880', display: 'block', marginBottom: 4 }}>
+                    E-mailadres ontvanger
+                  </label>
+                  <input
+                    type="text"
+                    list="delivery-recipients-list"
+                    value={deliveryEmailDraft}
+                    onChange={(e) => setDeliveryEmailDraft(e.target.value)}
+                    placeholder="bijv. delivery@advisionmedia.nl"
+                    style={{ width: '100%', boxSizing: 'border-box', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13, background: '#FFFFFF' }}
+                  />
+                  <datalist id="delivery-recipients-list">
+                    {deliveryRecipients.map((r) => (
+                      <option key={r.id} value={r.email} />
+                    ))}
+                  </datalist>
+                </div>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => handleSendDelivery(selected.id)}
+                    disabled={deliveryBusy || !deliveryLinkDraft.trim() || !deliveryEmailDraft.trim()}
+                    style={{
+                      border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600,
+                      padding: '8px 16px', cursor: deliveryBusy || !deliveryLinkDraft.trim() || !deliveryEmailDraft.trim() ? 'not-allowed' : 'pointer',
+                      opacity: deliveryBusy || !deliveryLinkDraft.trim() || !deliveryEmailDraft.trim() ? 0.6 : 1,
+                    }}
+                  >
+                    {selected.deliveredAt ? 'Opnieuw versturen' : 'Versturen'}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: '#8C8880' }}>
+                  Verstuurt direct een e-mail met deze link naar het opgegeven adres, met een overzicht van script, stem en gekozen muziek.
+                </div>
+                {deliveryError && (
+                  <div style={{ fontSize: 12, fontWeight: 600, color: '#C2513F' }}>
+                    Versturen is niet gelukt, probeer het opnieuw.
+                  </div>
+                )}
+              </div>
+            </div>
+            )}
+
             {modalTab === 'overzicht' && (
             <div className="tfa-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: 16 }}>
               <div style={refCardStyle}>
@@ -1104,10 +1307,61 @@ export default function DashboardClient({ briefs }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', marginBottom: 10 }}>
                     {parseInternalNotes(selected).slice().reverse().map((n) => (
                       <div key={n.id} style={{ background: '#FFFFFF', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px' }}>
-                        <div style={{ fontSize: 13, color: '#1D1D1D', lineHeight: 1.5 }}>{n.text}</div>
-                        <div style={{ fontSize: 11, color: '#8C8880', marginTop: 4 }}>
-                          {n.author || 'Team'} · {new Date(n.createdAt).toLocaleString('nl-NL')}
-                        </div>
+                        {editingNoteId === n.id ? (
+                          <div>
+                            <textarea
+                              autoFocus
+                              value={editNoteDraft}
+                              onChange={(e) => setEditNoteDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey && !editNoteBusy) {
+                                  e.preventDefault();
+                                  handleEditNote(selected.id, n.id);
+                                } else if (e.key === 'Escape') {
+                                  cancelEditNote();
+                                }
+                              }}
+                              style={{ width: '100%', minHeight: 50, border: '1px solid #C9C5B9', borderRadius: 6, padding: '6px 8px', fontSize: 13, fontFamily: 'inherit', resize: 'vertical' }}
+                            />
+                            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+                              <button
+                                type="button"
+                                onClick={() => handleEditNote(selected.id, n.id)}
+                                disabled={editNoteBusy || !editNoteDraft.trim()}
+                                style={{
+                                  border: 'none', borderRadius: 6, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12, fontWeight: 600,
+                                  padding: '5px 12px', cursor: editNoteBusy || !editNoteDraft.trim() ? 'not-allowed' : 'pointer', opacity: editNoteBusy || !editNoteDraft.trim() ? 0.6 : 1,
+                                }}
+                              >
+                                Opslaan
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditNote}
+                                disabled={editNoteBusy}
+                                style={{ border: '1px solid #C9C5B9', borderRadius: 6, background: '#FFFFFF', color: '#5C5850', fontSize: 12, fontWeight: 600, padding: '5px 12px', cursor: 'pointer' }}
+                              >
+                                Annuleren
+                              </button>
+                            </div>
+                            {editNoteError && (
+                              <div style={{ marginTop: 6, fontSize: 12, fontWeight: 600, color: '#C2513F' }}>
+                                Opslaan is niet gelukt, probeer het opnieuw.
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div
+                            onClick={() => startEditNote(n)}
+                            title="Klik om te bewerken"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <div style={{ fontSize: 13, color: '#1D1D1D', lineHeight: 1.5 }}>{n.text}</div>
+                            <div style={{ fontSize: 11, color: '#8C8880', marginTop: 4 }}>
+                              {n.author || 'Team'} · {new Date(n.createdAt).toLocaleString('nl-NL')}{n.editedAt ? ' · bewerkt' : ''}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ))}
                     {parseInternalNotes(selected).length === 0 && (
@@ -1204,17 +1458,47 @@ export default function DashboardClient({ briefs }) {
                 {(() => {
                   const tracks = parseSelectedTracks(selected);
                   if (!tracks.length) return <div style={{ fontSize: 13.5, color: '#9C9890' }}>Nog niet gekozen</div>;
+                  // With only 1 candidate there's no ambiguity to resolve —
+                  // that one is simply what's used, no picker needed. With
+                  // more than one, a producer has to say which one actually
+                  // ended up in the final production (see finalTrackOf in
+                  // components/flowData.js) — this feeds both the final
+                  // delivery email and, eventually, the accountant's
+                  // invoice, so leaving it unmarked is a real gap, not a
+                  // cosmetic one.
+                  const usedTrack = finalTrackOf(selected);
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {tracks.map((t, i) => (
-                        <div key={t.id || i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', background: '#FBF0C8', borderRadius: 8 }}>
-                          <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#E6C858', fontSize: 10, fontWeight: 700, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{i + 1}</div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 12.5, fontWeight: 700 }}>{t.title || 'Onbekende track'}{t.artist ? ` (${t.artist})` : ''}</div>
-                            <div style={{ fontSize: 11, color: '#8C6D1F', fontWeight: 600 }}>{t.playlistName || 'categorie onbekend'}</div>
-                          </div>
+                      {tracks.length > 1 && (
+                        <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 2 }}>
+                          {usedTrack ? 'Klik om aan te passen welke track uiteindelijk gebruikt is.' : 'Nog niet vastgelegd welke track gebruikt is — klik er één aan.'}
                         </div>
-                      ))}
+                      )}
+                      {tracks.map((t, i) => {
+                        const isUsed = tracks.length === 1 || (usedTrack && usedTrack.id === t.id);
+                        return (
+                          <div
+                            key={t.id || i}
+                            onClick={tracks.length > 1 ? () => handleMetaChange(selected.id, { usedTrackId: t.id }) : undefined}
+                            style={{
+                              display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8,
+                              background: isUsed ? '#FBF0C8' : '#F3F1EA', cursor: tracks.length > 1 ? 'pointer' : 'default',
+                              border: isUsed && tracks.length > 1 ? '1px solid #E6C858' : '1px solid transparent',
+                            }}
+                          >
+                            <div style={{ width: 16, height: 16, borderRadius: '50%', background: isUsed ? '#E6C858' : '#D9D5C7', fontSize: 10, fontWeight: 700, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {isUsed && tracks.length > 1 ? '✓' : i + 1}
+                            </div>
+                            <div style={{ minWidth: 0, flex: 1 }}>
+                              <div style={{ fontSize: 12.5, fontWeight: 700 }}>{t.title || 'Onbekende track'}{t.artist ? ` (${t.artist})` : ''}</div>
+                              <div style={{ fontSize: 11, color: '#8C6D1F', fontWeight: 600 }}>{t.playlistName || 'categorie onbekend'}</div>
+                            </div>
+                            {tracks.length > 1 && isUsed && (
+                              <div style={{ fontSize: 10.5, fontWeight: 700, color: '#8C6D1F', flex: 'none' }}>GEBRUIKT</div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })()}

@@ -26,6 +26,14 @@ import { useEffect, useRef, useState } from 'react';
 // "sliding" because the neighbours get pushed out of the way.
 const SIZES = { 0: '56%', 1: '20%', 2: '4%' };
 
+// Hover behaviour (added per Karim's request): on top of the auto-loop,
+// hovering a card slowly zooms/pans its photo — a slow, subtle Ken-Burns
+// nudge rather than a snappy hover-pop, since the ask was specifically for
+// something gentle. Also pauses the auto-advance timer while the pointer
+// is over the row, so a photo someone is actually looking at doesn't slide
+// away mid-hover; it resumes on pointer-leave.
+const HOVER_TRANSITION = 'transform 1.6s cubic-bezier(.25,.1,.25,1)';
+
 function distance(i, active, n) {
   const d = Math.abs(i - active);
   return Math.min(d, n - d);
@@ -40,6 +48,8 @@ export default function StudioCarousel({
 }) {
   const [active, setActive] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [hovered, setHovered] = useState(null);
+  const [rowHovered, setRowHovered] = useState(false);
   const n = images.length;
   const timerRef = useRef(null);
 
@@ -51,12 +61,12 @@ export default function StudioCarousel({
   }, []);
 
   useEffect(() => {
-    if (n < 2) return undefined;
+    if (n < 2 || rowHovered) return undefined;
     timerRef.current = setInterval(() => {
       setActive((i) => (i + 1) % n);
     }, intervalMs);
     return () => clearInterval(timerRef.current);
-  }, [intervalMs, n, active]);
+  }, [intervalMs, n, active, rowHovered]);
 
   if (!images || images.length === 0) return null;
 
@@ -69,17 +79,22 @@ export default function StudioCarousel({
     <div style={{ width: '100%', maxWidth, margin: '0 auto' }}>
       <div
         className="tfa-carousel-row"
+        onMouseEnter={() => setRowHovered(true)}
+        onMouseLeave={() => { setRowHovered(false); setHovered(null); }}
         style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center', gap, overflow: 'hidden', width: '100%' }}
       >
         {images.map((img, i) => {
           const d = distance(i, active, n);
           const isActive = i === active;
+          const isHovered = hovered === i;
           if (isMobile && d > 0) return null;
           const width = isMobile ? '100%' : SIZES[Math.min(d, 2)];
           return (
             <button
               key={img.src}
               onClick={() => goTo(i)}
+              onMouseEnter={() => setHovered(i)}
+              onMouseLeave={() => setHovered((h) => (h === i ? null : h))}
               aria-label={img.alt || `Foto ${i + 1}`}
               style={{
                 position: 'relative', flex: `0 0 ${width}`, width,
@@ -92,7 +107,11 @@ export default function StudioCarousel({
               <img
                 src={img.src}
                 alt={img.alt || ''}
-                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                style={{
+                  width: '100%', height: '100%', objectFit: 'cover', display: 'block',
+                  transform: isHovered ? 'scale(1.08)' : 'scale(1)',
+                  transition: HOVER_TRANSITION,
+                }}
               />
               {isActive && img.tag && (
                 <span

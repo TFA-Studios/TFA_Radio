@@ -74,10 +74,13 @@ export default function BrandWave() {
 
     const material = new THREE.PointsMaterial({
       color: 0xe6c858,
-      size: 5,
+      // Turned down from 0.28 per Karim's note that the hero felt too busy
+      // — the field still fills the section edge to edge, it's just a
+      // quieter presence behind the text now rather than competing with it.
+      size: 4,
       sizeAttenuation: true,
       transparent: true,
-      opacity: 0.28,
+      opacity: 0.14,
       depthWrite: false,
     });
 
