@@ -97,6 +97,104 @@ export default function HomePage() {
         </video>
       </div>
 
+      {/* "Kom langs" / visit-the-studio section — sits between the banner
+          video and the footer, same #1D1D1D background as both so the
+          whole bottom of the page reads as one continuous dark close
+          rather than a new card bolted on. Layout locked in with Karim via
+          artifact comments on the mockup: left column is the pitch text +
+          address + CTA, right column is a small map card (NOT full-width —
+          it sits next to the paragraph, doesn't dominate). A dotted trail
+          drops from the map down into a horizontal-scroll photo gallery
+          underneath — "the studio & the buurt". Real Google Maps embed
+          (no API key needed for a basic place/search iframe) rather than
+          the fake placeholder graphic used in the sandboxed mockup preview
+          — this page isn't sandboxed, so the live map just works. Gallery
+          only has the two real studio photos that exist today
+          (public/studio/*) — add more entries to `galleryPhotos` below as
+          real exterior/neighborhood shots come in; it already scrolls
+          horizontally so extra cards just slot in. */}
+      <section style={{ background: '#1D1D1D', padding: '72px 20px 0', position: 'relative' }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto' }}>
+          <div style={{ maxWidth: 620, margin: '0 0 40px' }}>
+            <div style={{ fontSize: 13, letterSpacing: '.09em', textTransform: 'uppercase', color: '#E6C858', fontWeight: 600, marginBottom: 16 }}>
+              Kom langs
+            </div>
+            <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 38, lineHeight: 1.15, color: '#FBF9EC', margin: 0 }}>
+              Liever face to face? Onze studio&apos;s staan voor je open.
+            </h2>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 48, alignItems: 'start' }} className="tfa-visit-columns">
+            <div>
+              <p style={{ fontSize: 16, lineHeight: 1.65, color: '#B9B6AC', maxWidth: 420, margin: '0 0 26px' }}>
+                Even sparren over je script, meeluisteren in de opnamestudio, of gewoon koffie drinken en kennismaken — je bent van
+                harte welkom in Amsterdam.
+              </p>
+              <div style={{ fontSize: 14, lineHeight: 1.7, color: '#B9B6AC', marginBottom: 26 }}>
+                <strong style={{ color: '#FBF9EC', fontWeight: 600, display: 'block', marginBottom: 4 }}>TFA Studio</strong>
+                Koivistokade 26A, 1013 BB Amsterdam
+              </div>
+              <a
+                href="https://www.google.com/maps/dir/?api=1&destination=Koivistokade+26A,+1013+BB+Amsterdam"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="tfa-cta-hero"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#E6C858', color: '#1D1D1D', fontWeight: 600, fontSize: 14.5, padding: '13px 24px', borderRadius: 999, textDecoration: 'none' }}
+              >
+                Route plannen
+                <span className="tfa-cta-arrow" aria-hidden="true">→</span>
+              </a>
+            </div>
+
+            <div className="tfa-visit-map">
+              <iframe
+                title="TFA Studio op de kaart"
+                src="https://www.google.com/maps?q=Koivistokade+26A,+1013+BB+Amsterdam&output=embed"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                style={{ width: '100%', height: '100%', border: 0, display: 'block' }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Dotted connector: a thin gold trail from the map card down into
+            the gallery below, with a small "de studio & de buurt" label —
+            the visual hint that scrolling down here means more photos,
+            not just decoration. Coordinates are tuned for the 1180px
+            container/1.3fr-1fr split above; it reflows fine at other
+            widths since it's one flat SVG path, not per-element. */}
+        <div style={{ position: 'relative', height: 84, maxWidth: 1180, margin: '0 auto' }} className="tfa-visit-connector">
+          <svg viewBox="0 0 1180 84" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
+            <path d="M 900 0 C 900 30, 300 20, 120 60" fill="none" stroke="#E6C858" strokeWidth="2" strokeDasharray="1 10" strokeLinecap="round" opacity="0.8" />
+            <circle cx="900" cy="0" r="3.5" fill="#E6C858" />
+            <circle cx="120" cy="60" r="3.5" fill="#E6C858" />
+          </svg>
+          <div style={{ position: 'absolute', left: 20, bottom: 6, fontSize: 12.5, color: '#8C8880', fontStyle: 'italic', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#E6C858" strokeWidth="1.6" width={15} height={15}>
+              <rect x="3" y="6" width="18" height="14" rx="2" />
+              <circle cx="12" cy="13" r="3.2" />
+              <path d="M8 6l1.5-2h5L16 6" />
+            </svg>
+            De studio &amp; de buurt
+          </div>
+        </div>
+
+        <div style={{ padding: '0 0 72px' }}>
+          <div className="tfa-visit-gallery">
+            {[
+              { src: '/studio/studio-1.jpg', alt: 'TFA Studio interieur', tag: 'Studio interieur' },
+              { src: '/studio/studio-2.jpg', alt: 'TFA Studio — aan het mixen', tag: 'Opnamehoek' },
+            ].map((photo) => (
+              <div key={photo.src} className="tfa-visit-gallery-card">
+                <img src={photo.src} alt={photo.alt} />
+                <span className="tfa-visit-gallery-tag">{photo.tag}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer rebuilt to match the original tfa.studio site's structure —
           dark background (the same #1D1D1D as the hero, not a separate
           white/beige card sitting on the page background) with several
@@ -183,6 +281,36 @@ export default function HomePage() {
         }
         @media (max-width: 460px) {
           .tfa-footer-grid { grid-template-columns: 1fr !important; }
+        }
+
+        .tfa-visit-map {
+          border-radius: 14px; overflow: hidden; border: 1px solid #33301F;
+          background: #141414; aspect-ratio: 1 / 0.95; max-width: 340px; margin-left: auto;
+        }
+        @media (max-width: 860px) {
+          .tfa-visit-columns { grid-template-columns: 1fr !important; gap: 32px !important; }
+          .tfa-visit-map { margin-left: 0; max-width: 100%; }
+          .tfa-visit-connector { height: 56px !important; }
+        }
+
+        .tfa-visit-gallery {
+          display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x proximity;
+          padding: 0 20px 16px; margin: 0 calc(50% - 590px);
+          -ms-overflow-style: none; scrollbar-width: none;
+        }
+        .tfa-visit-gallery::-webkit-scrollbar { display: none; }
+        .tfa-visit-gallery-card {
+          flex: 0 0 auto; width: 250px; height: 170px; border-radius: 12px; overflow: hidden;
+          scroll-snap-align: start; position: relative; border: 1px solid #33301F;
+        }
+        .tfa-visit-gallery-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .tfa-visit-gallery-tag {
+          position: absolute; bottom: 8px; left: 8px; background: rgba(29,29,29,.75);
+          color: #FBF9EC; font-size: 11px; padding: 4px 9px; border-radius: 999px;
+          border: 1px solid rgba(255,255,255,.08);
+        }
+        @media (max-width: 700px) {
+          .tfa-visit-gallery { margin: 0 -20px; }
         }
       `}</style>
     </div>
