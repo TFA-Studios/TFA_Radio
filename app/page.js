@@ -171,24 +171,44 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Replaced the two-photo "peek" loop with a centered, continuously
-            auto-advancing carousel — reference for the interaction (big
-            centered card, cropped neighbours peeking at the edges, smooth
-            slide, bottom-left play/pause + progress bar) was a clip Karim
-            recorded; the photos, copy, tags and styling here are TFA's own,
-            not copied from that reference. Click any peeking neighbour to
-            jump straight to it. Add more entries to `images` below as more
-            real photos come in — sizing/spacing is all relative. */}
-        <div style={{ padding: '48px 0 80px' }}>
+        {/* Centered, continuously auto-advancing carousel — reference for
+            the interaction (big centered card, cropped neighbours peeking
+            at the edges, smooth slide) was a clip Karim recorded; the
+            photos, copy, tags and styling here are TFA's own, not copied
+            from that reference. Click any peeking neighbour to jump
+            straight to it.
+            Per follow-up notes: no play/pause button or progress bar
+            anymore (StudioCarousel no longer renders one), and it now runs
+            FULL-BLEED edge-to-edge like the banner video above — same
+            `left: 50%; width: 100vw; margin-left: -50vw` trick, and the
+            row's height is capped the same way the video's is (see
+            `.tfa-carousel-row` below: 560px desktop / 260px mobile).
+
+            TAGS & ORDER: both live right here, in the `images` array a few
+            lines down — `tag` is the little label shown on the active
+            photo, order in the array is the order they cycle in. Move a
+            line to reorder; edit its `tag` to relabel. (This replaces an
+            earlier mislabeling: studio-1/2/3 are actually three different
+            control rooms, not a control room + booth + entrance — I had
+            the wrong rooms tagged. studio-4 is the vocal booth. Fixed
+            below.)
+
+            MISSING PHOTOS: the lobby/entrance shot and the red lounge-room
+            shot you sent earlier never actually saved as separate files on
+            my end (only two new uploads came through, and they turned out
+            to be two more control-room angles, not those two) — so they're
+            not in this carousel yet. Could you resend those two? I'll drop
+            them straight into this array once they're in. */}
+        <div style={{ position: 'relative', left: '50%', width: '100vw', marginLeft: '-50vw', padding: '48px 0 80px', overflow: 'hidden' }}>
           <StudioCarousel
             intervalMs={4000}
-            maxWidth={1180}
+            maxWidth="100%"
             borderRadius={20}
             images={[
               { src: '/studio/studio-1.jpg', alt: 'TFA Studio — controlekamer', tag: 'Controlekamer' },
-              { src: '/studio/studio-2.jpg', alt: 'TFA Studio — opnamehokje', tag: 'Opnamehokje' },
-              { src: '/studio/studio-3.jpg', alt: 'TFA Studio — entree', tag: 'Entree' },
-              { src: '/studio/studio-4.jpg', alt: 'TFA Studio — lounge', tag: 'Lounge' },
+              { src: '/studio/studio-2.jpg', alt: 'TFA Studio — mixage', tag: 'Mixage' },
+              { src: '/studio/studio-3.jpg', alt: 'TFA Studio — editsuite', tag: 'Editsuite' },
+              { src: '/studio/studio-4.jpg', alt: 'TFA Studio — opnamehokje', tag: 'Opnamehokje' },
             ]}
           />
         </div>
@@ -265,6 +285,10 @@ export default function HomePage() {
         .tfa-banner-video { max-height: 560px; }
         @media (max-width: 640px) {
           .tfa-banner-video { max-height: 260px; }
+        }
+        .tfa-carousel-row { aspect-ratio: 1280 / 674; max-height: 560px; }
+        @media (max-width: 640px) {
+          .tfa-carousel-row { max-height: 260px; }
         }
         .tfa-footer-icon {
           display: flex; align-items: center; justify-content: center;

@@ -6,17 +6,25 @@ import { useEffect, useRef, useState } from 'react';
 // section. Interaction pattern (not the visuals/content) was requested by
 // Karim from a reference clip he recorded: one big centered card, its
 // neighbours peeking in cropped at the edges, a continuous smooth slide
-// between them, and a bottom-left play/pause control with a progress bar
-// that fills up until the next auto-advance. Everything here — photos,
-// copy, colors, card shape — is TFA's own; only the mechanics are borrowed.
+// between them. Everything here — photos, copy, colors, card shape — is
+// TFA's own; only the mechanics are borrowed.
+//
+// Per Karim's follow-up notes: no play/pause button or progress bar
+// anymore (removed — it just autoplays, no visible transport controls),
+// and it's meant to run full-bleed edge-to-edge like the banner video
+// above it — the caller (app/page.js) wraps this in the same
+// `left: 50%; width: 100vw; margin-left: -50vw` full-bleed trick used for
+// the video, and passes maxWidth="100%" here. Card widths are percentages
+// of that full row width (not fixed px) so it scales the same way at any
+// viewport size, and the row's height is capped the same way the video's
+// is (see `.tfa-carousel-row` in page.js's <style> block).
 //
 // Sizing per card is driven by its circular distance from the active
 // index (0 = active/big, 1 = immediate neighbour, 2+ = far/sliver), so
 // growing the active card and shrinking the rest is just a flex-basis
 // transition — no manual translateX math, and it still reads as the track
 // "sliding" because the neighbours get pushed out of the way.
-const SIZES = { 0: 620, 1: 210, 2: 110 };
-const MOBILE_SIZES = { 0: '100%', 1: 0, 2: 0 };
+const SIZES = { 0: '56%', 1: '20%', 2: '4%' };
 
 function distance(i, active, n) {
   const d = Math.abs(i - active);
@@ -26,12 +34,11 @@ function distance(i, active, n) {
 export default function StudioCarousel({
   images,
   intervalMs = 4000,
-  maxWidth = 1180,
+  maxWidth = '100%',
   borderRadius = 20,
   gap = 14,
 }) {
   const [active, setActive] = useState(0);
-  const [playing, setPlaying] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const n = images.length;
   const timerRef = useRef(null);
@@ -44,12 +51,12 @@ export default function StudioCarousel({
   }, []);
 
   useEffect(() => {
-    if (!playing || n < 2) return undefined;
+    if (n < 2) return undefined;
     timerRef.current = setInterval(() => {
       setActive((i) => (i + 1) % n);
     }, intervalMs);
     return () => clearInterval(timerRef.current);
-  }, [playing, intervalMs, n, active]);
+  }, [intervalMs, n, active]);
 
   if (!images || images.length === 0) return null;
 
@@ -61,25 +68,21 @@ export default function StudioCarousel({
   return (
     <div style={{ width: '100%', maxWidth, margin: '0 auto' }}>
       <div
-        style={{
-          display: 'flex', alignItems: 'stretch', justifyContent: 'center', gap,
-          overflow: 'hidden', aspectRatio: isMobile ? '4 / 3' : '16 / 7.2',
-        }}
+        className="tfa-carousel-row"
+        style={{ display: 'flex', alignItems: 'stretch', justifyContent: 'center', gap, overflow: 'hidden', width: '100%' }}
       >
         {images.map((img, i) => {
           const d = distance(i, active, n);
-          const widthTable = isMobile ? MOBILE_SIZES : SIZES;
-          const width = widthTable[Math.min(d, 2)];
           const isActive = i === active;
-          if (isMobile && width === 0) return null;
+          if (isMobile && d > 0) return null;
+          const width = isMobile ? '100%' : SIZES[Math.min(d, 2)];
           return (
             <button
               key={img.src}
               onClick={() => goTo(i)}
               aria-label={img.alt || `Foto ${i + 1}`}
               style={{
-                position: 'relative', flex: `0 0 ${typeof width === 'number' ? `${width}px` : width}`,
-                width: typeof width === 'number' ? width : width,
+                position: 'relative', flex: `0 0 ${width}`, width,
                 borderRadius, overflow: 'hidden', border: 0, padding: 0, cursor: i === active ? 'default' : 'pointer',
                 background: '#141414', transition: 'flex-basis .65s cubic-bezier(.65,0,.35,1), opacity .5s ease, filter .5s ease',
                 opacity: isActive ? 1 : 0.55,
@@ -106,44 +109,6 @@ export default function StudioCarousel({
           );
         })}
       </div>
-
-      {n > 1 && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 20 }}>
-          <button
-            onClick={() => setPlaying((p) => !p)}
-            aria-label={playing ? 'Pauzeer diavoorstelling' : 'Speel diavoorstelling af'}
-            style={{
-              flex: 'none', width: 40, height: 40, borderRadius: '50%', border: '1px solid #45412A',
-              background: 'transparent', color: '#FBF9EC', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-          >
-            {playing ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#FBF9EC"><rect x="5" y="4" width="5" height="16" rx="1" /><rect x="14" y="4" width="5" height="16" rx="1" /></svg>
-            ) : (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="#FBF9EC"><path d="M6 4l14 8-14 8V4z" /></svg>
-            )}
-          </button>
-
-          <div style={{ flex: 1, height: 3, borderRadius: 999, background: 'rgba(255,255,255,.12)', overflow: 'hidden' }}>
-            <div
-              key={`${active}-${playing}`}
-              className="tfa-carousel-progress"
-              style={{
-                height: '100%', background: '#E6C858', borderRadius: 999, width: playing ? undefined : '0%',
-                animation: playing ? `tfaCarouselProgress ${intervalMs}ms linear forwards` : 'none',
-              }}
-            />
-          </div>
-        </div>
-      )}
-
-      <style>{`
-        @keyframes tfaCarouselProgress { from { width: 0%; } to { width: 100%; } }
-        @media (prefers-reduced-motion: reduce) {
-          .tfa-carousel-progress { animation: none !important; width: 100% !important; }
-        }
-      `}</style>
     </div>
   );
 }
