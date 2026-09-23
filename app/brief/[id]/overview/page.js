@@ -5,7 +5,7 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts } from '../../../../components/flowData';
+import { variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts, agencyNameOf } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
 
 function formatImpressions(brief) {
@@ -112,10 +112,13 @@ export default function OverviewPage({ params }) {
         n: '3', label: 'Review & goedkeuring',
         detail: 'Zodra er een eerste versie klaarstaat, ontvang je een e-mail met een link om deze te beluisteren, feedback te geven of goed te keuren.',
       },
-      // Final delivery goes to Advision Media, not straight to the client —
-      // see the identical "Wat gebeurt er nu?" note on the review/status
-      // page (app/brief/[id]/review/page.js) once a round is approved.
-      { n: '4', label: 'Levering', detail: 'Na jouw goedkeuring levert TFA de eindbestanden op aan Advision Media, klaar voor uitzending.' },
+      // Final delivery goes to whichever agency this brief is attributed to
+      // (agencyNameOf falls back to "Advision Media" for anything with no
+      // agency code attached — see components/flowData.js) — not straight
+      // to the client. Same identical "Wat gebeurt er nu?" note on the
+      // review/status page (app/brief/[id]/review/page.js) once a round is
+      // approved.
+      { n: '4', label: 'Levering', detail: 'Na jouw goedkeuring levert TFA de eindbestanden op aan ' + agencyNameOf(brief) + ', klaar voor uitzending.' },
     ];
     // One always-visible "status" line + button to the review page — not
     // conditional on whether a round exists yet, deliberately: a client
@@ -222,7 +225,7 @@ export default function OverviewPage({ params }) {
             <li style={{ marginBottom: 6 }}>Brengt de klant na goedkeuring en opname van het script alsnog wijzigingen aan, dan worden de kosten van de daaruit voortvloeiende heropname(s) apart in rekening gebracht.</li>
             <li style={{ marginBottom: 6 }}>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
             <li style={{ marginBottom: 6 }}>{ipRightsDisclaimerText()}</li>
-            <li>{revisionDisclaimerText()}</li>
+            <li>{revisionDisclaimerText(brief)}</li>
           </ul>
         </div>
 
@@ -405,7 +408,7 @@ export default function OverviewPage({ params }) {
           <li style={{ marginBottom: 6 }}>Brengt de klant na goedkeuring en opname van het script alsnog wijzigingen aan, dan worden de kosten van de daaruit voortvloeiende heropname(s) apart in rekening gebracht.</li>
           <li style={{ marginBottom: 6 }}>TFA aanvaardt geen aansprakelijkheid voor vertraging in de levering wanneer deze het gevolg is van het uitblijven van tijdige goedkeuring of feedback van de klant.</li>
           <li style={{ marginBottom: 6 }}>{ipRightsDisclaimerText()}</li>
-          <li>{revisionDisclaimerText()}</li>
+          <li>{revisionDisclaimerText(brief)}</li>
         </ul>
       </div>
 

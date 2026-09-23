@@ -68,6 +68,7 @@ function ResumeCard({ briefId, defaultEmail }) {
         <button
           type="button"
           onClick={copyLink}
+          className="tfa-sidebar-mini-btn"
           style={{ flex: 1, border: '1px solid #514E44', background: 'transparent', color: '#FFFFFF', borderRadius: 7, padding: '7px 8px', fontSize: 11.5, cursor: 'pointer' }}
         >
           {copyState === 'copied' ? '✓ Gekopieerd' : copyState === 'error' ? 'Kon niet kopiëren' : 'Kopieer link'}
@@ -75,6 +76,7 @@ function ResumeCard({ briefId, defaultEmail }) {
         <button
           type="button"
           onClick={() => setOpen((o) => !o)}
+          className="tfa-sidebar-mini-btn"
           style={{ flex: 1, border: '1px solid #514E44', background: 'transparent', color: '#FFFFFF', borderRadius: 7, padding: '7px 8px', fontSize: 11.5, cursor: 'pointer' }}
         >
           {open ? 'Sluiten' : 'E-mail mij de link'}
@@ -93,9 +95,10 @@ function ResumeCard({ briefId, defaultEmail }) {
             type="button"
             onClick={sendLink}
             disabled={emailState === 'sending' || !email.trim()}
+            className="btn-primary"
             style={{
-              flex: 'none', border: 'none', background: '#E6C858', color: '#1D1D1D', borderRadius: 7, padding: '7px 12px',
-              fontSize: 11.5, fontWeight: 600, cursor: emailState === 'sending' ? 'wait' : 'pointer', opacity: emailState === 'sending' ? 0.7 : 1,
+              flex: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 11.5,
+              cursor: emailState === 'sending' ? 'wait' : 'pointer', opacity: emailState === 'sending' ? 0.7 : 1,
             }}
           >
             {emailState === 'sent' ? '✓ Verstuurd' : emailState === 'error' ? 'Mislukt' : emailState === 'sending' ? '…' : 'Verstuur'}
@@ -589,10 +592,23 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
            step" instead of just a generic hover state. Only .tfa-step-row
            gets this class, and it's only applied to steps that actually
            render as a <Link> (isDone && briefId) — an upcoming step you
-           can't jump to renders as a plain div with no hover at all. */
+           can't jump to renders as a plain div with no hover at all.
+           The box-shadow glow (on top of the background tint that was
+           already here) is per Karim's note that clickable things in the
+           client portal weren't obviously clickable — same glow language
+           used on the dashboard sidebar/stat tiles. */
+        .tfa-step-row {
+          transition: background .12s ease, box-shadow .12s ease;
+        }
         .tfa-step-row:hover {
           background: rgba(230, 200, 88, .16);
+          box-shadow: inset 0 0 0 1px rgba(230,200,88,.45), 0 0 14px rgba(230,200,88,.3);
         }
+        /* "Kopieer link" / "E-mail mij de link" — same glow language as the
+           step rows above, on the two dark-sidebar buttons that had no
+           hover state at all before. */
+        .tfa-sidebar-mini-btn { transition: box-shadow .12s ease, border-color .12s ease; }
+        .tfa-sidebar-mini-btn:hover { box-shadow: 0 0 0 1px rgba(230,200,88,.5), 0 0 12px rgba(230,200,88,.35); border-color: #E6C858; }
       `}</style>
     </div>
   );

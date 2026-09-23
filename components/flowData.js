@@ -271,8 +271,29 @@ export function ipRightsDisclaimerText() {
   return 'Alle intellectuele eigendomsrechten – waaronder begrepen maar niet beperkt tot auteursrechten, naburige rechten, merkrechten en modelrechten – met betrekking tot de commercial en alle daarvoor ontwikkelde (tussentijdse) materialen, concepten, scripts, beelden en audio, berusten uitsluitend en volledig bij TFA.';
 }
 
-export function revisionDisclaimerText() {
-  return 'Let op: bij deze productie zijn ' + INCLUDED_REVISIONS + ' rondes revisie inbegrepen. Heb je meer nodig? Neem dan contact op met Advision Media.';
+// Which agency a brief is attributed to, for display — see the
+// agencyCode/agencyName/agencyContactEmail comment in lib/db.js's
+// STRING_COLUMNS. Every brief before this feature (and any created with no
+// matching agency code) has agencyName === '', and every client-facing
+// mention of "who TFA hands the final files to" used to hardcode "Advision
+// Media" — so that's the fallback here too, not a blank. A brief tagged
+// with a real agency (agencyName set at creation time) shows that instead.
+export function agencyNameOf(brief) {
+  return (brief && brief.agencyName && brief.agencyName.trim()) || 'Advision Media';
+}
+
+// Companion to agencyNameOf — used to default the Uitlevering tab's
+// recipient-email field to the brief's own agency contact (see
+// DashboardClient.js) rather than always falling back to whatever was
+// typed last. No fallback address here (unlike the name above): a blank
+// means "no known contact for this brief's agency", which the dashboard
+// should show as an empty field, not silently guess an email.
+export function agencyContactEmailOf(brief) {
+  return (brief && brief.agencyContactEmail && brief.agencyContactEmail.trim()) || '';
+}
+
+export function revisionDisclaimerText(brief) {
+  return 'Let op: bij deze productie zijn ' + INCLUDED_REVISIONS + ' rondes revisie inbegrepen. Heb je meer nodig? Neem dan contact op met ' + agencyNameOf(brief) + '.';
 }
 
 // Turns a round's 'YYYY-MM-DD' folderDate into a Dutch long date ("8

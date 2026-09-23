@@ -10,6 +10,7 @@ import SpotFlowLogo from './SpotFlowLogo';
 const NAV_ITEMS = [
   { key: 'dashboard', href: '/dashboard', label: 'Dashboard' },
   { key: 'library', href: '/dashboard/library', label: 'Bibliotheek' },
+  { key: 'agencies', href: '/dashboard/agencies', label: 'Agentschappen' },
   { key: 'prompt', href: '/dashboard/prompt', label: 'AI-prompt' },
   { key: 'reports', href: '/dashboard/reports', label: 'Rapporten' },
   { key: 'help', href: '/dashboard/help', label: 'Help & uitleg' },
@@ -92,7 +93,11 @@ export const DASHBOARD_SHELL_STYLES = `
     .tfa-dash-nav { flex-direction: row !important; flex-wrap: wrap; margin-top: 0 !important; gap: 6px !important; }
     .tfa-dash-footer { display: none; }
   }
-  .tfa-dash-navlink { transition: background .15s ease, color .15s ease; }
-  .tfa-dash-navlink:hover { background: rgba(255,255,255,.08); color: #FFFFFF; }
+  .tfa-dash-navlink { transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+  /* Soft gold glow on hover — per Karim's note that it wasn't obvious the
+     sidebar links (and anything else clickable) actually are clickable.
+     Brighter/wider than the plain background tint alone so it reads as an
+     actual glow against the dark #1D1D1D sidebar, not just a shade change. */
+  .tfa-dash-navlink:hover { background: rgba(255,255,255,.08); color: #FFFFFF; box-shadow: inset 0 0 0 1px rgba(230,200,88,.4), 0 0 14px rgba(230,200,88,.35); }
   .tfa-dash-navlink--active:hover { background: rgba(230,200,88,.2); color: #FFFFFF; }
 `;

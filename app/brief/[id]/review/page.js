@@ -5,7 +5,7 @@ import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import SpotFlowLogo from '../../../../components/SpotFlowLogo';
 import { useBrief } from '../../../../components/useBrief';
-import { parseReviewRounds, currentReviewRound, formatRoundLabel, formatDateTime, revisionDisclaimerText } from '../../../../components/flowData';
+import { parseReviewRounds, currentReviewRound, formatRoundLabel, formatDateTime, revisionDisclaimerText, agencyNameOf } from '../../../../components/flowData';
 import StudioPhotoLoop from '../../../../components/StudioPhotoLoop';
 
 // Post-production review — reached via a private link emailed to the
@@ -58,7 +58,7 @@ export default function ReviewPage({ params }) {
 
   if (!round) {
     return (
-      <Shell companyName={companyName} firstName={firstName}>
+      <Shell companyName={companyName} firstName={firstName} agencyName={agencyNameOf(brief)}>
         <InProductionCard brief={brief} assignedTo={assignedTo} />
       </Shell>
     );
@@ -122,7 +122,7 @@ export default function ReviewPage({ params }) {
   }
 
   return (
-    <Shell companyName={companyName} firstName={firstName}>
+    <Shell companyName={companyName} firstName={firstName} agencyName={agencyNameOf(brief)}>
       {/* One centered "hero" moment instead of a left-aligned status card
           followed by a whole separate box restating the same thing (the old
           layout said "Goedgekeurd" in the title, then a full green banner
@@ -196,9 +196,11 @@ export default function ReviewPage({ params }) {
         )}
         {/* The single question every client asks right after approving:
             "wat nu?". Answered here directly instead of leaving it implicit
-            — TFA hands the approved audio off to Advision from this point,
-            and it's worth saying so plainly rather than the client having
-            to email and ask. */}
+            — TFA hands the approved audio off to whichever agency this
+            brief is attributed to (agencyNameOf falls back to "Advision
+            Media" — see components/flowData.js) from this point, and it's
+            worth saying so plainly rather than the client having to email
+            and ask. */}
         {isApproved && (
           <div
             style={{
@@ -207,7 +209,7 @@ export default function ReviewPage({ params }) {
             }}
           >
             <span style={{ fontWeight: 700 }}>Wat gebeurt er nu? </span>
-            TFA draagt deze goedgekeurde audio nu over aan Advision Media, zij nemen het vanaf hier over. Neem gerust rechtstreeks contact met hen op voor de verdere afhandeling.
+            TFA draagt deze goedgekeurde audio nu over aan {agencyNameOf(brief)}, zij nemen het vanaf hier over. Neem gerust rechtstreeks contact met hen op voor de verdere afhandeling.
           </div>
         )}
       </div>
@@ -510,7 +512,7 @@ function InProductionCard({ brief, assignedTo }) {
 // cream/gold gradient instead of flat gray (matching the cards' own
 // palette), and — when the brief has a contact name — an actual greeting
 // instead of just the company name sitting alone.
-function Shell({ companyName, firstName, children }) {
+function Shell({ companyName, firstName, children, agencyName }) {
   return (
     <div
       style={{
@@ -543,7 +545,7 @@ function Shell({ companyName, firstName, children }) {
             explicit request that this be clear "everywhere", not buried in
             terms shown only pre-submit. */}
         <div style={{ marginTop: 22, fontSize: 11.5, lineHeight: 1.6, color: '#8C8880', textAlign: 'center' }}>
-          {revisionDisclaimerText()}
+          {revisionDisclaimerText({ agencyName })}
         </div>
       </div>
     </div>

@@ -48,23 +48,38 @@ const baseStyle = (
     .btn-primary {
       border: none; border-radius: 10px; background: #E6C858; color: #1D1D1D;
       font-family: 'Geist', sans-serif; font-weight: 600; font-size: 16.5px; padding: 14px 12px; cursor: pointer;
+      transition: box-shadow .15s ease, filter .15s ease;
     }
     .btn-primary:disabled { background: #EAE7DE; color: #8C8880; cursor: not-allowed; }
+    /* Glow-on-hover, applied globally to every standard clickable control
+       below (not just buttons that happen to have a distinct :hover rule
+       already) — per Karim's note that it wasn't obvious some of these
+       tiles/rows/cards were clickable at all, this is the same soft gold
+       halo repeated everywhere so "glowing on hover" reliably means
+       "clickable" across the whole app, dashboard and client portal alike.
+       Skipped on :disabled so a greyed-out button doesn't glow. */
+    .btn-primary:not(:disabled):hover { box-shadow: 0 0 0 3px rgba(230,200,88,.35), 0 4px 18px rgba(230,200,88,.45); filter: brightness(1.03); }
     .ghost-btn {
       width: 100%; border: 1px solid #C9C5B9; border-radius: 10px; background: transparent; color: #5C5850;
       font-family: 'Geist', sans-serif; font-weight: 500; font-size: 13.5px; padding: 11px; cursor: pointer;
+      transition: box-shadow .15s ease, border-color .15s ease;
     }
+    .ghost-btn:hover { box-shadow: 0 0 0 3px rgba(230,200,88,.22); border-color: #E6C858; }
     .seg-btn {
       flex: 1; font-family: 'Geist', sans-serif; font-size: 12.5px; font-weight: 500; padding: 11px 8px;
       border-radius: 9px; cursor: pointer; border: 1px solid #C9C5B9; background: #FFFFFF; color: #5C5850;
+      transition: box-shadow .15s ease, border-color .15s ease;
     }
     .seg-btn.selected { border: 1px solid #E6C858; background: #E6C858; color: #1D1D1D; font-weight: 600; }
+    .seg-btn:not(.selected):hover { box-shadow: 0 0 0 3px rgba(230,200,88,.22); border-color: #E6C858; }
     .tone-chip {
       font-family: 'Geist', sans-serif; font-size: 12px; font-weight: 500; padding: 9px 14px; border-radius: 999px;
       border: 1px solid #C9C5B9; background: #FFFFFF; color: #5C5850; cursor: pointer;
+      transition: box-shadow .15s ease, border-color .15s ease;
     }
     .tone-chip.active { background: #E6C858; border-color: #E6C858; color: #1D1D1D; font-weight: 600; }
     .tone-chip.disabled { opacity: .4; cursor: not-allowed; }
+    .tone-chip:not(.active):not(.disabled):hover { box-shadow: 0 0 0 3px rgba(230,200,88,.22); border-color: #E6C858; }
     .box { background: #FBF9EC; border: 1px solid #EAE3C4; border-radius: 12px; padding: 14px 16px; }
     .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 20px; }
     .field-grid .full { grid-column: 1 / -1; }

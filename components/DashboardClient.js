@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   variationsSummaryLabel, variationsCountOf, parseVariationScripts, parseReviewRounds as parseReviewRoundsOf,
   reviewOverIncludedCap, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime,
-  formatAirDate, deliveryDeadlineMeta, TONE_LABELS, finalTrackOf,
+  formatAirDate, deliveryDeadlineMeta, TONE_LABELS, finalTrackOf, agencyNameOf, agencyContactEmailOf,
 } from './flowData';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
 import { SCRIPT_SOURCE_META, IMPRESSIONS_LABELS } from '../lib/reports';
@@ -28,6 +28,46 @@ const STATUS_META = {
   done: { label: 'Klaar', color: '#1D7A46', bg: 'rgba(29,122,70,.12)' },
 };
 const STATUS_ORDER = ['todo', 'pending_customer', 'in_progress', 'done'];
+
+// The dashboard's clickable summary tiles (below the range/search row) —
+// each one is both a live count AND a one-click filter on the table below
+// it (see toggleStatTile/activeTile). Deliberately a data-driven list, not
+// four hardcoded JSX tiles, for two reasons: (1) the workflow has grown a
+// real extra stage since these were first built — client approval
+// ("Klaar"/status done) and actual final delivery to the agency
+// (deliveredAt, via the Uitlevering tab) are now two different moments,
+// and (2) which of these a producer wants to glance at is exactly the
+// kind of thing that should be a per-browser choice, same as the table's
+// own "⚙ Kolommen" picker — see STAT_TILE_STORAGE_KEY/DEFAULT_STAT_TILE_KEYS
+// below. `total` isn't in here — it's rendered separately as a fixed,
+// non-filtering, always-shown tile.
+const STAT_TILE_DEFS = [
+  { key: 'todo', label: 'To-do', color: STATUS_META.todo.color, filterFn: (b) => (b.status || 'todo') === 'todo' },
+  { key: 'pending_customer', label: 'Wacht op klant', color: STATUS_META.pending_customer.color, filterFn: (b) => b.status === 'pending_customer' },
+  { key: 'in_progress', label: 'In behandeling', color: STATUS_META.in_progress.color, filterFn: (b) => b.status === 'in_progress' },
+  { key: 'done', label: 'Klaar', color: STATUS_META.done.color, filterFn: (b) => b.status === 'done' },
+  {
+    // Distinct from "Klaar" above: status flips to 'done' the moment the
+    // client approves a round (see (mem|pg)ApproveReview in lib/db.js), but
+    // the actual WAV hand-off — the "Uitlevering" tab, saveDelivery() — is a
+    // separate producer action that can lag behind approval. This tile is
+    // "how many are actually out the door", not just client-approved.
+    key: 'delivered', label: 'Geleverd', color: '#6B4FA0', filterFn: (b) => !!b.deliveredAt,
+  },
+  {
+    // The gap between the two tiles above, made explicit rather than making
+    // a producer do the subtraction themselves: approved by the client, but
+    // nothing's gone out to the agency yet.
+    key: 'approvedNotDelivered', label: 'Goedgekeurd, nog niet geleverd', color: '#C2513F',
+    filterFn: (b) => !!b.reviewApprovedAt && !b.deliveredAt,
+  },
+  { key: 'unseen', label: 'Nieuw, nog niet bekeken', color: '#8C6D1F', filterFn: (b) => isUnseenBrief(b) },
+];
+const STAT_TILE_STORAGE_KEY = 'tfa-dashboard-stat-tiles-v1';
+// Matches the 4 tiles this dashboard already showed, plus "Geleverd" — the
+// one genuinely new stage worth surfacing by default now that final
+// delivery is tracked at all. Everything else in STAT_TILE_DEFS is opt-in.
+const DEFAULT_STAT_TILE_KEYS = ['todo', 'pending_customer', 'in_progress', 'done', 'delivered'];
 
 // A brief counts as "new/unchecked" once it's been submitted but no
 // producer has opened it since — i.e. never opened at all, or opened
@@ -278,10 +318,13 @@ export default function DashboardClient({ briefs }) {
   const [sortDir, setSortDir] = useState('desc');
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState(null);
-  // Clicking a status tile (To-do / Wacht op klant / In behandeling / Klaar)
-  // filters the table below it to just that status; clicking the same tile
-  // again (or picking a different one) toggles back to the full overview.
-  const [statusFilter, setStatusFilter] = useState(null);
+  // Clicking a summary tile (To-do / Wacht op klant / ... / Geleverd, see
+  // STAT_TILE_DEFS) filters the table below it to just that tile's briefs;
+  // clicking the same tile again (or picking a different one) toggles back
+  // to the full overview. Stores the tile KEY now, not a raw status string,
+  // since a tile's filter can be based on something other than `status`
+  // (delivered/approvedNotDelivered/unseen all read other fields).
+  const [activeTile, setActiveTile] = useState(null);
   // Free-text search across company name, contact person, and contact
   // email — the range/status filters above narrow by date/workflow stage,
   // but there was previously no way to just find "that one brief" once the
@@ -315,9 +358,34 @@ export default function DashboardClient({ briefs }) {
     });
   }
 
-  function toggleStatusFilter(status) {
-    setStatusFilter((cur) => (cur === status ? null : status));
+  function toggleStatTile(key) {
+    setActiveTile((cur) => (cur === key ? null : key));
     setPage(1);
+  }
+
+  // Which optional stat tiles are on, plus whether its picker dropdown is
+  // open — same persistence pattern as visibleColumns/columnsMenuOpen above
+  // (start at the default on every render including SSR, then swap to
+  // whatever's saved in localStorage right after mount).
+  const [visibleStatTiles, setVisibleStatTiles] = useState(DEFAULT_STAT_TILE_KEYS);
+  const [statTilesMenuOpen, setStatTilesMenuOpen] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(STAT_TILE_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) setVisibleStatTiles(parsed);
+      }
+    } catch (e) {}
+  }, []);
+  function toggleStatTileVisible(key) {
+    setVisibleStatTiles((cur) => {
+      const next = cur.includes(key) ? cur.filter((k) => k !== key) : [...cur, key];
+      try {
+        window.localStorage.setItem(STAT_TILE_STORAGE_KEY, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
   }
 
   // Keep local editable copy in sync if the server-fetched prop ever changes
@@ -398,7 +466,11 @@ export default function DashboardClient({ briefs }) {
     // both stay editable in case a resend to a different/updated address
     // is needed.
     setDeliveryLinkDraft((selected && selected.deliveryLink) || '');
-    setDeliveryEmailDraft((selected && selected.deliveryRecipientEmail) || '');
+    // Prefill order: an address already sent to (above) beats everything;
+    // failing that, this brief's own agency contact (see the /dashboard/
+    // agencies screen) is a much better default than an empty field or
+    // whatever was typed for a previous, unrelated brief.
+    setDeliveryEmailDraft((selected && selected.deliveryRecipientEmail) || (selected && agencyContactEmailOf(selected)) || '');
     setDeliveryError(false);
     // Default straight to Productie & review once a brief is actually IN
     // that stage — a producer opening a brief mid-production almost always
@@ -650,6 +722,16 @@ export default function DashboardClient({ briefs }) {
     },
     { key: 'contactPerson', label: 'Contactpersoon', cell: (b) => b.contactPerson || '—', cellStyle: (b) => ({ color: b.contactPerson ? '#1D1D1D' : '#9C9890' }) },
     { key: 'contactEmail', label: 'E-mail', cell: (b) => b.contactEmail || '—', cellStyle: (b) => ({ color: b.contactEmail ? '#1D1D1D' : '#9C9890' }) },
+    {
+      // Which referring agency this brief came in through — see the
+      // agencyCode/agencyName comment in lib/db.js and the new
+      // /dashboard/agencies screen. agencyNameOf falls back to "Advision
+      // Media" for anything with no agency code attached, same fallback
+      // used everywhere else this shows (client emails, status page).
+      key: 'agencyName', label: 'Agency',
+      cell: (b) => agencyNameOf(b),
+      cellStyle: (b) => ({ color: b.agencyName ? '#1D1D1D' : '#9C9890' }),
+    },
     { key: 'createdAt', label: 'Aangemaakt', cell: (b) => (b.createdAt ? new Date(b.createdAt).toLocaleDateString('nl-NL') : '—') },
     { key: 'submittedAt', label: 'Verzonden', cell: (b) => (b.submittedAt ? new Date(b.submittedAt).toLocaleDateString('nl-NL') : 'Nog niet'), cellStyle: (b) => ({ color: b.submittedAt ? '#1D1D1D' : '#9C9890' }) },
     { key: 'audience', label: 'Doelgroep', cell: (b) => (b.audience === 'b2b' ? 'B2B' : b.audience === 'b2c' ? 'B2C' : '—') },
@@ -726,9 +808,10 @@ export default function DashboardClient({ briefs }) {
   }, [rows, range]);
 
   const visible = useMemo(() => {
-    if (!statusFilter) return filtered;
-    return filtered.filter((b) => (b.status || 'todo') === statusFilter);
-  }, [filtered, statusFilter]);
+    if (!activeTile) return filtered;
+    const tile = STAT_TILE_DEFS.find((t) => t.key === activeTile);
+    return tile ? filtered.filter(tile.filterFn) : filtered;
+  }, [filtered, activeTile]);
 
   const searched = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -756,13 +839,14 @@ export default function DashboardClient({ briefs }) {
   const pageSafe = Math.min(page, totalPages);
   const pageItems = sorted.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
+  // One count per STAT_TILE_DEFS entry, keyed by tile key — replaces the
+  // old fixed { total, todo, pendingCustomer, inProgress, done } shape now
+  // that the set of tiles is data-driven/configurable rather than four
+  // hardcoded fields.
   const stats = useMemo(() => {
-    const total = filtered.length;
-    const todo = filtered.filter((b) => (b.status || 'todo') === 'todo').length;
-    const pendingCustomer = filtered.filter((b) => b.status === 'pending_customer').length;
-    const inProgress = filtered.filter((b) => b.status === 'in_progress').length;
-    const done = filtered.filter((b) => b.status === 'done').length;
-    return { total, todo, pendingCustomer, inProgress, done };
+    const byTile = {};
+    for (const tile of STAT_TILE_DEFS) byTile[tile.key] = filtered.filter(tile.filterFn).length;
+    return { total: filtered.length, ...byTile };
   }, [filtered]);
 
   function toggleSort(field) {
@@ -790,8 +874,8 @@ export default function DashboardClient({ briefs }) {
   // status's own accent color (used only for its number/label) — one
   // consistent "this is the active filter" signal instead of a color that
   // changes depending on which tile you clicked.
-  function tileStyle(status) {
-    const active = statusFilter === status;
+  function tileStyle(key) {
+    const active = activeTile === key;
     return {
       ...cardStyle,
       cursor: 'pointer',
@@ -850,72 +934,107 @@ export default function DashboardClient({ briefs }) {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 14, marginBottom: 26 }} className="tfa-stats-grid">
+      <div
+        style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(visibleStatTiles.length + 1, 6)}, 1fr)`, gap: 14, marginBottom: 26 }}
+        className="tfa-stats-grid"
+      >
         <div style={cardStyle}>
           <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>Totaal briefs</div>
           <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6 }}>{stats.total}</div>
         </div>
-        <button type="button" onClick={() => toggleStatusFilter('todo')} style={tileStyle('todo')}>
-          <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>To-do</div>
-          <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6 }}>{stats.todo}</div>
-        </button>
-        <button type="button" onClick={() => toggleStatusFilter('pending_customer')} style={tileStyle('pending_customer')}>
-          <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>Wacht op klant</div>
-          <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6, color: '#8C6D1F' }}>{stats.pendingCustomer}</div>
-        </button>
-        <button type="button" onClick={() => toggleStatusFilter('in_progress')} style={tileStyle('in_progress')}>
-          <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>In behandeling</div>
-          <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6, color: '#1F6F8C' }}>{stats.inProgress}</div>
-        </button>
-        <button type="button" onClick={() => toggleStatusFilter('done')} style={tileStyle('done')}>
-          <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>Klaar</div>
-          <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6, color: '#1D7A46' }}>{stats.done}</div>
-        </button>
+        {/* Data-driven, and editable — see STAT_TILE_DEFS/visibleStatTiles
+            above. Each tile doubles as a click-to-filter toggle (the whole
+            point being to make clear these ARE clickable, not just numbers
+            — see the glow-on-hover .tfa-stat-tile CSS below) and as a live
+            count of exactly what it filters to. */}
+        {STAT_TILE_DEFS.filter((t) => visibleStatTiles.includes(t.key)).map((t) => (
+          <button key={t.key} type="button" onClick={() => toggleStatTile(t.key)} style={tileStyle(t.key)} className="tfa-stat-tile">
+            <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t.label}</div>
+            <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6, color: t.color }}>{stats[t.key]}</div>
+          </button>
+        ))}
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: -14, marginBottom: 18 }}>
-        {statusFilter ? (
+        {activeTile ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#5C5850' }}>
-            Gefilterd op <b style={{ color: STATUS_META[statusFilter].color }}>{STATUS_META[statusFilter].label}</b>
-            <button type="button" onClick={() => setStatusFilter(null)} style={{ border: '1px solid #C9C5B9', borderRadius: 999, background: '#FFFFFF', padding: '3px 10px', fontSize: 11.5, cursor: 'pointer', color: '#5C5850' }}>
+            Gefilterd op <b style={{ color: (STAT_TILE_DEFS.find((t) => t.key === activeTile) || {}).color }}>{(STAT_TILE_DEFS.find((t) => t.key === activeTile) || {}).label}</b>
+            <button type="button" onClick={() => setActiveTile(null)} style={{ border: '1px solid #C9C5B9', borderRadius: 999, background: '#FFFFFF', padding: '3px 10px', fontSize: 11.5, cursor: 'pointer', color: '#5C5850' }}>
               ✕ Wis filter
             </button>
           </div>
         ) : <div />}
 
-        {/* Column picker — which of the optional columns in COLUMN_DEFS
-            show up in the table below, saved per-browser via toggleColumn
-            (see COLUMN_STORAGE_KEY above). 'Bedrijf' and 'Status' aren't
-            listed here since they're core and always shown. */}
-        <div style={{ position: 'relative' }}>
-          <button
-            type="button"
-            onClick={() => setColumnsMenuOpen((o) => !o)}
-            style={{ border: '1px solid #C9C5B9', borderRadius: 8, background: '#FFFFFF', padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 6 }}
-          >
-            ⚙ Kolommen ({activeColumns.length - 2})
-          </button>
-          {columnsMenuOpen && (
-            <>
-              <div onClick={() => setColumnsMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
-              <div
-                style={{
-                  position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 21, width: 280, maxHeight: 380, overflowY: 'auto',
-                  background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, boxShadow: '0 12px 32px rgba(29,29,29,.16)', padding: '10px 0',
-                }}
-              >
-                <div style={{ padding: '4px 14px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880' }}>
-                  Kies welke kolommen je ziet
+        {/* Both pickers live together on the right: "⚙ Kaarten" (which
+            summary tiles show above, see STAT_TILE_DEFS/visibleStatTiles)
+            and "⚙ Kolommen" (which table columns show below, unchanged from
+            before). */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setStatTilesMenuOpen((o) => !o)}
+              style={{ border: '1px solid #C9C5B9', borderRadius: 8, background: '#FFFFFF', padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              ⚙ Kaarten ({visibleStatTiles.length})
+            </button>
+            {statTilesMenuOpen && (
+              <>
+                <div onClick={() => setStatTilesMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                <div
+                  style={{
+                    position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 21, width: 300, maxHeight: 380, overflowY: 'auto',
+                    background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, boxShadow: '0 12px 32px rgba(29,29,29,.16)', padding: '10px 0',
+                  }}
+                >
+                  <div style={{ padding: '4px 14px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880' }}>
+                    Kies welke kaarten je ziet
+                  </div>
+                  {STAT_TILE_DEFS.map((t) => (
+                    <label key={t.key} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', fontSize: 13, cursor: 'pointer', color: '#1D1D1D' }}>
+                      <input type="checkbox" checked={visibleStatTiles.includes(t.key)} onChange={() => toggleStatTileVisible(t.key)} />
+                      {t.label}
+                    </label>
+                  ))}
                 </div>
-                {COLUMN_DEFS.filter((c) => !c.core).map((c) => (
-                  <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', fontSize: 13, cursor: 'pointer', color: '#1D1D1D' }}>
-                    <input type="checkbox" checked={visibleColumns.includes(c.key)} onChange={() => toggleColumn(c.key)} />
-                    {c.label}
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
+              </>
+            )}
+          </div>
+
+          {/* Column picker — which of the optional columns in COLUMN_DEFS
+              show up in the table below, saved per-browser via toggleColumn
+              (see COLUMN_STORAGE_KEY above). 'Bedrijf' and 'Status' aren't
+              listed here since they're core and always shown. */}
+          <div style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setColumnsMenuOpen((o) => !o)}
+              style={{ border: '1px solid #C9C5B9', borderRadius: 8, background: '#FFFFFF', padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              ⚙ Kolommen ({activeColumns.length - 2})
+            </button>
+            {columnsMenuOpen && (
+              <>
+                <div onClick={() => setColumnsMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 20 }} />
+                <div
+                  style={{
+                    position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 21, width: 280, maxHeight: 380, overflowY: 'auto',
+                    background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, boxShadow: '0 12px 32px rgba(29,29,29,.16)', padding: '10px 0',
+                  }}
+                >
+                  <div style={{ padding: '4px 14px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880' }}>
+                    Kies welke kolommen je ziet
+                  </div>
+                  {COLUMN_DEFS.filter((c) => !c.core).map((c) => (
+                    <label key={c.key} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 14px', fontSize: 13, cursor: 'pointer', color: '#1D1D1D' }}>
+                      <input type="checkbox" checked={visibleColumns.includes(c.key)} onChange={() => toggleColumn(c.key)} />
+                      {c.label}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -928,6 +1047,7 @@ export default function DashboardClient({ briefs }) {
                   <th
                     key={c.key}
                     onClick={() => (c.sortable === false ? null : toggleSort(c.key))}
+                    className={c.sortable === false ? '' : 'tfa-sortable-th'}
                     style={{ padding: '12px 16px', cursor: c.sortable === false ? 'default' : 'pointer', color: '#5C5850', fontWeight: 600, whiteSpace: 'nowrap' }}
                   >
                     {c.label} {sortField === c.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
@@ -1254,6 +1374,11 @@ export default function DashboardClient({ briefs }) {
                   <Field label="Aangemaakt">{new Date(selected.createdAt).toLocaleString('nl-NL')}</Field>
                   {selected.submittedAt && <Field label="Verzonden">{new Date(selected.submittedAt).toLocaleString('nl-NL')}</Field>}
                   <Field label="Op de radio" empty={!selected.airDate && !selected.dateUnknown}>{formatAirDate(selected)}</Field>
+                  {/* Which referring agency this brief came in through — see
+                      /dashboard/agencies. Shown here rather than only as a
+                      table column since this is where a producer looks for
+                      "who does the finished audio actually go to". */}
+                  <Field label="Agency" empty={!selected.agencyName}>{agencyNameOf(selected)}</Field>
                 </div>
               </div>
             </div>
@@ -1517,10 +1642,20 @@ export default function DashboardClient({ briefs }) {
         @media (max-width: 560px) {
           .tfa-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
-        .tfa-dash-row { transition: background .12s ease; }
-        .tfa-dash-row:hover { background: rgba(230,200,88,.1); }
+        .tfa-dash-row { transition: background .12s ease, box-shadow .12s ease; }
+        .tfa-dash-row:hover { background: rgba(230,200,88,.1); box-shadow: inset 0 0 0 1px rgba(230,200,88,.3); }
         .tfa-btn-glow { transition: filter .12s ease; }
         .tfa-btn-glow:hover { filter: brightness(1.08); }
+        /* Summary tiles ("To-do", "Geleverd", ...) act as click-to-filter
+           toggles, which wasn't obvious before — per Karim's note, this
+           glow (on top of tileStyle's own active-state highlight above) is
+           what signals "this is clickable" on hover, same gold-glow
+           language used on the sidebar and the client-portal step rail. */
+        .tfa-stat-tile:hover { box-shadow: 0 0 0 1px rgba(230,200,88,.4), 0 4px 18px rgba(230,200,88,.4); }
+        /* Sortable table headers — another spot that was clickable with no
+           visual hint at all. */
+        .tfa-sortable-th { transition: color .12s ease, box-shadow .12s ease; cursor: pointer; }
+        .tfa-sortable-th:hover { color: #1D1D1D; box-shadow: inset 0 -2px 0 rgba(230,200,88,.6); }
         @media (max-width: 560px) {
           .tfa-modal-grid { grid-template-columns: 1fr !important; }
         }
