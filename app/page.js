@@ -273,14 +273,16 @@ export default function HomePage() {
         }
         @media (max-width: 700px) {
           .tfa-footer-grid { grid-template-columns: 1fr 1fr !important; gap: 24px !important; }
-        }
-        @media (max-width: 460px) {
-          .tfa-footer-grid { grid-template-columns: 1fr !important; }
-          /* Once the grid collapses to one stacked column, "centered" and
-             "right-aligned" no longer mean anything relative to each other
-             — every column is the full width, so keep all three reading
-             the same, plain left-aligned way the Contact column already
-             does, rather than an odd stack of left/center/right blocks. */
+          /* At this 2-column width the "Snel naar" and "Volg ons" columns'
+             desktop alignment (centered / right-aligned WITHIN their own
+             grid cell) reads as broken rather than intentional: with only
+             two columns, "Volg ons" lands alone in row 2's first cell and
+             right-aligning it there just floats it in the middle of the
+             page, with a block of empty space to its actual right — exactly
+             the "not centered, nonsense space on the right" symptom. Once
+             the grid isn't a clean single row of 3 anymore (700px down to
+             the 460px single-column collapse below), every column reads
+             the same plain left-aligned way Contact already does instead. */
           .tfa-footer-col-center,
           .tfa-footer-col-right {
             align-items: flex-start !important;
@@ -291,6 +293,9 @@ export default function HomePage() {
             align-items: flex-start !important;
             justify-content: flex-start !important;
           }
+        }
+        @media (max-width: 460px) {
+          .tfa-footer-grid { grid-template-columns: 1fr !important; }
         }
 
         /* Right column's map fills the grid row's full height (the grid's

@@ -140,7 +140,7 @@ export default async function ReportsPage({ searchParams }) {
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
       <DashboardSidebar active="reports" />
 
-      <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }}>
+      <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }} className="tfa-dash-main">
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 6, flexWrap: 'wrap' }}>
           <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: 0, color: '#1D1D1D' }}>
             Rapporten

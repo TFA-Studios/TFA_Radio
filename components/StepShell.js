@@ -444,7 +444,24 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
         </div>
       )}
 
-      <style jsx>{`
+      {/* Plain <style>, not <style jsx> — deliberately: several selectors
+          below (.tfa-sidebar-brand-label in particular) target elements
+          rendered inside a CHILD component (SpotFlowLogo), not elements
+          literally written in this file's own JSX. styled-jsx's scoping
+          only tags elements from THIS file's render output with its hash
+          attribute — it never propagates into a child component's own
+          output — so a scoped <style jsx> rule for a child's className
+          silently never matches anything. That's what let the "TFA
+          SpotFlow" wordmark keep rendering (and visibly overflowing/
+          clipping) on the mobile 56px step-rail even though
+          .tfa-sidebar-brand-label { display: none } "should" have hidden
+          it there. A plain global <style> tag (same pattern already used
+          in DashboardSidebar.js/app/layout.js) has no such scoping, and
+          every class name here already carries a unique tfa- prefix, so
+          going global is safe. (`<style jsx global>` would fix this too,
+          but this project's build doesn't accept that two-word form —
+          verified it fails to compile — so plain <style> it is.) */}
+      <style>{`
         /* Base height/overflow live here — NOT inline — specifically so the
            mobile rules below can actually override them. An inline height/
            overflow on these same three elements used to silently defeat

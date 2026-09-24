@@ -58,7 +58,7 @@ export default function HelpPage() {
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
       <DashboardSidebar active="help" />
 
-      <main style={{ flex: 1, padding: '32px 36px', minWidth: 0, display: 'flex', gap: 32 }} className="tfa-help-main">
+      <main style={{ flex: 1, padding: '32px 36px', minWidth: 0, display: 'flex', gap: 32 }} className="tfa-help-main tfa-dash-main">
         {/* In-page section nav — sticky, jumps via plain anchors (no client
             JS needed: this whole page can stay a server component). */}
         <nav className="tfa-help-toc" style={{ flex: '0 0 200px', position: 'sticky', top: 32, alignSelf: 'flex-start', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -101,7 +101,13 @@ export default function HelpPage() {
         .tfa-help-toclink:hover { background: rgba(29,29,29,.05); color: #1D1D1D; }
         @media (max-width: 900px) {
           .tfa-help-main { flex-direction: column; }
-          .tfa-help-toc { position: static; flex-direction: row !important; flex-wrap: wrap; }
+          /* flex-basis needs !important too, not just flex-direction: the
+             <nav> sets flex: '0 0 200px' inline for the desktop side-by-side
+             layout, and that inline value otherwise keeps winning even
+             after .tfa-help-main switches to a column — it just silently
+             becomes a forced 200px HEIGHT instead of width, stretching/
+             clipping the link list against a box the wrong shape for it. */
+          .tfa-help-toc { position: static; flex: none !important; width: 100%; flex-direction: row !important; flex-wrap: wrap; }
         }
       `}</style>
     </div>

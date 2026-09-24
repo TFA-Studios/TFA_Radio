@@ -86,12 +86,31 @@ export const DASHBOARD_SHELL_STYLES = `
   .tfa-dash-sidebar { min-height: 100vh; }
   @media (max-width: 900px) {
     .tfa-dash-shell { flex-direction: column; }
+    /* !important on both flex and min-height here, not just padding: the
+       <aside> sets flex: '0 0 240px' inline (for the desktop full-height
+       column layout), and an inline style silently beats a plain
+       stylesheet rule for the same property no matter what a media query
+       says — that's what left the mobile nav bar stuck at a fixed 240px
+       tall box with a big dead gap above the "Uitloggen" footer (the
+       footer's marginTop:'auto' was consuming the leftover space in that
+       stuck-tall box). !important is the one thing that beats an inline
+       style, so it's required here, not optional cleanup. */
     .tfa-dash-sidebar {
-      flex: none; width: 100%; min-height: auto; padding: 14px 16px !important;
+      flex: none !important; width: 100%; min-height: auto !important; padding: 14px 16px !important;
     }
     .tfa-dash-sidebar-brand { display: none; }
     .tfa-dash-nav { flex-direction: row !important; flex-wrap: wrap; margin-top: 0 !important; gap: 6px !important; }
-    .tfa-dash-footer { display: none; }
+    /* Same inline-vs-stylesheet issue as above: the footer div sets
+       display:'flex' inline, which silently beat this rule without
+       !important — the "Uitloggen / Login niet geconfigureerd" row was
+       never actually hidden on mobile, it just sat there looking stray. */
+    .tfa-dash-footer { display: none !important; }
+    /* The 32px/36px desktop gutter around each page's main content reads
+       as wasted margin on a 390px phone (roughly a fifth of the screen
+       width gone on each side) — this is what's behind cards/tables
+       visually "not filling the screen". Shared here so every /dashboard/*
+       page's <main className="tfa-dash-main"> gets it in one place. */
+    .tfa-dash-main { padding: 18px 16px !important; }
   }
   .tfa-dash-navlink { transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
   /* Soft gold glow on hover — per Karim's note that it wasn't obvious the
