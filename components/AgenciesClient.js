@@ -100,7 +100,14 @@ export default function AgenciesClient({ initialAgencies }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 640 }}>
+    // No maxWidth cap here (unlike the intro paragraph in
+    // app/dashboard/agencies/page.js, which keeps one deliberately for
+    // readable line length) — this list/cards should fill the same full
+    // width as every other dashboard list (PromptVersionsClient, the
+    // briefs table, ...). A leftover 640px cap here used to leave the
+    // whole tab huddled in a narrow left column with the rest of the
+    // page's width sitting empty on wide screens.
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {error && (
         <div style={{ background: '#FBF3F1', border: '1px solid #C2513F', borderRadius: 10, padding: '10px 14px', fontSize: 13, color: '#C2513F' }}>
           {error}
@@ -117,17 +124,27 @@ export default function AgenciesClient({ initialAgencies }) {
         <div key={agency.id} style={cardStyle}>
           {editingId === agency.id ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div>
-                <label style={labelStyle}>Toegangscode</label>
-                <input style={inputStyle} value={editCode} onChange={(e) => setEditCode(e.target.value)} />
-              </div>
-              <div>
-                <label style={labelStyle}>Naam</label>
-                <input style={inputStyle} value={editName} onChange={(e) => setEditName(e.target.value)} />
-              </div>
-              <div>
-                <label style={labelStyle}>Contact-e-mailadres</label>
-                <input style={inputStyle} value={editContactEmail} onChange={(e) => setEditContactEmail(e.target.value)} placeholder="bijv. delivery@advisionmedia.nl" />
+              {/* auto-fit grid, not a fixed 2/3-column count — with the
+                  640px cap on the whole tab gone, the card itself can now
+                  be very wide, and three stacked single-column inputs at
+                  that width look just as "empty on the right" as the old
+                  narrow column did. minmax(200px, 1fr) lets the three
+                  fields sit side by side once there's room, and wrap back
+                  down on a narrower screen, with no separate breakpoint
+                  needed. */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+                <div>
+                  <label style={labelStyle}>Toegangscode</label>
+                  <input style={inputStyle} value={editCode} onChange={(e) => setEditCode(e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Naam</label>
+                  <input style={inputStyle} value={editName} onChange={(e) => setEditName(e.target.value)} />
+                </div>
+                <div>
+                  <label style={labelStyle}>Contact-e-mailadres</label>
+                  <input style={inputStyle} value={editContactEmail} onChange={(e) => setEditContactEmail(e.target.value)} placeholder="bijv. delivery@advisionmedia.nl" />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button
@@ -181,17 +198,19 @@ export default function AgenciesClient({ initialAgencies }) {
 
       {showForm ? (
         <form onSubmit={createAgency} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 10 }}>
-          <div>
-            <label style={labelStyle}>Toegangscode</label>
-            <input style={inputStyle} value={code} onChange={(e) => setCode(e.target.value)} placeholder="bijv. TFA2026ADVISION" autoFocus />
-          </div>
-          <div>
-            <label style={labelStyle}>Naam</label>
-            <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="bijv. Advision Media" />
-          </div>
-          <div>
-            <label style={labelStyle}>Contact-e-mailadres</label>
-            <input style={inputStyle} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="bijv. delivery@advisionmedia.nl" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
+            <div>
+              <label style={labelStyle}>Toegangscode</label>
+              <input style={inputStyle} value={code} onChange={(e) => setCode(e.target.value)} placeholder="bijv. TFA2026ADVISION" autoFocus />
+            </div>
+            <div>
+              <label style={labelStyle}>Naam</label>
+              <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} placeholder="bijv. Advision Media" />
+            </div>
+            <div>
+              <label style={labelStyle}>Contact-e-mailadres</label>
+              <input style={inputStyle} value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} placeholder="bijv. delivery@advisionmedia.nl" />
+            </div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button

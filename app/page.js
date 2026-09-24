@@ -81,30 +81,37 @@ export default function HomePage() {
           "100vw wide" alone would let it keep growing taller with the
           browser's width.
 
-          PHOTOS — four distinct studio shots exist in public/studio today
-          (studio-1..4). The two "engineer" photos Karim asked for turned out,
-          on close comparison, to already BE studio-1 (Karim, the oud/Dolby
-          Atmos room) and studio-2 (Marco, the green room) — every image sent
-          across both rounds matched one of these four rooms pixel-for-pixel,
-          none were a genuinely new fifth/sixth shot. So this is four, not
-          six, until two more distinct photos come through; flagged back to
-          Karim rather than guessing. Once two new ones land, add them here
-          as additional entries — no other changes needed, sizing/order are
-          driven entirely by this array.
+          PHOTOS — six distinct studio shots now exist in public/studio
+          (studio-1..6). The first four (studio-1..4) were the original set;
+          studio-5 (reception, the "TFA STUDIOS" glass-wall lobby with the
+          curved wood-slat desk) and studio-6 (a dedicated red Dolby Atmos
+          listening room — sofa, keyboard, ceiling-mounted surround speakers)
+          were added 2026-09-24, confirmed genuinely new/distinct from the
+          existing four (studio-1 looked similar in name only — it's Karim's
+          own workstation desk, not this room).
+          NOTE for Karim: studio-1's tag below still says "Dolby Atmos
+          studio" from before studio-6 existed — now that there's a second,
+          more literally-Atmos room (visible ceiling speaker array), you may
+          want studio-1 relabeled to something like "Mixkamer" to avoid two
+          "Dolby Atmos" tags in the same carousel. Left as-is for now rather
+          than guessing which one should keep the name.
           TAGS deliberately describe the room, not the person at the desk
           (Karim asked for no names on the site) — "Dolby Atmos studio" /
           "Mixstudio" cover studio-1 / studio-2 without naming Karim/Marco.
-          ORDER is arranged for visual variety (wide control room → dramatic
-          Atmos room → intimate booth → mix room) rather than strictly
-          "engineers first" — Karim left the exact arrangement up to us. */}
+          ORDER is arranged for visual variety rather than strictly
+          "engineers first" — Karim left the exact arrangement up to us;
+          reception opens the set (first impression of the building), the
+          new Atmos room sits right after the existing one for contrast. */}
       <div style={{ position: 'relative', left: '50%', width: '100vw', marginLeft: '-50vw', overflow: 'hidden', background: '#1D1D1D' }}>
         <StudioCarousel
-          intervalMs={4000}
+          intervalMs={3200}
           maxWidth="100%"
           borderRadius={20}
           images={[
+            { src: '/studio/studio-5.jpg', alt: 'TFA Studio — receptie', tag: 'Receptie' },
             { src: '/studio/studio-3.jpg', alt: 'TFA Studio — controlekamer', tag: 'Controlekamer' },
             { src: '/studio/studio-1.jpg', alt: 'TFA Studio — Dolby Atmos studio', tag: 'Dolby Atmos studio' },
+            { src: '/studio/studio-6.jpg', alt: 'TFA Studio — Dolby Atmos luisterkamer', tag: 'Dolby Atmos luisterkamer' },
             { src: '/studio/studio-4.jpg', alt: 'TFA Studio — opnamehokje', tag: 'Opnamehokje' },
             { src: '/studio/studio-2.jpg', alt: 'TFA Studio — mixstudio', tag: 'Mixstudio' },
           ]}
