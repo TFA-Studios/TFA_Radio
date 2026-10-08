@@ -37,14 +37,35 @@ export function computeReached(brief) {
     if (Array.isArray(parsed)) tracks = parsed;
   } catch (e) {}
   const hasScript = !!(brief.generatedScript || brief.editedScript);
+  // Copywriter workflow: steps 4-7 only exist for the client once TFA has
+  // released the script proposals (see briefStageOf below). Until then they
+  // stay greyed out in the sidebar even though the brief itself is complete.
+  const released = !!brief.scriptsReleasedAt || !!brief.finalizedAt;
   return {
     2: !!(brief.impressions || brief.airDate || brief.dateUnknown),
     3: !!(brief.product || brief.usp || brief.mainMessage),
-    4: hasScript,
-    5: !!brief.selectedVoiceId,
-    6: tracks.length > 0,
-    7: !!brief.submittedAt || (hasScript && !!brief.selectedVoiceId && tracks.length > 0),
+    4: released && hasScript,
+    5: released && !!brief.selectedVoiceId,
+    6: released && tracks.length > 0,
+    7: !!brief.finalizedAt || (released && hasScript && !!brief.selectedVoiceId && tracks.length > 0),
   };
+}
+
+// Where a brief is in the copywriter workflow, from the client's point of
+// view. One place so every page/email/dashboard agrees:
+//   'filling'  — client is still filling in steps 1-3 (not sent yet)
+//   'writing'  — brief sent; TFA's copywriter is writing/reviewing the
+//                script proposals (client waits, steps 4-7 locked)
+//   'choosing' — TFA released the proposals; client picks a script, then
+//                voice and music, then confirms on the overview
+//   'final'    — client confirmed everything; TFA is producing
+// Briefs from the old instant-script flow are backfilled as 'final' (see the
+// finalizedAt migration in lib/db.js).
+export function briefStageOf(brief) {
+  if (!brief || !brief.submittedAt) return 'filling';
+  if (brief.finalizedAt) return 'final';
+  if (brief.scriptsReleasedAt) return 'choosing';
+  return 'writing';
 }
 
 // Single source of truth for the tone-of-voice vocabulary — used by the
@@ -228,6 +249,8 @@ export const INCLUDED_REVISIONS = 2;
 
 export const PRODUCTION_STATUS_LABELS = {
   '': 'Nog niet gestart',
+  script_writing: 'Script wordt geschreven',
+  script_choosing: 'Klant kiest script, stem & muziek',
   awaiting_review: 'Wacht op klantreview',
   in_revision: 'Feedback ontvangen',
   approved: 'Goedgekeurd',

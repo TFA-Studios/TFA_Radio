@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { listPromptVersions, createPromptVersion } from '../../../../lib/promptVersions';
 
@@ -7,11 +8,15 @@ import { listPromptVersions, createPromptVersion } from '../../../../lib/promptV
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const versions = await listPromptVersions();
   return NextResponse.json(versions);
 }
 
 export async function POST(request) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const label = (body && body.label ? String(body.label) : '').trim();
   const content = (body && body.content ? String(body.content) : '').trim();

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { profileOfBrief } from '../../../../lib/formProfile';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
@@ -87,6 +88,7 @@ export default function DeliveryPage({ params }) {
 
   if (showLoader || navigating) return <Preloader />;
 
+  const hide = profileOfBrief(brief).hide;
   const todayISO = new Date().toISOString().slice(0, 10);
   const currentMonth = new Date().getMonth() + 1;
   const monthOptions = [];
@@ -101,6 +103,7 @@ export default function DeliveryPage({ params }) {
   return (
     <StepShell briefId={id} current={2} brief={brief} bigNum="02" kicker="Wat we gaan opleveren" title="Jouw commercial" hint="Dit bepaalt hoeveel bestanden TFA straks aanlevert." backHref={`/brief/${id}/contact`} backLabel="Terug naar je gegevens">
       <div className="field-grid">
+        {!hide.includes('impressions') && (
         <div>
           <label className="field-label">Aantal impressies</label>
           <select value={form.impressions} onChange={(e) => update({ impressions: e.target.value })}>
@@ -125,6 +128,7 @@ export default function DeliveryPage({ params }) {
             </div>
           )}
         </div>
+        )}
         <div>
           <label className="field-label">Lengte van de hoofdspot</label>
           <select value={form.hoofdspotLength} onChange={(e) => update({ hoofdspotLength: e.target.value })}>
@@ -134,6 +138,7 @@ export default function DeliveryPage({ params }) {
         </div>
       </div>
 
+      {!hide.includes('variations') && (
       <div style={{ marginTop: 20 }}>
         <label className="field-label" style={{ marginBottom: 3 }}>Zijn er ook variaties nodig van de hoofdspot?</label>
         <div className="hint" style={{ marginBottom: 7 }}>
@@ -178,11 +183,14 @@ export default function DeliveryPage({ params }) {
         )}
       </div>
 
+      )}
+
       <div className="box" style={{ marginTop: 16, background: '#E6C858', border: '2px solid #000', color: '#383209', fontSize: 12.5, lineHeight: 1.5 }}>
         TFA levert op:<br />
         <b>{summaryParts.join(' + ')}</b>
       </div>
 
+      {!hide.includes('airDate') && (
       <div style={{ marginTop: 24 }}>
         <label className="field-label">Eerste uitzenddatum</label>
         <input
@@ -214,7 +222,7 @@ export default function DeliveryPage({ params }) {
           </div>
         )}
       </div>
-
+      )}
 
       <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         {!canContinue && (

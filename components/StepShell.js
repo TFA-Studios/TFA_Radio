@@ -2,9 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import SpotFlowLogo from './SpotFlowLogo';
-import { STEPS, computeReached, variationsCountOf } from './flowData';
+import { PartnerSidebarBlock, PartnerWatermark, usePartnerTitle } from './PartnerBadge';
+import { STEPS, computeReached, variationsCountOf, briefStageOf } from './flowData';
 
 function WaveIcon({ dim }) {
   const fill = dim ? '#514E44' : '#E6C858';
@@ -125,7 +126,17 @@ function ResumeCard({ briefId, defaultEmail }) {
 // slim step-number rail instead of stacking full-width above the form —
 // see the mobile media query below for why and how.
 export default function StepShell({ briefId, current, brief, subtitle, bigNum, kicker, title, hint, backHref, backLabel, children, showWipe = false }) {
+  usePartnerTitle(brief);
   const reached = computeReached(brief);
+  // Steps 4-7 only open once TFA's copywriters released the scripts: anyone
+  // arriving earlier (a bookmarked link, the back button) is sent to the
+  // status page, or back to the brief if it has not been sent yet.
+  const stageRouter = useRouter();
+  const guardStage = brief && current >= 4 ? briefStageOf(brief) : '';
+  useEffect(() => {
+    if (guardStage === 'writing') stageRouter.replace(`/brief/${briefId}/review`);
+    else if (guardStage === 'filling') stageRouter.replace(`/brief/${briefId}/details`);
+  }, [guardStage, briefId, stageRouter]);
   const companyName = brief && brief.companyName && brief.companyName.trim() ? brief.companyName : null;
   const pathname = usePathname();
   // Once the main script is approved AND the client asked for variation(s),
@@ -234,6 +245,9 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
         <Link href="/" onClick={handleLogoClick} style={{ textDecoration: 'none' }}>
           <SpotFlowLogo size={26} variant="dark" className="tfa-sidebar-brand" textClassName="tfa-sidebar-brand-label" />
         </Link>
+        {/* Partner agency co-branding (only for briefs that came in through
+            e.g. Advision Media) — hidden on the slim mobile rail. */}
+        <PartnerSidebarBlock brief={brief} size={26} className="tfa-sidebar-extra" />
         {/* On step 1 the client hasn't had a chance to fill in the company
             name yet (it's the very field this step asks for), so showing a
             "Nog geen bedrijfsnaam" placeholder here reads as if something's
@@ -358,6 +372,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
         }}
         className="tfa-content"
       >
+        <PartnerWatermark brief={brief} />
         {bigNum ? (
           <div style={{ position: 'absolute', top: -2, right: 8, fontWeight: 700, fontSize: 130, lineHeight: 1, color: '#1D1D1D', opacity: 0.05, zIndex: 0, pointerEvents: 'none' }}>
             {bigNum}

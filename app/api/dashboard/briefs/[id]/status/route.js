@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { updateBriefStatus, STATUS_VALUES } from '../../../../../../lib/db';
 
@@ -7,6 +8,8 @@ import { updateBriefStatus, STATUS_VALUES } from '../../../../../../lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(request, { params }) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const { status } = body || {};
 

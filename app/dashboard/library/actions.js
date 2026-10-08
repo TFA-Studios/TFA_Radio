@@ -1,5 +1,7 @@
 'use server';
 
+import { assertStaff } from '../../../lib/access';
+
 import { revalidatePath } from 'next/cache';
 import {
   createTrack, deleteTrack, updateTrack, deleteTracksBulk, updateTracksBulk, renameTracksBulk,
@@ -16,6 +18,7 @@ import {
 // real voice or music file would silently fail to add.
 
 export async function addTrackAction(formData) {
+  await assertStaff();
   await createTrack({
     title: formData.get('title'),
     artist: formData.get('artist'),
@@ -28,6 +31,7 @@ export async function addTrackAction(formData) {
 }
 
 export async function removeTrackAction(id) {
+  await assertStaff();
   await deleteTrack(id);
   revalidatePath('/dashboard/library');
 }
@@ -37,6 +41,7 @@ export async function removeTrackAction(id) {
 // producer actually uploaded a new file (the client only sends this field
 // when that happened), otherwise leave the existing audio alone.
 export async function updateTrackAction(id, formData) {
+  await assertStaff();
   const patch = {
     title: formData.get('title'),
     artist: formData.get('artist'),
@@ -56,12 +61,14 @@ export async function updateTrackAction(id, formData) {
 // submits every checked id in one FormData (repeated `id` entries) instead
 // of firing removeTrackAction once per row.
 export async function removeTracksBulkAction(formData) {
+  await assertStaff();
   const ids = formData.getAll('id').map(String).filter(Boolean);
   await deleteTracksBulk(ids);
   revalidatePath('/dashboard/library');
 }
 
 export async function addVoiceAction(formData) {
+  await assertStaff();
   const tagsRaw = formData.get('tags') || '';
   const tags = tagsRaw
     .toString()
@@ -81,6 +88,7 @@ export async function addVoiceAction(formData) {
 }
 
 export async function removeVoiceAction(id) {
+  await assertStaff();
   await deleteVoice(id);
   revalidatePath('/dashboard/library');
 }
@@ -88,6 +96,7 @@ export async function removeVoiceAction(id) {
 // See updateTrackAction above — same "only replace audio if a new file was
 // actually uploaded" behavior, voice side.
 export async function updateVoiceAction(id, formData) {
+  await assertStaff();
   const tagsRaw = formData.get('tags') || '';
   const tags = tagsRaw.toString().split(',').map((t) => t.trim()).filter(Boolean);
   const patch = {
@@ -108,6 +117,7 @@ export async function updateVoiceAction(id, formData) {
 
 // See removeTracksBulkAction above — voice side.
 export async function removeVoicesBulkAction(formData) {
+  await assertStaff();
   const ids = formData.getAll('id').map(String).filter(Boolean);
   await deleteVoicesBulk(ids);
   revalidatePath('/dashboard/library');
@@ -121,6 +131,7 @@ export async function removeVoicesBulkAction(formData) {
 // to the whole batch instead of the per-file category picked in the staging
 // UI — the "adding 10 tracks that are all the same category" case.
 export async function addTracksBulkAction(formData) {
+  await assertStaff();
   const count = Number(formData.get('count') || 0);
   const sharedCategory = formData.get('sharedCategory') || '';
   for (let i = 0; i < count; i++) {
@@ -138,6 +149,7 @@ export async function addTracksBulkAction(formData) {
 
 // Batch re-categorize a selected set of tracks in one go.
 export async function setTracksCategoryBulkAction(formData) {
+  await assertStaff();
   const ids = formData.getAll('id').map(String).filter(Boolean);
   const category = formData.get('category');
   await updateTracksBulk(ids, { category });
@@ -147,6 +159,7 @@ export async function setTracksCategoryBulkAction(formData) {
 // Hide/unhide a selected set of tracks — pulls them out of the client-facing
 // picker (see app/api/library/tracks/route.js) without deleting them.
 export async function setTracksHiddenBulkAction(formData) {
+  await assertStaff();
   const ids = formData.getAll('id').map(String).filter(Boolean);
   const hidden = formData.get('hidden') === 'true';
   await updateTracksBulk(ids, { hidden });
@@ -156,6 +169,7 @@ export async function setTracksHiddenBulkAction(formData) {
 // Batch rename by find/replace across a selected set of tracks — e.g.
 // stripping a shared prefix like "REC_" from a batch of imported titles.
 export async function renameTracksBulkAction(formData) {
+  await assertStaff();
   const ids = formData.getAll('id').map(String).filter(Boolean);
   const find = formData.get('find') || '';
   const replace = formData.get('replace') || '';
@@ -164,6 +178,7 @@ export async function renameTracksBulkAction(formData) {
 }
 
 export async function addVoicesBulkAction(formData) {
+  await assertStaff();
   const count = Number(formData.get('count') || 0);
   for (let i = 0; i < count; i++) {
     const tagsRaw = formData.get(`voice_${i}_tags`) || '';
@@ -183,6 +198,7 @@ export async function addVoicesBulkAction(formData) {
 
 // See setTracksHiddenBulkAction above — voice side.
 export async function setVoicesHiddenBulkAction(formData) {
+  await assertStaff();
   const ids = formData.getAll('id').map(String).filter(Boolean);
   const hidden = formData.get('hidden') === 'true';
   await updateVoicesBulk(ids, { hidden });

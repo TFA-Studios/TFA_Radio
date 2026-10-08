@@ -1,3 +1,4 @@
+import { requireStaffPage } from '../../../lib/access';
 import { listPromptVersions } from '../../../lib/promptVersions';
 import PromptVersionsClient from '../../../components/PromptVersionsClient';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
@@ -6,6 +7,7 @@ import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/Da
 export const dynamic = 'force-dynamic';
 
 export default async function PromptVersionsPage() {
+  await requireStaffPage();
   const versions = await listPromptVersions();
 
   return (

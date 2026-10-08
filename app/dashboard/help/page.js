@@ -1,3 +1,4 @@
+import { requireStaffPage } from '../../../lib/access';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
 import { HELP_SECTIONS, HELP_LAST_UPDATED } from '../../../lib/helpContent';
 
@@ -53,7 +54,10 @@ function Block({ block }) {
   return null;
 }
 
-export default function HelpPage() {
+export const dynamic = 'force-dynamic';
+
+export default async function HelpPage() {
+  await requireStaffPage();
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
       <DashboardSidebar active="help" />

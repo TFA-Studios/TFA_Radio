@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { getBrief, updateBriefTeamMeta } from '../../../../../../lib/db';
 import { notifyAssigned } from '../../../../../../lib/slack';
@@ -11,6 +12,8 @@ import { notifyAssigned } from '../../../../../../lib/slack';
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(request, { params }) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const patch = {};
   if (Object.prototype.hasOwnProperty.call(body || {}, 'assignedTo')) patch.assignedTo = body.assignedTo;

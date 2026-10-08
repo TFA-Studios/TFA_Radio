@@ -26,7 +26,9 @@ async function HeaderUser() {
   return <UserButton afterSignOutUrl="/" />;
 }
 
-export default function DashboardSidebar({ active, unseenCount = 0 }) {
+export default function DashboardSidebar({ active, unseenCount = 0, role = 'staff' }) {
+  // Agency logins only get the dashboard (their own briefs) — see lib/access.js.
+  const navItems = role === 'agency' ? NAV_ITEMS.filter((i) => i.key === 'dashboard') : NAV_ITEMS;
   return (
     <aside
       style={{
@@ -39,7 +41,7 @@ export default function DashboardSidebar({ active, unseenCount = 0 }) {
         <SpotFlowLogo size={24} variant="dark" className="tfa-dash-sidebar-brand" />
       </Link>
       <nav className="tfa-dash-nav" style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const isActive = item.key === active;
           const showBadge = item.key === 'dashboard' && unseenCount > 0;
           return (

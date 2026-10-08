@@ -5,7 +5,8 @@ import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import SpotFlowLogo from '../../../../components/SpotFlowLogo';
 import { useBrief } from '../../../../components/useBrief';
-import { parseReviewRounds, currentReviewRound, formatRoundLabel, formatDateTime, revisionDisclaimerText, agencyNameOf } from '../../../../components/flowData';
+import { parseReviewRounds, currentReviewRound, briefStageOf, formatRoundLabel, formatDateTime, revisionDisclaimerText, agencyNameOf } from '../../../../components/flowData';
+import PartnerBadge, { PartnerWatermark, usePartnerTitle, spotflowOffsetFor, partnerLogoOf } from '../../../../components/PartnerBadge';
 import StudioPhotoLoop from '../../../../components/StudioPhotoLoop';
 
 // Post-production review — reached via a private link emailed to the
@@ -18,6 +19,7 @@ import StudioPhotoLoop from '../../../../components/StudioPhotoLoop';
 export default function ReviewPage({ params }) {
   const { id } = params;
   const { brief, loading, reload } = useBrief(id);
+  usePartnerTitle(brief);
   const showLoader = useMinDelay(loading, 700);
   const [feedbackText, setFeedbackText] = useState('');
   // Optional note that can ride along with an approval (a thank-you, a
@@ -28,6 +30,15 @@ export default function ReviewPage({ params }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [justSent, setJustSent] = useState('');
+
+  // While the copywriter is still working on the scripts, quietly re-check
+  // so this page flips to "your scripts are ready" without a manual refresh.
+  const waitingStage = brief ? briefStageOf(brief) : '';
+  useEffect(() => {
+    if (waitingStage !== 'writing') return undefined;
+    const t = setInterval(() => { reload(); }, 20000);
+    return () => clearInterval(t);
+  }, [waitingStage, reload]);
 
   if (showLoader) return <Preloader />;
 
@@ -57,9 +68,49 @@ export default function ReviewPage({ params }) {
   const round = currentReviewRound(brief);
 
   if (!round) {
+    const stage = briefStageOf(brief);
+    let view = null;
+    if (stage === 'filling') {
+      view = {
+        kicker: 'Brief nog niet verstuurd',
+        title: 'Je brief is nog niet verstuurd',
+        body: 'Rond eerst je brief af. Daarna gaat een copywriter van TFA aan de slag met jouw script.',
+        cta: { label: 'Verder met je brief', href: `/brief/${id}/details` },
+        stages: [
+          { label: 'Brief invullen', detail: 'Contact, levering en brief.', state: 'active' },
+          { label: 'Script', detail: 'Een copywriter schrijft de scriptvoorstellen.', state: 'upcoming' },
+          { label: 'Stem & muziek', detail: 'Jij kiest de stem en de muziek.', state: 'upcoming' },
+        ],
+      };
+    } else if (stage === 'writing') {
+      view = {
+        kicker: 'Brief ontvangen',
+        title: 'Een copywriter schrijft jouw script',
+        body: 'Bedankt, je brief is verstuurd. Een copywriter van TFA gaat er nu mee aan de slag en schrijft scriptvoorstellen voor je. Zodra ze klaarstaan ontvang je een e-mail, en kun je hier verder met je keuze. Je hoeft deze pagina niet te verversen.',
+        stages: [
+          { label: 'Brief verstuurd', detail: 'Jouw brief is bij TFA binnen.', state: 'done' },
+          { label: 'Script wordt geschreven', detail: assignedTo ? assignedTo + ' en het team werken aan jouw scriptvoorstellen.' : 'Een copywriter werkt aan jouw scriptvoorstellen.', state: 'active' },
+          { label: 'Jij kiest je script', detail: 'Je kiest een voorstel en past het eventueel aan.', state: 'upcoming' },
+          { label: 'Stem & muziek', detail: 'Daarna kies je de stem en de muziek en bevestig je alles.', state: 'upcoming' },
+        ],
+      };
+    } else if (stage === 'choosing') {
+      view = {
+        kicker: 'Scripts staan klaar',
+        title: 'Je scriptvoorstellen staan klaar',
+        body: 'Onze copywriter heeft een paar voorstellen voor je geschreven. Kies het script dat het best bij je past en pas het eventueel aan.',
+        cta: { label: 'Bekijk de scriptvoorstellen', href: `/brief/${id}/script` },
+        stages: [
+          { label: 'Brief verstuurd', detail: 'Jouw brief is bij TFA binnen.', state: 'done' },
+          { label: 'Script geschreven', detail: 'De voorstellen staan voor je klaar.', state: 'done' },
+          { label: 'Jij kiest je script', detail: 'Kies een voorstel en pas het eventueel aan.', state: 'active' },
+          { label: 'Stem & muziek', detail: 'Daarna kies je de stem en de muziek en bevestig je alles.', state: 'upcoming' },
+        ],
+      };
+    }
     return (
-      <Shell companyName={companyName} firstName={firstName} agencyName={agencyNameOf(brief)}>
-        <InProductionCard brief={brief} assignedTo={assignedTo} />
+      <Shell companyName={companyName} firstName={firstName} agencyName={agencyNameOf(brief)} brief={brief}>
+        <InProductionCard brief={brief} assignedTo={assignedTo} view={view} />
       </Shell>
     );
   }
@@ -122,7 +173,7 @@ export default function ReviewPage({ params }) {
   }
 
   return (
-    <Shell companyName={companyName} firstName={firstName} agencyName={agencyNameOf(brief)}>
+    <Shell companyName={companyName} firstName={firstName} agencyName={agencyNameOf(brief)} brief={brief}>
       {/* One centered "hero" moment instead of a left-aligned status card
           followed by a whole separate box restating the same thing (the old
           layout said "Goedgekeurd" in the title, then a full green banner
@@ -388,7 +439,7 @@ const STUDIO_TIPS = [
   'Timing is alles: een goede commercial wordt vaker geknipt dan je zou denken.',
 ];
 
-function InProductionCard({ brief, assignedTo }) {
+function InProductionCard({ brief, assignedTo, view }) {
   const spotLength = brief.hoofdspotLength || '20';
   const [tipIdx, setTipIdx] = useState(0);
   useEffect(() => {
@@ -401,7 +452,7 @@ function InProductionCard({ brief, assignedTo }) {
     }, 9000);
     return () => clearInterval(interval);
   }, []);
-  const stages = [
+  const stages = (view && view.stages) || [
     { label: 'In productie', detail: assignedTo ? assignedTo + ' is bezig met de opname en montage van jouw commercial.' : 'Opname en montage van jouw commercial zijn bezig.', state: 'active' },
     { label: 'Review & goedkeuring', detail: 'Je ontvangt een e-mail zodra er een versie klaarstaat om te beluisteren.', state: 'upcoming' },
     { label: 'Levering', detail: 'Na jouw goedkeuring rondt TFA de levering af.', state: 'upcoming' },
@@ -432,16 +483,19 @@ function InProductionCard({ brief, assignedTo }) {
           ))}
         </div>
         <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>
-          TFA is aan het werk
+          {view ? view.kicker : 'TFA is aan het werk'}
         </div>
         <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 28, margin: '10px 0 10px', color: '#1D1D1D' }}>
-          Je {spotLength}″ commercial wordt opgenomen
+          {view ? view.title : <>Je {spotLength}″ commercial wordt opgenomen</>}
         </h1>
         <p style={{ fontSize: 14, lineHeight: 1.6, color: '#5C5850', margin: '0 auto', maxWidth: 460 }}>
-          Er is nog niets te bekijken en dat is helemaal normaal op dit moment. Zodra de eerste versie klaarstaat, ontvang
-          je automatisch een e-mail met een link om deze te beluisteren, feedback te geven of goed te keuren. Deze pagina
-          werkt dan meteen mee: je hoeft deze niet te verversen of ergens anders naar te zoeken.
+          {view ? view.body : 'Er is nog niets te bekijken en dat is helemaal normaal op dit moment. Zodra de eerste versie klaarstaat, ontvang je automatisch een e-mail met een link om deze te beluisteren, feedback te geven of goed te keuren. Deze pagina werkt dan meteen mee: je hoeft deze niet te verversen of ergens anders naar te zoeken.'}
         </p>
+        {view && view.cta && (
+          <a href={view.cta.href} className="btn-primary" style={{ display: 'inline-block', marginTop: 20, padding: '13px 26px', textDecoration: 'none' }}>
+            {view.cta.label}
+          </a>
+        )}
         <div
           key={tipIdx}
           className="tfa-tip-fade"
@@ -463,7 +517,9 @@ function InProductionCard({ brief, assignedTo }) {
               }}
             >
               <div style={{ flex: 'none', width: 22, height: 22, marginTop: 1, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {active ? (
+                {s.state === 'done' ? (
+                  <span style={{ width: 18, height: 18, borderRadius: '50%', background: '#7A9B5A', color: '#fff', fontSize: 11, lineHeight: '18px', textAlign: 'center' }}>✓</span>
+                ) : active ? (
                   <>
                     <span className="tfa-pulse-ring" style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid #E6C858' }} />
                     <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#E6C858' }} />
@@ -473,8 +529,8 @@ function InProductionCard({ brief, assignedTo }) {
                 )}
               </div>
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: active ? '#1D1D1D' : '#9C9890' }}>{s.label}</div>
-                <div style={{ fontSize: 12.5, color: active ? '#5C5850' : '#B4B0A5', marginTop: 2, lineHeight: 1.5 }}>{s.detail}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: active || s.state === 'done' ? '#1D1D1D' : '#9C9890' }}>{s.label}</div>
+                <div style={{ fontSize: 12.5, color: active || s.state === 'done' ? '#5C5850' : '#B4B0A5', marginTop: 2, lineHeight: 1.5 }}>{s.detail}</div>
               </div>
             </div>
           );
@@ -512,7 +568,7 @@ function InProductionCard({ brief, assignedTo }) {
 // cream/gold gradient instead of flat gray (matching the cards' own
 // palette), and — when the brief has a contact name — an actual greeting
 // instead of just the company name sitting alone.
-function Shell({ companyName, firstName, children, agencyName }) {
+function Shell({ companyName, firstName, children, agencyName, brief }) {
   return (
     <div
       style={{
@@ -521,9 +577,14 @@ function Shell({ companyName, firstName, children, agencyName }) {
         fontFamily: "'Geist', system-ui, sans-serif",
       }}
     >
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '48px 20px' }}>
-        <div style={{ marginBottom: 22 }}>
-          <SpotFlowLogo size={26} variant="light" />
+      <PartnerWatermark brief={brief} />
+      <div style={{ maxWidth: 640, margin: '0 auto', padding: '48px 20px', position: 'relative', zIndex: 1 }}>
+        {/* SpotFlow left, partner right, sharing one baseline (see PartnerBadge.js). */}
+        <div style={{ marginBottom: 22, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px 18px' }}>
+          <div style={{ marginTop: partnerLogoOf(brief, 'light') ? spotflowOffsetFor(26) : 0 }}>
+            <SpotFlowLogo size={26} variant="light" />
+          </div>
+          <PartnerBadge brief={brief} variant="light" size={26} />
         </div>
         {companyName && (
           <div style={{ fontSize: 20, fontWeight: 700, color: '#1D1D1D', marginBottom: 22, lineHeight: 1.4 }}>

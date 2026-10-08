@@ -5,6 +5,15 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 // Wraps fetch/patch of a single brief via the /api/briefs/:id routes —
 // shared by every client-flow step page instead of each page reimplementing
 // its own fetch/save/debounce dance (as every original public/*.html did).
+// The full-screen loader appears before any brief is loaded on a new page, so
+// it reads the partner logo from here (set the first time a brief loads).
+function rememberPartnerLogo(b) {
+  try {
+    if (b && b.agencyLogoDark) window.sessionStorage.setItem('tfa_partner_logo', b.agencyLogoDark);
+    else window.sessionStorage.removeItem('tfa_partner_logo');
+  } catch (e) {}
+}
+
 export function useBrief(id) {
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +35,7 @@ export function useBrief(id) {
       }
       const data = await res.json();
       setBrief(data);
+      rememberPartnerLogo(data);
       setNotFound(false);
       return data;
     } catch (e) {

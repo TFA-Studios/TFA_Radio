@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { addReviewRound } from '../../../../../../lib/db';
 import { sendReviewReadyEmail } from '../../../../../../lib/email';
@@ -15,6 +16,8 @@ import { sendReviewReadyEmail } from '../../../../../../lib/email';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request, { params }) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const frameioLink = (body && body.frameioLink ? String(body.frameioLink) : '').trim();
   const folderDate = (body && body.folderDate ? String(body.folderDate) : '').trim();

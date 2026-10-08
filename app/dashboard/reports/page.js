@@ -1,3 +1,4 @@
+import { requireStaffPage } from '../../../lib/access';
 import { listBriefs } from '../../../lib/db';
 import { buildReportData } from '../../../lib/reports';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
@@ -124,6 +125,7 @@ function inRange(brief, fromISO, toISO) {
 }
 
 export default async function ReportsPage({ searchParams }) {
+  await requireStaffPage();
   const from = (searchParams && searchParams.from) || '';
   const to = (searchParams && searchParams.to) || '';
   const hasRange = !!(from || to);

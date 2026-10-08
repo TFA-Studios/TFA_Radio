@@ -1,3 +1,4 @@
+import { requireStaffPage } from '../../../lib/access';
 import { listAgencies } from '../../../lib/db';
 import AgenciesClient from '../../../components/AgenciesClient';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
@@ -7,6 +8,7 @@ import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/Da
 export const dynamic = 'force-dynamic';
 
 export default async function AgenciesPage() {
+  await requireStaffPage();
   const agencies = await listAgencies();
 
   return (

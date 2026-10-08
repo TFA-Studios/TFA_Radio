@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { variationsCountOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts, agencyNameOf } from '../../../../components/flowData';
+import { variationsCountOf, briefStageOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts, agencyNameOf } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
 
 function formatImpressions(brief) {
@@ -15,13 +16,21 @@ function formatImpressions(brief) {
   const n = parseInt(v, 10);
   return (isNaN(n) ? v : n.toLocaleString('nl-NL')) + ' impressies';
 }
-// Step 7 — mirrors public/overview.html. CRITICAL: this is the ONLY place
-// in the whole flow that sends {submitted:true} — no other step may ever
-// send it, since that flag means "the whole 7-step flow is done, fire the
-// confirmation email".
+// Step 7 — final confirmation. CRITICAL: this is the ONLY place in the whole
+// flow that sends {finalized:true} — that flag means "the client confirmed
+// script, voice and music", which fires the confirmation email + Slack ping.
+// (The earlier {submitted:true} now happens at the end of step 3, when the
+// brief is sent to the copywriters.)
 export default function OverviewPage({ params }) {
   const { id } = params;
   const { brief, loading, patch } = useBrief(id);
+  const router = useRouter();
+  const stageNow = brief ? briefStageOf(brief) : '';
+  useEffect(() => {
+    // The overview is the last step: it only opens once the scripts are released.
+    if (stageNow === 'writing') router.replace(`/brief/${id}/review`);
+    else if (stageNow === 'filling') router.replace(`/brief/${id}/details`);
+  }, [stageNow, id, router]);
   const showLoader = useMinDelay(loading, 700);
   const [consentChecked, setConsentChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -99,12 +108,12 @@ export default function OverviewPage({ params }) {
     if (!briefReady || !consentChecked) return;
     setSubmitting(true);
     setSubmitError(false);
-    const result = await patch({ submitted: true });
+    const result = await patch({ finalized: true });
     setSubmitting(false);
     if (!result) setSubmitError(true);
   }
 
-  if (brief.submittedAt) {
+  if (brief.finalizedAt) {
     const nextSteps = [
       { n: '1', label: 'Opname', detail: 'De stem neemt jouw script in de studio op.' },
       { n: '2', label: 'Montage & mix', detail: 'Stem, muziek en eventuele varianten worden samengevoegd.' },
@@ -135,9 +144,9 @@ export default function OverviewPage({ params }) {
       ? 'TFA verwerkt je laatste feedback.'
       : brief.productionStatus === 'approved'
       ? 'Je hebt de laatste versie goedgekeurd: TFA rondt de levering af.'
-      : 'Zodra er een eerste versie klaarstaat, kun je hem hier beluisteren en beoordelen.';
+      : 'Alles is bevestigd. Zodra er een eerste versie klaarstaat, kun je hem hier beluisteren en beoordelen.';
     return (
-      <StepShell briefId={id} current={7} brief={brief} bigNum="07" kicker="Verzonden naar TFA" title={'Bedankt, ' + companyName + '!'}>
+      <StepShell briefId={id} current={7} brief={brief} bigNum="07" kicker="Bevestigd bij TFA" title={'Bedankt, ' + companyName + '!'}>
         <div
           style={{
             background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 16, padding: '32px 34px',
@@ -207,7 +216,7 @@ export default function OverviewPage({ params }) {
         {/* Same "permanent record" gap as the confirmation email: before
             submit this info only ever lived on this page's pre-submit view,
             which gets replaced by the thank-you view above the moment
-            brief.submittedAt is set — so a client coming back to their one
+            brief.finalizedAt is set — so a client coming back to their one
             durable link (this page, keyed by brief id) never saw their own
             required text or the terms again. Shown here unconditionally so
             it survives exactly as long as the link does. */}

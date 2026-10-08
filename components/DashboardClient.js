@@ -6,6 +6,7 @@ import {
   reviewOverIncludedCap, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime,
   formatAirDate, deliveryDeadlineMeta, TONE_LABELS, finalTrackOf, agencyNameOf, agencyContactEmailOf,
 } from './flowData';
+import { profileOfBrief, answersOfBrief } from '../lib/formProfile';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
 import { SCRIPT_SOURCE_META, IMPRESSIONS_LABELS } from '../lib/reports';
 
@@ -177,6 +178,13 @@ function statusMetaOf(brief) {
 // approved -> done), but the wording here is specific to the review step
 // rather than the generic 4-value workflow status.
 const PRODUCTION_BADGE_META = {
+  // Copywriter workflow (see briefStageOf in components/flowData.js): the
+  // brief is in, the drafts are waiting for the producer to check and
+  // release — then the client picks. Producer-facing wording, so
+  // script_writing reads as the TFA to-do it is, not the client's "being
+  // written" copy.
+  script_writing: { label: 'Script nakijken', color: '#C2513F', bg: 'rgba(194,81,63,.12)' },
+  script_choosing: { label: 'Klant kiest script', color: '#8C6D1F', bg: 'rgba(230,200,88,.22)' },
   awaiting_review: { label: 'Review verzonden', color: '#8C6D1F', bg: 'rgba(230,200,88,.22)' },
   in_revision: { label: 'Feedback ontvangen', color: '#C2513F', bg: 'rgba(194,81,63,.12)' },
   approved: { label: 'Goedgekeurd', color: '#1D7A46', bg: 'rgba(29,122,70,.12)' },
@@ -196,11 +204,12 @@ function ProductionBadge({ brief, small }) {
   );
 }
 
-function StatusSelect({ brief, onChange, compact }) {
+function StatusSelect({ brief, onChange, compact, disabled }) {
   const meta = statusMetaOf(brief);
   return (
     <select
       value={brief.status || 'todo'}
+      disabled={!!disabled}
       onClick={(e) => e.stopPropagation()}
       onChange={(e) => onChange(brief.id, e.target.value)}
       style={{
@@ -211,7 +220,7 @@ function StatusSelect({ brief, onChange, compact }) {
         color: meta.color,
         background: meta.bg,
         border: `1px solid ${meta.color}33`,
-        cursor: 'pointer',
+        cursor: disabled ? 'default' : 'pointer',
         appearance: 'none',
         WebkitAppearance: 'none',
       }}
@@ -230,6 +239,163 @@ function Field({ label, children, empty }) {
     <div>
       <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
       <div style={{ fontSize: 13.5, marginTop: 3, color: empty ? '#9C9890' : '#1D1D1D' }}>{children}</div>
+    </div>
+  );
+}
+
+// Producer-side half of the "copywriter" workflow: the server drafts up to 3
+// script versions when a client sends their brief. Here a producer checks and
+// edits them, regenerates if they are off, and releases them to the client
+// (who gets an email). Once released the drafts are read-only here — the
+// client now owns the choice and their own edits.
+function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
+  let drafts = [];
+  try {
+    const parsed = brief.scriptHistory ? JSON.parse(brief.scriptHistory) : [];
+    if (Array.isArray(parsed)) drafts = parsed;
+  } catch (e) {}
+  const released = !!brief.scriptsReleasedAt;
+  const needsVariation = !!brief.needsVariations;
+  const [edits, setEdits] = useState({});
+  const [ownScript, setOwnScript] = useState('');
+  const [ownVariation, setOwnVariation] = useState('');
+  const [busy, setBusy] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => { setEdits({}); setError(''); }, [brief.id, brief.scriptGeneratedAt]);
+
+  function valueOf(d, field) {
+    const e = edits[d.id];
+    return e && e[field] !== undefined ? e[field] : d[field] || '';
+  }
+  function setField(d, field, value) {
+    setEdits((cur) => ({ ...cur, [d.id]: { ...(cur[d.id] || {}), [field]: value } }));
+  }
+  async function call(method, body, label) {
+    setBusy(label);
+    setError('');
+    try {
+      const res = await fetch(`/api/dashboard/briefs/${brief.id}/scripts`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.message || 'Dat is niet gelukt. Probeer het opnieuw.');
+        return null;
+      }
+      onUpdated(data);
+      return data;
+    } catch (e) {
+      setError('Geen verbinding. Probeer het opnieuw.');
+      return null;
+    } finally {
+      setBusy('');
+    }
+  }
+  async function saveDraft(d) {
+    const e = edits[d.id];
+    if (!e) return null;
+    const out = await call('PATCH', { versionId: d.id, ...e }, 'save-' + d.id);
+    if (out) setEdits((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
+    return out;
+  }
+  async function release() {
+    // Save any unsaved edits first so the client gets what is on screen.
+    for (const d of drafts) {
+      if (edits[d.id]) {
+        const ok = await saveDraft(d);
+        if (!ok) return;
+      }
+    }
+    if (typeof window !== 'undefined' && !window.confirm('Scripts vrijgeven aan de klant? De klant krijgt hier meteen een e-mail over.')) return;
+    await call('POST', { action: 'release' }, 'release');
+  }
+
+  const dirty = Object.keys(edits).length > 0;
+  const taStyle = { width: '100%', minHeight: 90, fontSize: 13, lineHeight: 1.55, padding: '9px 11px', border: '1px solid #DAD6C8', borderRadius: 8, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' };
+
+  return (
+    <div style={{ ...cardStyle, border: '1.5px solid ' + (released ? '#EEECE3' : '#E6C858'), background: released ? '#FFFFFF' : '#FBF9EC' }}>
+      <ModalSectionTitle>Scriptvoorstellen {released ? '· vrijgegeven' : '· nakijken'}</ModalSectionTitle>
+      {released ? (
+        <div style={{ fontSize: 12.5, color: '#5C5850', lineHeight: 1.5 }}>
+          Vrijgegeven aan de klant op {new Date(brief.scriptsReleasedAt).toLocaleString('nl-NL')}.
+          {brief.finalizedAt ? ' De klant heeft alles bevestigd.' : ' De klant kiest nu een voorstel.'}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12.5, color: '#5C5850', lineHeight: 1.5, marginBottom: 10 }}>
+          De klant ziet nu een wachtpagina (&ldquo;een copywriter schrijft je script&rdquo;). Pas de teksten aan waar nodig en geef ze daarna vrij: de klant krijgt dan een e-mail en kiest een voorstel.
+        </div>
+      )}
+
+      {drafts.length === 0 && !released && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 12.5, color: '#5C5850', marginBottom: 6, lineHeight: 1.5 }}>
+            Script van het agentschap (of zelf geschreven)? Plak het hier, dan krijgt de klant dat als enig voorstel.
+          </div>
+          <textarea style={taStyle} value={ownScript} onChange={(e) => setOwnScript(e.target.value)} placeholder="Plak hier het script" />
+          {needsVariation && (
+            <textarea style={{ ...taStyle, minHeight: 64, marginTop: 6 }} value={ownVariation} onChange={(e) => setOwnVariation(e.target.value)} placeholder="Variatie (optioneel)" />
+          )}
+          <button
+            type="button"
+            disabled={!!busy || !ownScript.trim()}
+            onClick={() => call('POST', { action: 'provide', main: ownScript, variation: ownVariation }, 'provide')}
+            style={{ marginTop: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', opacity: !ownScript.trim() ? 0.6 : 1 }}
+          >
+            {busy === 'provide' ? 'Bezig…' : 'Script toevoegen'}
+          </button>
+        </div>
+      )}
+      {drafts.length === 0 && (
+        <div style={{ fontSize: 12.5, color: '#C2513F', marginBottom: 10 }}>
+          De concepten worden nog geschreven (dat duurt even, ververs straks). Zijn ze er na een minuut nog niet, klik dan op &ldquo;Opnieuw schrijven&rdquo; of plak hierboven zelf een script.
+        </div>
+      )}
+
+      {drafts.map((d, i) => (
+        <div key={d.id} style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 5 }}>
+            Voorstel {i + 1}{d.source === 'template' ? ' · sjabloon (geen AI beschikbaar)' : d.source === 'agency' ? ' · script van agentschap' : ''}
+          </div>
+          {released ? (
+            <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 14, lineHeight: 1.6 }}>{d.main}</div>
+          ) : (
+            <>
+              <textarea style={taStyle} value={valueOf(d, 'main')} onChange={(e) => setField(d, 'main', e.target.value)} onBlur={() => saveDraft(d)} />
+              {needsVariation && (
+                <>
+                  <div style={{ fontSize: 11, color: '#8C8880', margin: '6px 0 4px' }}>Variatie bij dit voorstel</div>
+                  <textarea style={{ ...taStyle, minHeight: 64 }} value={valueOf(d, 'variation')} onChange={(e) => setField(d, 'variation', e.target.value)} onBlur={() => saveDraft(d)} />
+                </>
+              )}
+            </>
+          )}
+        </div>
+      ))}
+
+      {error && <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, marginBottom: 8 }}>{error}</div>}
+
+      {!released && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <button type="button" disabled={!!busy || drafts.length === 0} onClick={release} className="btn-primary" style={{ padding: '10px 18px', flex: 'none' }}>
+            {busy === 'release' ? 'Bezig…' : 'Vrijgeven aan klant'}
+          </button>
+          <button
+            type="button"
+            disabled={!!busy}
+            onClick={() => {
+              if (dirty && typeof window !== 'undefined' && !window.confirm('Je aanpassingen gaan verloren. Toch opnieuw schrijven?')) return;
+              call('POST', { action: 'regenerate' }, 'regen');
+            }}
+            style={{ border: 'none', background: 'transparent', color: '#383209', fontWeight: 600, fontSize: 12.5, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+          >
+            {busy === 'regen' ? 'Bezig met schrijven…' : 'Opnieuw schrijven (3 nieuwe voorstellen)'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -311,7 +477,7 @@ const SORT_GETTERS = {
   overIncludedCap: (b) => (reviewOverIncludedCap(b) ? 1 : 0),
 };
 
-export default function DashboardClient({ briefs }) {
+export default function DashboardClient({ briefs, readOnly = false }) {
   const [rows, setRows] = useState(briefs);
   const [range, setRange] = useState('30d');
   const [sortField, setSortField] = useState('updatedAt');
@@ -479,7 +645,7 @@ export default function DashboardClient({ briefs }) {
     // reaching it was exactly the extra-clicks complaint. Anything earlier
     // in the process (still filling in the brief, nothing shared yet)
     // still opens on Overzicht as before.
-    setModalTab(selected && selected.productionStatus ? 'productie' : 'overzicht');
+    setModalTab(!readOnly && selected && selected.productionStatus ? 'productie' : 'overzicht');
   }, [selected && selected.id]);
 
   async function handleAddReviewRound(id) {
@@ -575,7 +741,9 @@ export default function DashboardClient({ briefs }) {
   // reads exactly like "the badge goes away, then comes back on refresh."
   function handleOpenBrief(b) {
     setSelected(b);
-    if (!isUnseenBrief(b)) return;
+    // Agency logins are read-only: they never mark briefs as seen.
+    if (readOnly) setModalTab('overzicht');
+    if (readOnly || !isUnseenBrief(b)) return;
     const now = new Date().toISOString();
     setRows((cur) => cur.map((row) => (row.id === b.id ? { ...row, seenAt: now } : row)));
     setSelected((cur) => (cur && cur.id === b.id ? { ...cur, seenAt: now } : cur));
@@ -718,7 +886,7 @@ export default function DashboardClient({ briefs }) {
     { key: 'updatedAt', label: 'Laatst gewijzigd', cell: (b) => new Date(b.updatedAt).toLocaleString('nl-NL') },
     {
       key: 'status', core: true, label: 'Status', sortable: false,
-      cell: (b) => <StatusSelect brief={b} onChange={handleStatusChange} compact />,
+      cell: (b) => <StatusSelect disabled={readOnly} brief={b} onChange={handleStatusChange} compact />,
     },
     { key: 'contactPerson', label: 'Contactpersoon', cell: (b) => b.contactPerson || '—', cellStyle: (b) => ({ color: b.contactPerson ? '#1D1D1D' : '#9C9890' }) },
     { key: 'contactEmail', label: 'E-mail', cell: (b) => b.contactEmail || '—', cellStyle: (b) => ({ color: b.contactEmail ? '#1D1D1D' : '#9C9890' }) },
@@ -1123,11 +1291,11 @@ export default function DashboardClient({ briefs }) {
                   This used to be a 4-row stack (name, status, approved
                   badge, Frame.io link) before the tabs even started. */}
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <StatusSelect brief={selected} onChange={handleStatusChange} />
+                <StatusSelect disabled={readOnly} brief={selected} onChange={handleStatusChange} />
               </div>
 
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 16, borderBottom: '1px solid #EEECE3', paddingBottom: 10 }}>
-                {modalTabsFor(selected).map((t) => {
+                {modalTabsFor(selected).filter((t) => !readOnly || t.key === 'overzicht' || t.key === 'creatief').map((t) => {
                   const active = modalTab === t.key;
                   return (
                     <button
@@ -1381,6 +1549,18 @@ export default function DashboardClient({ briefs }) {
                   <Field label="Agency" empty={!selected.agencyName}>{agencyNameOf(selected)}</Field>
                 </div>
               </div>
+
+              {profileOfBrief(selected).extraQuestions.length > 0 && (
+                <div style={{ ...refCardStyle, gridColumn: '1 / -1' }}>
+                  <ModalSectionTitle>Extra vragen van {agencyNameOf(selected)}</ModalSectionTitle>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {profileOfBrief(selected).extraQuestions.map((q) => {
+                      const a = answersOfBrief(selected)[q.key];
+                      return <Field key={q.key} label={q.label} empty={!a}>{a || 'Nog niet ingevuld'}</Field>;
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             )}
 
@@ -1526,7 +1706,17 @@ export default function DashboardClient({ briefs }) {
 
             {modalTab === 'creatief' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
-              {(() => {
+              {!readOnly && selected.submittedAt && !selected.finalizedAt && (
+                <ScriptDraftsPanel
+                  brief={selected}
+                  cardStyle={refCardStyle}
+                  onUpdated={(updated) => {
+                    setRows((cur) => cur.map((b) => (b.id === updated.id ? { ...b, ...updated } : b)));
+                    setSelected((cur) => (cur && cur.id === updated.id ? { ...cur, ...updated } : cur));
+                  }}
+                />
+              )}
+              {!(selected.submittedAt && !selected.scriptsReleasedAt) && (() => {
                 // Was missing the brief's variations entirely — the client
                 // could always see them on their own overview page and in
                 // the confirmation email, but the dashboard's Script card

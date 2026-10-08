@@ -46,6 +46,12 @@ export default function Preloader({ fullScreen = true, messages }) {
   // actually going on instead of a silent spinner. Every other call site
   // omits `messages` and gets the same plain logo-only loader as before.
   const [msgIdx, setMsgIdx] = useState(0);
+  // Partner co-branding (see useBrief's rememberPartnerLogo). Read after mount
+  // so server and client render the same first paint.
+  const [partnerLogo, setPartnerLogo] = useState('');
+  useEffect(() => {
+    try { setPartnerLogo(window.sessionStorage.getItem('tfa_partner_logo') || ''); } catch (e) {}
+  }, []);
   useEffect(() => {
     if (!messages || messages.length < 2) return undefined;
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -117,6 +123,10 @@ export default function Preloader({ fullScreen = true, messages }) {
           playsInline
           style={{ width: 140, height: 140, objectFit: 'contain' }}
         />
+        {partnerLogo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={partnerLogo} alt="" style={{ height: 22, width: 'auto', opacity: 0.9 }} />
+        )}
         {messages && messages.length > 0 && (
           <div
             key={msgIdx}

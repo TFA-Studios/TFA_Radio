@@ -1,3 +1,4 @@
+import { requireStaffPage } from '../../../lib/access';
 import { listTracks, listVoices, MUSIC_CATEGORIES, DEFAULT_VOICE_TAGS } from '../../../lib/library';
 import LibraryClient from '../../../components/LibraryClient';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
@@ -6,6 +7,7 @@ import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/Da
 export const dynamic = 'force-dynamic';
 
 export default async function LibraryPage() {
+  await requireStaffPage();
   const [tracks, voices] = await Promise.all([listTracks(), listVoices()]);
 
   return (

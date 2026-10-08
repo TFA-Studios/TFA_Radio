@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { saveDelivery } from '../../../../../../lib/db';
 import { sendDeliveryEmail } from '../../../../../../lib/email';
@@ -14,6 +15,8 @@ import { sendDeliveryEmail } from '../../../../../../lib/email';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request, { params }) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const link = (body && body.link || '').trim();
   const recipientEmail = (body && body.recipientEmail || '').trim();

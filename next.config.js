@@ -15,7 +15,7 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['pdfkit'],
     outputFileTracingIncludes: {
-      '/api/dashboard/briefs/[id]/pdf': ['./node_modules/pdfkit/js/data/**/*.afm'],
+      '/api/dashboard/briefs/[id]/pdf': ['./node_modules/pdfkit/js/data/**/*.afm', './public/agency-logos/**'],
     },
   },
 };

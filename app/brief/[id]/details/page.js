@@ -5,24 +5,21 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
+import { profileOfBrief, answersOfBrief } from '../../../../lib/formProfile';
 import { useBrief } from '../../../../components/useBrief';
 import { TONE_LABELS } from '../../../../components/flowData';
 
 const MAX_TONES = 3;
 const TONE_ORDER = Object.keys(TONE_LABELS);
 
-// Shown on the full-screen Preloader while submit() below is actually
-// mid-flight generating the real script (the "await fetch(generate-script)"
-// call happens before router.push, so this loading screen isn't a generic
-// page transition, it's the one moment the client is genuinely waiting on
-// TFA's AI). Personalized with the company name where we have one, so it
-// reads as "working on my brief" rather than a stock loading message.
-function scriptPreloaderMessages(companyName) {
+// Shown on the full-screen Preloader while the brief is being sent. The
+// script is written by TFA's copywriters afterwards, so the copy here
+// deliberately only talks about sending the brief.
+function sendPreloaderMessages(companyName) {
   const name = companyName && companyName.trim() ? companyName.trim() : 'jouw merk';
   return [
-    `TFA's AI, getraind op duizenden radioklare scripts, buigt zich nu over de brief van ${name}…`,
-    'Er wordt gezocht naar de juiste invalshoek, geen opsomming van clichés…',
-    `Bijna klaar: het scriptvoorstel voor ${name} wordt verfijnd…`,
+    `De brief van ${name} wordt veilig verstuurd naar TFA…`,
+    'Een copywriter van TFA krijgt jouw brief straks op tafel…',
   ];
 }
 
@@ -81,7 +78,7 @@ export default function DetailsPage({ params }) {
   const [form, setForm] = useState({
     disclaimerText: '', product: '', audience: 'b2b', decisionMaker: '',
     audienceAgeInterests: '', usp: '', price: null, priceDetail: '', mainMessage: '',
-    cta: '', slogan: '', toneOfVoice: [],
+    cta: '', slogan: '', toneOfVoice: [], extraAnswers: {},
   });
   const [generating, setGenerating] = useState(false);
 
@@ -107,6 +104,7 @@ export default function DetailsPage({ params }) {
         cta: brief.cta || '',
         slogan: brief.slogan || '',
         toneOfVoice: tones,
+        extraAnswers: answersOfBrief(brief),
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,7 +113,7 @@ export default function DetailsPage({ params }) {
   function update(field, value) {
     const next = { ...form, [field]: value };
     setForm(next);
-    schedulePatch({ [field]: field === 'toneOfVoice' ? JSON.stringify(value) : value });
+    schedulePatch({ [field]: field === 'toneOfVoice' || field === 'extraAnswers' ? JSON.stringify(value) : value });
   }
 
   function toggleTone(v) {
@@ -134,27 +132,31 @@ export default function DetailsPage({ params }) {
   async function submit() {
     setNavigating(true);
     flushPending();
-    // NOTE: this only advances past the brief/details step — it must NOT
-    // pass {submitted:true}. That flag means "the whole 7-step flow is
-    // done, send the confirmation email", which only happens on the
-    // overview step's final submit.
-    await patch({ ...form, toneOfVoice: JSON.stringify(form.toneOfVoice) });
     if (returnToOverview) {
+      await patch({ ...form, toneOfVoice: JSON.stringify(form.toneOfVoice), extraAnswers: JSON.stringify(form.extraAnswers) });
       router.push(`/brief/${id}/overview`);
       return;
     }
+    // Sending the brief hands it to TFA's copywriters: the server writes the
+    // script drafts, emails the client a receipt and pings the team. The
+    // client then waits on the status page until the scripts are released.
     setGenerating(true);
-    try {
-      await fetch(`/api/briefs/${id}/generate-script`, { method: 'POST' });
-    } catch (e) {
-      // If this fails, the script step still offers a "Genereer" button —
-      // submission itself already succeeded, so don't block navigation.
+    const saved = await patch({ ...form, toneOfVoice: JSON.stringify(form.toneOfVoice), extraAnswers: JSON.stringify(form.extraAnswers), submitted: true });
+    if (!saved) {
+      setGenerating(false);
+      setNavigating(false);
+      return;
     }
-    router.push(`/brief/${id}/script`);
+    router.push(`/brief/${id}/review`);
   }
 
+  const profile = profileOfBrief(brief);
+  const hide = profile.hide;
+  const extraQuestions = profile.extraQuestions;
+  const missingRequired = extraQuestions.some((q) => q.required && !String((form.extraAnswers || {})[q.key] || '').trim());
+
   if (showLoader) return <Preloader />;
-  if (navigating) return generating ? <Preloader messages={scriptPreloaderMessages(brief && brief.companyName)} /> : <Preloader />;
+  if (navigating) return generating ? <Preloader messages={sendPreloaderMessages(brief && brief.companyName)} /> : <Preloader />;
 
   return (
     <StepShell briefId={id} current={3} brief={brief} bigNum="03" kicker="De inhoud" title="Jouw brief" hint="Nog een paar korte vragen over je commercial en je brief." backHref={`/brief/${id}/delivery`} backLabel="Terug naar levering">
@@ -164,6 +166,7 @@ export default function DetailsPage({ params }) {
         <CharCount field="product" value={form.product} />
       </div>
 
+      {!hide.includes('audience') && (
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
         <label className="field-label" style={{ marginBottom: 7 }}>Wie wil je bereiken?</label>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -184,6 +187,7 @@ export default function DetailsPage({ params }) {
           </div>
         )}
       </div>
+      )}
 
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
         <label className="field-label">Waarom kiezen klanten voor jou en niet voor een concurrent?</label>
@@ -191,6 +195,7 @@ export default function DetailsPage({ params }) {
         <CharCount field="usp" value={form.usp} />
       </div>
 
+      {!hide.includes('price') && (
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
         <label className="field-label" style={{ marginBottom: 7 }}>Wil je prijzen of een aanbieding noemen?</label>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -205,6 +210,7 @@ export default function DetailsPage({ params }) {
           </div>
         )}
       </div>
+      )}
 
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
         <label className="field-label">Wat wil je vooral vertellen?</label>
@@ -240,14 +246,19 @@ export default function DetailsPage({ params }) {
           <input type="text" maxLength={FIELD_LIMITS.cta} value={form.cta} placeholder="Bijv. 'Bestel nu op merk.nl'" onChange={(e) => update('cta', e.target.value)} />
           <CharCount field="cta" value={form.cta} />
         </div>
+        {!hide.includes('slogan') && (
+          <>
         <div>
           <label className="field-label">Heeft je bedrijf al een slogan? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
           <input type="text" maxLength={FIELD_LIMITS.slogan} value={form.slogan} placeholder="Bijv. 'Altijd in de buurt'" onChange={(e) => update('slogan', e.target.value)} />
           <CharCount field="slogan" value={form.slogan} />
         </div>
         <div className="full hint" style={{ marginTop: -10 }}>Als je er een hebt, gebruiken we deze aan het einde van het script.</div>
+          </>
+        )}
       </div>
 
+      {!hide.includes('disclaimer') && (
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
         <label className="field-label">Moet er verplichte wettelijke tekst in? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel, laat leeg als dit niet van toepassing is)</span></label>
         <textarea
@@ -262,11 +273,31 @@ export default function DetailsPage({ params }) {
           tekst wordt woordelijk overgenomen in het script en blijft daarna overal zichtbaar, voor jou en voor TFA.
         </div>
       </div>
+      )}
+
+      {extraQuestions.map((q) => {
+        const val = (form.extraAnswers || {})[q.key] || '';
+        const setVal = (v) => update('extraAnswers', { ...(form.extraAnswers || {}), [q.key]: v });
+        return (
+          <div key={q.key} style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
+            <label className="field-label">{q.label}{q.required ? '' : <span style={{ color: '#8C8880', fontWeight: 400 }}> (optioneel)</span>}</label>
+            {q.type === 'longtext' && <textarea style={{ minHeight: 80 }} maxLength={1200} value={val} onChange={(e) => setVal(e.target.value)} />}
+            {q.type === 'text' && <input type="text" maxLength={300} value={val} onChange={(e) => setVal(e.target.value)} />}
+            {q.type === 'choice' && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {q.options.map((o) => (
+                  <button key={o} type="button" className={'seg-btn' + (val === o ? ' selected' : '')} onClick={() => setVal(o)}>{o}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
 
 
       <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={submit} disabled={generating}>
-          {generating ? 'Script wordt gegenereerd…' : returnToOverview ? 'Terug naar overzicht' : 'Akkoord: verder naar het scriptvoorstel'}
+        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={submit} disabled={generating || missingRequired}>
+          {generating ? 'Brief wordt verstuurd…' : returnToOverview ? 'Terug naar overzicht' : 'Brief versturen naar TFA'}
         </button>
       </div>
     </StepShell>

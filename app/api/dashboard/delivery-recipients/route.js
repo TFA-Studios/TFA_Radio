@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { listDeliveryRecipients } from '../../../../lib/db';
 
@@ -8,6 +9,8 @@ import { listDeliveryRecipients } from '../../../../lib/db';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const recipients = await listDeliveryRecipients();
   return NextResponse.json(recipients);
 }

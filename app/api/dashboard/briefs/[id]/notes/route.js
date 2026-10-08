@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { addInternalNote, editInternalNote } from '../../../../../../lib/db';
 import { notifyInternalNote } from '../../../../../../lib/slack';
@@ -26,6 +27,8 @@ async function resolveAuthor(fallback) {
 }
 
 export async function POST(request, { params }) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const text = (body && body.text || '').trim();
   if (!text) return NextResponse.json({ error: 'empty_note' }, { status: 400 });
@@ -56,6 +59,8 @@ export async function POST(request, { params }) {
 // comment" — see components/DashboardClient.js). Deliberately does NOT
 // re-ping Slack — see the comment on notifyInternalNote in lib/slack.js.
 export async function PATCH(request, { params }) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const noteId = body && body.noteId;
   const text = (body && body.text || '').trim();

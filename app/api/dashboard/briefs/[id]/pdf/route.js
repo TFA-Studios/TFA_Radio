@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getBrief } from '../../../../../../lib/db';
+import { requireBriefReadApi } from '../../../../../../lib/access';
 import { buildBriefPdf } from '../../../../../../lib/briefPdf';
 
 // Producer-only (gated by middleware's /api/dashboard/* matcher) — used by
@@ -11,9 +12,9 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request, { params }) {
   const brief = await getBrief(params.id);
-  if (!brief) {
-    return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  }
+  // Staff may download any brief; an agency login only its own clients'.
+  const denied = await requireBriefReadApi(brief);
+  if (denied) return denied;
   const pdfBuffer = await buildBriefPdf(brief);
   const safeName = (brief.companyName || 'brief').trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'brief';
   return new NextResponse(pdfBuffer, {

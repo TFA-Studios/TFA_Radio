@@ -1,4 +1,5 @@
 import { listBriefs } from '../../lib/db';
+import { getViewer, scopeBriefs } from '../../lib/access';
 import DashboardClient from '../../components/DashboardClient';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../components/DashboardSidebar';
 
@@ -16,23 +17,25 @@ function isUnseenBrief(b) {
 }
 
 export default async function DashboardPage() {
-  const briefs = await listBriefs();
+  const viewer = await getViewer();
+  const briefs = scopeBriefs(viewer, await listBriefs());
+  const isAgency = viewer.role === 'agency';
   const unseenCount = briefs.filter(isUnseenBrief).length;
 
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
-      <DashboardSidebar active="dashboard" unseenCount={unseenCount} />
+      <DashboardSidebar active="dashboard" unseenCount={isAgency ? 0 : unseenCount} role={viewer.role} />
 
       <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }} className="tfa-dash-main">
         <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: '0 0 24px', color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 12 }}>
-          Dashboard
-          {unseenCount > 0 && (
+          {isAgency ? viewer.agency.name : 'Dashboard'}
+          {!isAgency && unseenCount > 0 && (
             <span style={{ fontFamily: "'Geist', system-ui, sans-serif", fontSize: 13, fontWeight: 700, color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 8, padding: '4px 10px' }}>
               {unseenCount} nieuwe brief{unseenCount === 1 ? '' : 's'}
             </span>
           )}
         </h1>
-        <DashboardClient briefs={briefs} />
+        <DashboardClient briefs={briefs} readOnly={isAgency} />
       </main>
 
       <style>{DASHBOARD_SHELL_STYLES}</style>

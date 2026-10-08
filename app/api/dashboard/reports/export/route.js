@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { listBriefs } from '../../../../../lib/db';
 import { briefsToRows, rowsToCsv } from '../../../../../lib/reports';
@@ -8,6 +9,8 @@ import { briefsToRows, rowsToCsv } from '../../../../../lib/reports';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const from = searchParams.get('from') || '';
   const to = searchParams.get('to') || '';

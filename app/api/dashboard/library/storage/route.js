@@ -1,3 +1,4 @@
+import { requireStaffApi } from '../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { getBlobStorageUsage } from '../../../../../lib/library';
 
@@ -9,6 +10,8 @@ import { getBlobStorageUsage } from '../../../../../lib/library';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   const usage = await getBlobStorageUsage();
   return NextResponse.json(usage);
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { createBrief, listBriefs, findAgencyByCode } from '../../../lib/db';
+import { createBrief, findAgencyByCode } from '../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +42,6 @@ export async function POST(request) {
   return NextResponse.json(brief, { status: 201 });
 }
 
-export async function GET() {
-  const briefs = await listBriefs();
-  return NextResponse.json(briefs);
-}
+// NOTE: there used to be a public GET here that returned every client's brief.
+// Nothing used it and it would have exposed other agencies' data, so it is gone;
+// the producer dashboard reads briefs server-side (scoped per viewer).
