@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Preloader from '../../components/Preloader';
+import { enableTestModeFromUrl } from '../../components/TestAutofill';
 
 // Landing route the public homepage's CTA points to: creates a fresh brief
 // via POST /api/briefs, then redirects to step 1 with the new id — mirrors
@@ -47,6 +48,7 @@ function StartInner() {
   }
 
   useEffect(() => {
+    enableTestModeFromUrl(); // ?test=1 on the start link turns on the hidden test-fill button
     attempt(searchParams.get('code'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

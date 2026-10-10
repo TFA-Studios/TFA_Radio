@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import SpotFlowLogo from './SpotFlowLogo';
 import { PartnerSidebarBlock, PartnerWatermark, usePartnerTitle } from './PartnerBadge';
+import TestAutofill from './TestAutofill';
 import { STEPS, computeReached, variationsCountOf, briefStageOf } from './flowData';
 
 function WaveIcon({ dim }) {
@@ -373,6 +374,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
         className="tfa-content"
       >
         <PartnerWatermark brief={brief} />
+        <TestAutofill brief={brief} />
         {bigNum ? (
           <div style={{ position: 'absolute', top: -2, right: 8, fontWeight: 700, fontSize: 130, lineHeight: 1, color: '#1D1D1D', opacity: 0.05, zIndex: 0, pointerEvents: 'none' }}>
             {bigNum}
