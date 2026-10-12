@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../../components/StepShell';
 import Preloader from '../../../../../components/Preloader';
 import useMinDelay from '../../../../../components/useMinDelay';
-import { estimateSeconds, wordCountOf, variationsCountOf, parseVariationScripts } from '../../../../../components/flowData';
+import { estimateSeconds, wordCountOf, variationsCountOf, parseVariationScripts, parseVariationInfo, variationInfoLabel } from '../../../../../components/flowData';
 import { diffWords, DiffPreview } from '../../../../../components/textDiff';
 
 // Dedicated subpage for reviewing/customizing each requested variation of
@@ -182,9 +182,9 @@ export default function ScriptVariationsPage({ params }) {
       kicker="Script goedgekeurd"
       title={variationCount > 1 ? 'Jouw variaties' : 'Jouw variatie'}
       hint={
-        'Je gaf bij levering aan ' + (variationCount > 1 ? `${variationCount} variaties` : 'ook een variatie') +
-        ' nodig te hebben. Hieronder staat je goedgekeurde script ' + (variationCount > 1 ? `${variationCount}x` : 'nogmaals') +
-        ': dit is dezelfde tekst, klaar om aan te passen. Typ zelf de stukjes tekst aan die anders moeten zijn; de rest laat je gewoon staan. Alles wordt automatisch bewaard zodra je typt.'
+        'Je gaf aan ' + (variationCount > 1 ? `${variationCount} variaties` : 'een variatie') +
+        ' nodig te hebben. Onze copywriter schreef ' + (variationCount > 1 ? 'ze' : 'hem') +
+        ' op basis van wat je in je brief vertelde, gebaseerd op je goedgekeurde script. Pas de tekst gerust aan waar het anders moet; alles wordt automatisch bewaard zodra je typt.'
       }
       backHref={`/brief/${id}/script`}
       backLabel="Terug naar je script"
@@ -213,6 +213,18 @@ export default function ScriptVariationsPage({ params }) {
           })}
         </div>
       )}
+
+      {(() => {
+        const info = parseVariationInfo(brief)[activeVarIdx];
+        const label = variationInfoLabel(info);
+        if (!label) return null;
+        return (
+          <div style={{ marginBottom: 14, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 14px' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>Waar deze variatie over gaat</div>
+            <div style={{ fontSize: 13.5, color: '#1D1D1D', marginTop: 3, lineHeight: 1.5 }}>{label}</div>
+          </div>
+        );
+      })()}
 
       {(() => {
         const idx = activeVarIdx;
@@ -270,7 +282,7 @@ export default function ScriptVariationsPage({ params }) {
                   onClick={() => resetVar(idx, scriptText)}
                   style={{ width: 'auto', flex: 'none', border: '1.5px solid #B06156', color: '#B06156' }}
                 >
-                  ↺ Terugzetten naar origineel
+                  ↺ Terugzetten naar je hoofdscript
                 </button>
               </div>
             )}

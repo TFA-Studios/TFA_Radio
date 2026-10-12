@@ -20,7 +20,7 @@ const clerkConfigured = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && !!pro
 
 async function HeaderUser() {
   if (!clerkConfigured) {
-    return <span style={{ fontSize: 12, color: '#8C8880' }}>Login niet geconfigureerd</span>;
+    return <span style={{ fontSize: 12, color: '#B9B6AC' }}>Login niet geconfigureerd</span>;
   }
   const { UserButton } = await import('@clerk/nextjs');
   return <UserButton afterSignOutUrl="/" />;
@@ -50,9 +50,10 @@ export default function DashboardSidebar({ active, unseenCount = 0, role = 'staf
               href={item.href}
               className={isActive ? 'tfa-dash-navlink tfa-dash-navlink--active' : 'tfa-dash-navlink'}
               style={{
-                padding: '10px 12px', borderRadius: 8,
-                background: isActive ? 'rgba(230,200,88,.12)' : 'transparent',
-                color: isActive ? '#FFFFFF' : '#B9B6AC',
+                padding: '9px 12px', borderRadius: 8,
+                background: isActive ? 'rgba(230,200,88,.16)' : 'transparent',
+                boxShadow: isActive ? 'inset 3px 0 0 #E6C858, 0 0 12px rgba(230,200,88,.18)' : 'none',
+                color: isActive ? '#FFFFFF' : '#C9C6BC',
                 fontWeight: isActive ? 600 : 400, fontSize: 14, textDecoration: 'none',
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
               }}
@@ -67,9 +68,9 @@ export default function DashboardSidebar({ active, unseenCount = 0, role = 'staf
           );
         })}
       </nav>
-      <div className="tfa-dash-footer" style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #33301F', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 13, color: '#B9B6AC' }}>Uitloggen</span>
+      <div className="tfa-dash-footer" style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #33301F', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px 12px' }}>
         <HeaderUser />
+        <span style={{ fontSize: 12.5, color: '#C9C6BC', whiteSpace: 'nowrap' }}>Account &amp; uitloggen</span>
       </div>
     </aside>
   );
@@ -120,5 +121,8 @@ export const DASHBOARD_SHELL_STYLES = `
      Brighter/wider than the plain background tint alone so it reads as an
      actual glow against the dark #1D1D1D sidebar, not just a shade change. */
   .tfa-dash-navlink:hover { background: rgba(255,255,255,.08); color: #FFFFFF; box-shadow: inset 0 0 0 1px rgba(230,200,88,.4), 0 0 14px rgba(230,200,88,.35); }
-  .tfa-dash-navlink--active:hover { background: rgba(230,200,88,.2); color: #FFFFFF; }
+  .tfa-dash-navlink--active:hover { background: rgba(230,200,88,.24); color: #FFFFFF; }
+  .tfa-dash-navlink:focus-visible { outline: 2px solid #E6C858; outline-offset: 2px; }
+  .tfa-dash-main button:focus-visible, .tfa-dash-main a:focus-visible, .tfa-dash-main select:focus-visible { outline: 2px solid #1D1D1D; outline-offset: 2px; }
+  .tfa-dash-main { font-feature-settings: 'ss01', 'ss03'; }
 `;

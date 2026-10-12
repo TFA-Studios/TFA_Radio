@@ -8,12 +8,29 @@ import { HIDEABLE, normalizeFormConfig } from '../lib/formProfile';
 // PromptVersionsClient.js (a simple add-form + list, no separate edit
 // modal): add/edit/delete, nothing fancier, since this is expected to be
 // touched rarely (a handful of agency partners, added as they come on).
-const cardStyle = { background: '#FFFFFF', borderRadius: 12, padding: '16px 18px', boxShadow: '0 1px 6px rgba(29,29,29,.04)' };
+const cardStyle = { background: '#FFFFFF', borderRadius: 12, padding: '16px 18px', border: '1px solid #D2CFC8', boxShadow: '0 1px 8px rgba(29,29,29,.07)' };
 const inputStyle = {
-  fontSize: 13.5, padding: '9px 11px', borderRadius: 8, border: '1px solid #D8D4C8',
+  fontSize: 13.5, padding: '9px 11px', borderRadius: 8, border: '1px solid #BDB9AE',
   background: '#fff', color: '#1D1D1D', width: '100%', boxSizing: 'border-box',
 };
-const labelStyle = { fontSize: 11.5, fontWeight: 600, color: '#5C5850', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4, display: 'block' };
+const labelStyle = { fontSize: 12.5, fontWeight: 500, color: '#1D1D1D', marginBottom: 5, display: 'block' };
+const hintStyle = { fontSize: 12, color: '#5C5850', marginTop: 5, lineHeight: 1.5 };
+const ghostBtn = { padding: '7px 14px', borderRadius: 999, fontSize: 12.5, fontWeight: 500, border: '1px solid #BDB9AE', background: '#fff', color: '#1D1D1D', cursor: 'pointer' };
+
+// One titled block of the edit form. The form used to be one long wall of
+// fields; grouping them by purpose (basics, access, script, branding, form)
+// makes it clear where to look for what.
+function Section({ title, hint, children }) {
+  return (
+    <section style={{ background: '#FBF9EC', border: '1px solid #EAE3C4', borderLeft: '4px solid #E6C858', borderRadius: '4px 12px 12px 4px', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div>
+        <h3 style={{ margin: 0, fontSize: 14.5, fontWeight: 600 }}>{title}</h3>
+        {hint && <div style={{ ...hintStyle, marginTop: 2 }}>{hint}</div>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function AgenciesClient({ initialAgencies }) {
   const [agencies, setAgencies] = useState(initialAgencies);
@@ -132,13 +149,13 @@ export default function AgenciesClient({ initialAgencies }) {
       <div>
         <label style={labelStyle}>{label}</label>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div style={{ width: 64, height: 40, flexShrink: 0, borderRadius: 8, border: '1px solid #D8D4C8', background: dark ? '#1D1D1D' : '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <div style={{ width: 64, height: 40, flexShrink: 0, borderRadius: 8, border: '1px solid #BDB9AE', background: dark ? '#1D1D1D' : '#FFFFFF', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            {value ? <img src={value} alt="" style={{ maxWidth: '90%', maxHeight: '90%' }} /> : <span style={{ fontSize: 10, color: '#8C8880' }}>geen</span>}
+            {value ? <img src={value} alt="" style={{ maxWidth: '90%', maxHeight: '90%' }} /> : <span style={{ fontSize: 11, color: '#5C5850' }}>geen</span>}
           </div>
           <input style={inputStyle} value={value} onChange={(e) => setter(e.target.value)} placeholder="/agency-logos/… of https://…" />
         </div>
-        <label style={{ display: 'inline-block', marginTop: 6, fontSize: 12, color: '#5C5850', textDecoration: 'underline', cursor: 'pointer' }}>
+        <label style={{ ...ghostBtn, display: 'inline-block', marginTop: 8, padding: '5px 12px', fontSize: 12 }}>
           {uploading === kind ? 'Uploaden…' : 'Bestand uploaden'}
           <input type="file" accept="image/png,image/webp,image/jpeg,image/svg+xml" style={{ display: 'none' }} onChange={(e) => { uploadLogo(kind, e.target.files && e.target.files[0], setter); e.target.value = ''; }} />
         </label>
@@ -184,7 +201,8 @@ export default function AgenciesClient({ initialAgencies }) {
       {agencies.map((agency) => (
         <div key={agency.id} style={cardStyle}>
           {editingId === agency.id ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 500 }}>{agency.name} bewerken</h2>
               {/* auto-fit grid, not a fixed 2/3-column count — with the
                   640px cap on the whole tab gone, the card itself can now
                   be very wide, and three stacked single-column inputs at
@@ -193,6 +211,7 @@ export default function AgenciesClient({ initialAgencies }) {
                   fields sit side by side once there's room, and wrap back
                   down on a narrower screen, with no separate breakpoint
                   needed. */}
+              <Section title="Basis" hint="Hoe deze agency heet en welke codes bij haar horen.">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Toegangscode</label>
@@ -215,12 +234,14 @@ export default function AgenciesClient({ initialAgencies }) {
                   onChange={(e) => setEditExtraCodes(e.target.value)}
                   placeholder={'bijv. TFA 2026 Advision B'}
                 />
-                <div style={{ fontSize: 11.5, color: '#8C8880', marginTop: 4, lineHeight: 1.5 }}>
+                <div style={hintStyle}>
                   Elke code hierboven (hoofdcode + extra codes) opent dezelfde agency met hetzelfde logo en formulier. Op de brief wordt bewaard welke code is gebruikt.
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
-                <div style={{ gridColumn: '1 / -1' }}>
+              </Section>
+              <Section title="Toegang" hint="Wie van dit agentschap mag inloggen op het dashboard.">
+              <div>
+                <div>
                   <label style={labelStyle}>Logins van dit agentschap (e-mailadressen)</label>
                   <textarea
                     style={{ ...inputStyle, minHeight: 56, fontFamily: 'inherit' }}
@@ -228,10 +249,14 @@ export default function AgenciesClient({ initialAgencies }) {
                     onChange={(e) => setEditUserEmails(e.target.value)}
                     placeholder="bijv. jan@advisionmedia.nl, els@advisionmedia.nl"
                   />
-                  <div style={{ fontSize: 11.5, color: '#8C8880', marginTop: 4, lineHeight: 1.5 }}>
+                  <div style={hintStyle}>
                     Deze personen zien na het inloggen alleen de briefs van hun eigen klanten (alleen lezen). Nodig ze eerst uit in Clerk, met dit e-mailadres.
                   </div>
                 </div>
+              </div>
+              </Section>
+              <Section title="Script en formulier" hint="Wie het script schrijft en welk formulier de klanten zien.">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
                 <div>
                   <label style={labelStyle}>Scripts</label>
                   <select style={inputStyle} value={editScriptMode} onChange={(e) => setEditScriptMode(e.target.value)}>
@@ -246,6 +271,8 @@ export default function AgenciesClient({ initialAgencies }) {
                   </select>
                 </div>
               </div>
+              </Section>
+              <Section title="Branding" hint="Logo's voor de samenwerking op het formulier, de statuspagina's en de e-mails.">
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 10 }}>
                 {logoField('Logo voor donkere achtergrond', 'dark', editLogoDark, setEditLogoDark, true)}
                 {logoField('Logo voor lichte achtergrond', 'light', editLogoLight, setEditLogoLight, false)}
@@ -254,8 +281,10 @@ export default function AgenciesClient({ initialAgencies }) {
                   Met een logo zien de klanten van dit agentschap &ldquo;in samenwerking met&rdquo; + het logo in het formulier, de statuspagina&apos;s en de e-mails. Het icoon komt als heel vage achtergrond (±4%) achter het formulier van deze klanten. Leeg laten = geen logo/icoon.
                 </div>
               </div>
+              </Section>
+              <Section title="Formulier aanpassen" hint="Vragen verbergen of extra vragen toevoegen voor de klanten van dit agentschap.">
               <div>
-                <label style={labelStyle}>Vragen die dit agentschap NIET nodig heeft</label>
+                <label style={labelStyle}>Vragen die dit agentschap niet nodig heeft</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px 16px' }}>
                   {Object.keys(HIDEABLE).map((k) => (
                     <label key={k} style={{ fontSize: 13, color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
@@ -292,20 +321,21 @@ export default function AgenciesClient({ initialAgencies }) {
                   </button>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
+              </Section>
+              <div style={{ display: 'flex', gap: 8, position: 'sticky', bottom: 0, background: '#FFFFFF', borderTop: '1px solid #E3E0D5', margin: '0 -18px -16px', padding: '12px 18px', borderRadius: '0 0 8px 8px' }}>
                 <button
                   type="button"
                   className="btn-primary"
                   disabled={busyId === agency.id}
                   onClick={() => saveEdit(agency.id)}
-                  style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: busyId === agency.id ? 0.6 : 1 }}
+                  style={{ padding: '8px 20px', borderRadius: 999, fontSize: 13, fontWeight: 600, opacity: busyId === agency.id ? 0.6 : 1 }}
                 >
                   Opslaan
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditingId(null)}
-                  style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: '1px solid #D8D4C8', background: 'none', color: '#5C5850' }}
+                  style={{ ...ghostBtn, padding: '8px 16px', fontSize: 13 }}
                 >
                   Annuleren
                 </button>
@@ -315,12 +345,12 @@ export default function AgenciesClient({ initialAgencies }) {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 14.5, fontWeight: 600, color: '#1D1D1D' }}>{agency.name}</div>
-                <div style={{ fontSize: 12.5, color: '#8C8880', marginTop: 2 }}>
+                <div style={{ fontSize: 12.5, color: '#5C5850', marginTop: 2 }}>
                   Code: <code>{agency.code}</code>
                   {agency.extraCodes ? agency.extraCodes.split(/[,;\n]+/).filter(Boolean).map((c) => <span key={c}> · <code>{c.trim()}</code></span>) : null}
                   {agency.contactEmail ? ' · ' + agency.contactEmail : ''}
                 </div>
-                <div style={{ fontSize: 12, color: '#8C8880', marginTop: 2 }}>
+                <div style={{ fontSize: 12.5, color: '#5C5850', marginTop: 2 }}>
                   {agency.userEmails ? agency.userEmails.split(/[\s,;]+/).filter(Boolean).length + ' login(s)' : 'Geen logins'}
                   {' · '}{agency.scriptMode === 'provided' ? 'eigen script' : 'TFA schrijft scripts'}
                 </div>
@@ -329,7 +359,7 @@ export default function AgenciesClient({ initialAgencies }) {
                 <button
                   type="button"
                   onClick={() => startEdit(agency)}
-                  style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12.5, border: '1px solid #D8D4C8', background: 'none', color: '#5C5850' }}
+                  style={ghostBtn}
                 >
                   Bewerken
                 </button>
@@ -337,7 +367,7 @@ export default function AgenciesClient({ initialAgencies }) {
                   type="button"
                   disabled={busyId === agency.id}
                   onClick={() => removeAgency(agency.id)}
-                  style={{ padding: '6px 12px', borderRadius: 8, fontSize: 12.5, border: '1px solid #E3B0A8', background: 'none', color: '#C2513F', opacity: busyId === agency.id ? 0.6 : 1 }}
+                  style={{ ...ghostBtn, border: '1px solid #E3B0A8', color: '#A8402F', opacity: busyId === agency.id ? 0.6 : 1 }}
                 >
                   Verwijderen
                 </button>
@@ -368,14 +398,14 @@ export default function AgenciesClient({ initialAgencies }) {
               type="submit"
               className="btn-primary"
               disabled={busyId === 'new' || !code.trim() || !name.trim()}
-              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600, opacity: busyId === 'new' || !code.trim() || !name.trim() ? 0.6 : 1 }}
+              style={{ padding: '8px 20px', borderRadius: 999, fontSize: 13, fontWeight: 600, opacity: busyId === 'new' || !code.trim() || !name.trim() ? 0.6 : 1 }}
             >
               {busyId === 'new' ? 'Bezig…' : 'Toevoegen'}
             </button>
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              style={{ padding: '8px 16px', borderRadius: 8, fontSize: 13, border: '1px solid #D8D4C8', background: 'none', color: '#5C5850' }}
+              style={{ ...ghostBtn, padding: '8px 16px', fontSize: 13 }}
             >
               Annuleren
             </button>
@@ -386,7 +416,7 @@ export default function AgenciesClient({ initialAgencies }) {
           type="button"
           onClick={() => setShowForm(true)}
           className="btn-primary"
-          style={{ alignSelf: 'flex-start', padding: '10px 18px', borderRadius: 8, fontSize: 13, fontWeight: 600 }}
+          style={{ alignSelf: 'flex-start', padding: '10px 20px', borderRadius: 999, fontSize: 13, fontWeight: 600 }}
         >
           + Nieuwe agency
         </button>

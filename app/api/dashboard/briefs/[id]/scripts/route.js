@@ -46,8 +46,9 @@ export async function POST(request, { params }) {
     }
     const main = typeof body.main === 'string' ? body.main.trim() : '';
     const variation = typeof body.variation === 'string' ? body.variation.trim() : '';
+    const variations = Array.isArray(body.variations) ? body.variations.map((v) => String(v || '').trim()) : (variation ? [variation] : []);
     if (!main) return NextResponse.json({ error: 'empty', message: 'Plak eerst het script.' }, { status: 400 });
-    const saved = await saveScriptDrafts(params.id, [{ main, variation, source: 'agency' }]);
+    const saved = await saveScriptDrafts(params.id, [{ main, variation: variations[0] || variation, variations, source: 'agency' }]);
     return NextResponse.json(saved);
   }
 
@@ -88,6 +89,7 @@ export async function PATCH(request, { params }) {
   const data = {};
   if (typeof body.main === 'string') data.main = body.main;
   if (typeof body.variation === 'string') data.variation = body.variation;
+  if (Array.isArray(body.variations)) data.variations = body.variations.map((v) => String(v || ''));
   const updated = await updateScriptDraft(params.id, versionId, data);
   if (!updated) return NextResponse.json({ error: 'not_found_or_released' }, { status: 404 });
   return NextResponse.json(updated);

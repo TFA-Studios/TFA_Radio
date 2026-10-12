@@ -45,6 +45,7 @@ function sampleData(brief) {
     airMonth: '',
     needsVariations: true,
     variationsCount: '1',
+    variationDetail: JSON.stringify([{ kind: 'periode', detail: 'Black Friday-aanbod: twee broden voor de prijs van één', airing: 'Week 48, rond Black Friday' }]),
     disclaimerText: '',
     product: 'Ambachtelijk zuurdesembrood en verse gebakjes, elke ochtend vers uit de oven in ons eigen atelier in Utrecht.',
     audience: 'b2c',

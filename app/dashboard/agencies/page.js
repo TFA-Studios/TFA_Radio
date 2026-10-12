@@ -1,6 +1,7 @@
 import { requireStaffPage } from '../../../lib/access';
 import { listAgencies } from '../../../lib/db';
 import AgenciesClient from '../../../components/AgenciesClient';
+import PageHeader from '../../../components/PageHeader';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
 
 // Real, editable data — never statically cache this page (same as
@@ -16,18 +17,9 @@ export default async function AgenciesPage() {
       <DashboardSidebar active="agencies" />
 
       <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }} className="tfa-dash-main">
-        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: '0 0 6px', color: '#1D1D1D' }}>
-          Agentschappen
-        </h1>
-        <p style={{ fontSize: 13.5, color: '#5C5850', margin: '0 0 24px', maxWidth: 640, lineHeight: 1.5 }}>
-          Elke agency hieronder krijgt een eigen toegangscode — een link met{' '}
-          <code>/start?code=...</code> die die code gebruikt, maakt een brief aan die automatisch aan
-          deze agency wordt gekoppeld. Op die brief wordt dan overal (klantmail, statuspagina,
-          uitlevering) deze agency genoemd in plaats van de naam &quot;Advision Media&quot;, en het
-          contact-e-mailadres hieronder wordt in het dashboard als eerste suggestie getoond bij het
-          versturen van de eindlevering. Briefs zonder herkende code blijven &quot;Advision Media&quot;
-          tonen, zoals voorheen.
-        </p>
+        <PageHeader title="Agentschappen">
+          Elk agentschap heeft een toegangscode. Een klant die via <code>/start?code=…</code> binnenkomt, krijgt het logo en het formulier van dat agentschap, en de brief wordt aan hen gekoppeld. Zonder herkende code valt een brief onder Advision Media.
+        </PageHeader>
         <AgenciesClient initialAgencies={agencies} />
       </main>
 

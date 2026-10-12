@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   variationsSummaryLabel, variationsCountOf, parseVariationScripts, parseReviewRounds as parseReviewRoundsOf,
-  reviewOverIncludedCap, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime,
+  reviewOverIncludedCap, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime, formatShortDateTime,
   formatAirDate, deliveryDeadlineMeta, TONE_LABELS, finalTrackOf, agencyNameOf, agencyContactEmailOf,
+  parseVariationInfo, variationInfoLabel,
 } from './flowData';
 import { profileOfBrief, answersOfBrief } from '../lib/formProfile';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
@@ -114,8 +115,12 @@ const DEFAULT_COLUMN_KEYS = ['hoofdspotLength', 'assignedTo', 'airDate', 'update
 // which now opens straight to it in that case.
 const MODAL_TABS = [
   { key: 'overzicht', label: 'Overzicht' },
+  // All script work lives here: the drafts to check and release, the chosen
+  // script and what each variation is about. (It used to be hidden inside
+  // "Creatief", which made it easy to miss that a script was waiting.)
+  { key: 'script', label: 'Script' },
   { key: 'productie', label: 'Productie & review' },
-  { key: 'creatief', label: 'Creatief' },
+  { key: 'creatief', label: 'Stem & muziek' },
   { key: 'team', label: 'Team' },
 ];
 // Appended only once the client has approved (see modalTabsFor below) — the
@@ -223,7 +228,13 @@ function StatusSelect({ brief, onChange, compact, disabled }) {
         cursor: disabled ? 'default' : 'pointer',
         appearance: 'none',
         WebkitAppearance: 'none',
+        width: 'auto',
+        paddingRight: compact ? 8 : 26,
+        backgroundImage: compact ? 'none' : "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%231D1D1D' stroke-width='1.6'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E\")",
+        backgroundRepeat: 'no-repeat',
+        backgroundPosition: 'right 10px center',
       }}
+      aria-label="Status van de brief"
     >
       {STATUS_ORDER.map((key) => (
         <option key={key} value={key} style={{ color: '#1D1D1D', background: '#FFFFFF' }}>
@@ -237,7 +248,7 @@ function StatusSelect({ brief, onChange, compact, disabled }) {
 function Field({ label, children, empty }) {
   return (
     <div>
-      <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
+      <div style={{ fontSize: 12, fontWeight: 500, color: '#5C5850' }}>{label}</div>
       <div style={{ fontSize: 13.5, marginTop: 3, color: empty ? '#9C9890' : '#1D1D1D' }}>{children}</div>
     </div>
   );
@@ -255,10 +266,11 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
     if (Array.isArray(parsed)) drafts = parsed;
   } catch (e) {}
   const released = !!brief.scriptsReleasedAt;
-  const needsVariation = !!brief.needsVariations;
+  const varCount = brief.needsVariations ? variationsCountOf(brief) : 0;
+  const varInfos = parseVariationInfo(brief);
   const [edits, setEdits] = useState({});
   const [ownScript, setOwnScript] = useState('');
-  const [ownVariation, setOwnVariation] = useState('');
+  const [ownVariations, setOwnVariations] = useState([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
 
@@ -267,6 +279,20 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   function valueOf(d, field) {
     const e = edits[d.id];
     return e && e[field] !== undefined ? e[field] : d[field] || '';
+  }
+  // One text per requested variation: the draft's own list, falling back to
+  // the legacy single `variation` for the first one.
+  function variationsOf(d) {
+    const e = edits[d.id];
+    if (e && Array.isArray(e.variations)) return e.variations;
+    if (Array.isArray(d.variations) && d.variations.length) return d.variations;
+    return d.variation ? [d.variation] : [];
+  }
+  function setVariation(d, idx, value) {
+    const arr = variationsOf(d).slice();
+    while (arr.length < varCount) arr.push('');
+    arr[idx] = value;
+    setField(d, 'variations', arr);
   }
   function setField(d, field, value) {
     setEdits((cur) => ({ ...cur, [d.id]: { ...(cur[d.id] || {}), [field]: value } }));
@@ -321,7 +347,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
       <ModalSectionTitle>Scriptvoorstellen {released ? '· vrijgegeven' : '· nakijken'}</ModalSectionTitle>
       {released ? (
         <div style={{ fontSize: 12.5, color: '#5C5850', lineHeight: 1.5 }}>
-          Vrijgegeven aan de klant op {new Date(brief.scriptsReleasedAt).toLocaleString('nl-NL')}.
+          Vrijgegeven aan de klant op {formatShortDateTime(brief.scriptsReleasedAt)}.
           {brief.finalizedAt ? ' De klant heeft alles bevestigd.' : ' De klant kiest nu een voorstel.'}
         </div>
       ) : (
@@ -336,13 +362,18 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
             Script van het agentschap (of zelf geschreven)? Plak het hier, dan krijgt de klant dat als enig voorstel.
           </div>
           <textarea style={taStyle} value={ownScript} onChange={(e) => setOwnScript(e.target.value)} placeholder="Plak hier het script" />
-          {needsVariation && (
-            <textarea style={{ ...taStyle, minHeight: 64, marginTop: 6 }} value={ownVariation} onChange={(e) => setOwnVariation(e.target.value)} placeholder="Variatie (optioneel)" />
-          )}
+          {Array.from({ length: varCount }).map((_, i) => (
+            <div key={i}>
+              <div style={{ fontSize: 11, color: '#8C8880', margin: '8px 0 4px' }}>
+                {varCount > 1 ? 'Variatie ' + (i + 1) : 'Variatie'}{variationInfoLabel(varInfos[i]) ? ' · ' + variationInfoLabel(varInfos[i]) : ''} (optioneel)
+              </div>
+              <textarea style={{ ...taStyle, minHeight: 64 }} value={ownVariations[i] || ''} onChange={(e) => setOwnVariations((cur) => { const n = cur.slice(); n[i] = e.target.value; return n; })} placeholder="Variatietekst" />
+            </div>
+          ))}
           <button
             type="button"
             disabled={!!busy || !ownScript.trim()}
-            onClick={() => call('POST', { action: 'provide', main: ownScript, variation: ownVariation }, 'provide')}
+            onClick={() => call('POST', { action: 'provide', main: ownScript, variations: ownVariations }, 'provide')}
             style={{ marginTop: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', opacity: !ownScript.trim() ? 0.6 : 1 }}
           >
             {busy === 'provide' ? 'Bezig…' : 'Script toevoegen'}
@@ -361,16 +392,26 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
             Voorstel {i + 1}{d.source === 'template' ? ' · sjabloon (geen AI beschikbaar)' : d.source === 'agency' ? ' · script van agentschap' : ''}
           </div>
           {released ? (
-            <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 14, lineHeight: 1.6 }}>{d.main}</div>
+            <>
+              <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 14, lineHeight: 1.6 }}>{d.main}</div>
+              {Array.from({ length: varCount }).map((_, vi) => (variationsOf(d)[vi] ? (
+                <div key={vi} style={{ marginTop: 8 }}>
+                  <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 3 }}>{varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'}</div>
+                  <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 13.5, lineHeight: 1.6 }}>{variationsOf(d)[vi]}</div>
+                </div>
+              ) : null))}
+            </>
           ) : (
             <>
               <textarea style={taStyle} value={valueOf(d, 'main')} onChange={(e) => setField(d, 'main', e.target.value)} onBlur={() => saveDraft(d)} />
-              {needsVariation && (
-                <>
-                  <div style={{ fontSize: 11, color: '#8C8880', margin: '6px 0 4px' }}>Variatie bij dit voorstel</div>
-                  <textarea style={{ ...taStyle, minHeight: 64 }} value={valueOf(d, 'variation')} onChange={(e) => setField(d, 'variation', e.target.value)} onBlur={() => saveDraft(d)} />
-                </>
-              )}
+              {Array.from({ length: varCount }).map((_, vi) => (
+                <div key={vi}>
+                  <div style={{ fontSize: 11, color: '#8C8880', margin: '6px 0 4px' }}>
+                    {varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'} bij dit voorstel{variationInfoLabel(varInfos[vi]) ? ' · ' + variationInfoLabel(varInfos[vi]) : ''}
+                  </div>
+                  <textarea style={{ ...taStyle, minHeight: 64 }} value={variationsOf(d)[vi] || ''} onChange={(e) => setVariation(d, vi, e.target.value)} onBlur={() => saveDraft(d)} />
+                </div>
+              ))}
             </>
           )}
         </div>
@@ -645,7 +686,9 @@ export default function DashboardClient({ briefs, readOnly = false }) {
     // reaching it was exactly the extra-clicks complaint. Anything earlier
     // in the process (still filling in the brief, nothing shared yet)
     // still opens on Overzicht as before.
-    setModalTab(!readOnly && selected && selected.productionStatus ? 'productie' : 'overzicht');
+    // A brief whose scripts are waiting for TFA opens straight on Script.
+    const scriptsWaiting = !!(selected && selected.submittedAt && !selected.scriptsReleasedAt && !selected.finalizedAt);
+    setModalTab(!readOnly && scriptsWaiting ? 'script' : !readOnly && selected && selected.productionStatus ? 'productie' : 'overzicht');
   }, [selected && selected.id]);
 
   async function handleAddReviewRound(id) {
@@ -883,7 +926,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
       cell: (b, ctx) => <>{ctx.due.overdue ? '⚠ ' : ''}{ctx.due.label}</>,
       cellStyle: (b, ctx) => ({ color: ctx.due.color, fontWeight: ctx.due.overdue ? 700 : 400 }),
     },
-    { key: 'updatedAt', label: 'Laatst gewijzigd', cell: (b) => new Date(b.updatedAt).toLocaleString('nl-NL') },
+    { key: 'updatedAt', label: 'Laatst gewijzigd', cell: (b) => formatShortDateTime(b.updatedAt), cellStyle: () => ({ color: '#5C5850', whiteSpace: 'nowrap' }) },
     {
       key: 'status', core: true, label: 'Status', sortable: false,
       cell: (b) => <StatusSelect disabled={readOnly} brief={b} onChange={handleStatusChange} compact />,
@@ -1027,7 +1070,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
     setPage(1);
   }
 
-  const cardStyle = { background: '#FFFFFF', borderRadius: 14, padding: '20px 22px', boxShadow: '0 1px 10px rgba(29,29,29,.05)' };
+  const cardStyle = { background: '#FFFFFF', borderRadius: 10, padding: '16px 18px', border: '1px solid #D2CFC8', boxShadow: '0 1px 8px rgba(29,29,29,.07)' };
   // Two card styles inside the brief modal, used deliberately for two
   // different kinds of content — every card used to share modalCardStyle
   // (the gold-accented one), which is exactly why the modal read as "one
@@ -1036,8 +1079,8 @@ export default function DashboardClient({ briefs, readOnly = false }) {
   // ONLY marks something actionable (an input, a dropdown, the Productie
   // tab), plain marks read-only reference info (Contact, Levering, Script,
   // Stem, Muziek) — so the gold accent actually means something again.
-  const modalCardStyle = { background: '#FBF9EC', border: '1.5px solid #EAE3C4', borderLeft: '4px solid #E6C858', borderRadius: '4px 14px 14px 4px', padding: '14px 16px' };
-  const refCardStyle = { background: '#FFFFFF', border: '1px solid #EEECE3', borderRadius: 12, padding: '14px 16px' };
+  const modalCardStyle = { background: '#FBF9EC', border: '1.5px solid #EAE3C4', borderLeft: '4px solid #E6C858', borderRadius: '4px 12px 12px 4px', padding: '14px 16px', boxShadow: '0 1px 6px rgba(29,29,29,.05)' };
+  const refCardStyle = { background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, padding: '14px 16px', boxShadow: '0 1px 6px rgba(29,29,29,.05)' };
   // Active tile always highlights in the brand's gold, regardless of that
   // status's own accent color (used only for its number/label) — one
   // consistent "this is the active filter" signal instead of a color that
@@ -1052,8 +1095,8 @@ export default function DashboardClient({ briefs, readOnly = false }) {
       font: 'inherit',
       color: 'inherit',
       background: active ? '#FBF0C8' : cardStyle.background,
-      border: active ? '1.5px solid #E6C858' : '1.5px solid transparent',
-      boxShadow: active ? '0 2px 14px rgba(230,200,88,.4)' : cardStyle.boxShadow,
+      border: active ? '1.5px solid #E6C858' : cardStyle.border,
+      boxShadow: active ? '0 2px 14px rgba(230,200,88,.45)' : cardStyle.boxShadow,
       transition: 'background .12s ease, border-color .12s ease, box-shadow .12s ease',
     };
   }
@@ -1077,12 +1120,12 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         {/* Free-text search — filters on top of whichever range/status
             filter is already active, rather than replacing them, so
             "find this client within the last month" still works. */}
-        <div style={{ marginLeft: 'auto', position: 'relative', minWidth: 220 }}>
+        <div style={{ marginLeft: 'auto', position: 'relative', width: 'min(360px, 100%)' }}>
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-            placeholder="Zoek op bedrijf, contactpersoon of e-mail…"
+            placeholder="Zoek bedrijf, contact of e-mail" aria-label="Zoek in briefs"
             style={{ width: '100%', border: '1px solid #C9C5B9', borderRadius: 999, padding: '8px 14px', fontSize: 12.5, background: '#FFFFFF' }}
           />
           {searchQuery && (
@@ -1107,8 +1150,10 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         className="tfa-stats-grid"
       >
         <div style={cardStyle}>
-          <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>Totaal briefs</div>
-          <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6 }}>{stats.total}</div>
+          <div style={{ fontSize: 12.5, color: '#5C5850', display: 'flex', alignItems: 'center', gap: 7 }}>
+            <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: '#1D1D1D' }} />Totaal briefs
+          </div>
+          <div style={{ fontSize: 30, fontWeight: 500, marginTop: 6, letterSpacing: '-.01em', fontFeatureSettings: '"ss01","ss03"' }}>{stats.total}</div>
         </div>
         {/* Data-driven, and editable — see STAT_TILE_DEFS/visibleStatTiles
             above. Each tile doubles as a click-to-filter toggle (the whole
@@ -1117,8 +1162,10 @@ export default function DashboardClient({ briefs, readOnly = false }) {
             count of exactly what it filters to. */}
         {STAT_TILE_DEFS.filter((t) => visibleStatTiles.includes(t.key)).map((t) => (
           <button key={t.key} type="button" onClick={() => toggleStatTile(t.key)} style={tileStyle(t.key)} className="tfa-stat-tile">
-            <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>{t.label}</div>
-            <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6, color: t.color }}>{stats[t.key]}</div>
+            <div style={{ fontSize: 12.5, color: '#5C5850', display: 'flex', alignItems: 'center', gap: 7 }}>
+              <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: t.color, flex: 'none' }} />{t.label}
+            </div>
+            <div style={{ fontSize: 30, fontWeight: 500, marginTop: 6, letterSpacing: '-.01em', color: t.color }}>{stats[t.key]}</div>
           </button>
         ))}
       </div>
@@ -1152,10 +1199,10 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 <div
                   style={{
                     position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 21, width: 300, maxHeight: 380, overflowY: 'auto',
-                    background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, boxShadow: '0 12px 32px rgba(29,29,29,.16)', padding: '10px 0',
+                    background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 8, boxShadow: '0 8px 24px rgba(29,29,29,.12)', padding: '10px 0',
                   }}
                 >
-                  <div style={{ padding: '4px 14px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880' }}>
+                  <div style={{ padding: '4px 14px 8px', fontSize: 12, fontWeight: 500, color: '#5C5850' }}>
                     Kies welke kaarten je ziet
                   </div>
                   {STAT_TILE_DEFS.map((t) => (
@@ -1187,10 +1234,10 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 <div
                   style={{
                     position: 'absolute', right: 0, top: 'calc(100% + 6px)', zIndex: 21, width: 280, maxHeight: 380, overflowY: 'auto',
-                    background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, boxShadow: '0 12px 32px rgba(29,29,29,.16)', padding: '10px 0',
+                    background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 8, boxShadow: '0 8px 24px rgba(29,29,29,.12)', padding: '10px 0',
                   }}
                 >
-                  <div style={{ padding: '4px 14px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C8880' }}>
+                  <div style={{ padding: '4px 14px 8px', fontSize: 12, fontWeight: 500, color: '#5C5850' }}>
                     Kies welke kolommen je ziet
                   </div>
                   {COLUMN_DEFS.filter((c) => !c.core).map((c) => (
@@ -1206,17 +1253,17 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         </div>
       </div>
 
-      <div style={{ background: '#FFFFFF', borderRadius: 14, boxShadow: '0 1px 10px rgba(29,29,29,.05)', overflow: 'hidden' }}>
+      <div style={{ background: '#FFFFFF', borderRadius: 8, border: '1px solid #D2CFC8', boxShadow: '0 1px 8px rgba(29,29,29,.07)', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 820 }}>
             <thead>
-              <tr style={{ borderBottom: '1px solid #EEECE3', textAlign: 'left' }}>
+              <tr style={{ borderBottom: '1px solid #E3E0D5', textAlign: 'left' }}>
                 {activeColumns.map((c) => (
                   <th
                     key={c.key}
                     onClick={() => (c.sortable === false ? null : toggleSort(c.key))}
                     className={c.sortable === false ? '' : 'tfa-sortable-th'}
-                    style={{ padding: '12px 16px', cursor: c.sortable === false ? 'default' : 'pointer', color: '#5C5850', fontWeight: 600, whiteSpace: 'nowrap' }}
+                    style={{ padding: '11px 16px', cursor: c.sortable === false ? 'default' : 'pointer', color: '#5C5850', fontWeight: 500, fontSize: 12.5, whiteSpace: 'nowrap', background: '#FAF9F6' }}
                   >
                     {c.label} {sortField === c.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
                   </th>
@@ -1227,7 +1274,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
               {pageItems.map((b) => {
                 const ctx = { due: deliveryDeadlineMeta(b, b.status), unseen: isUnseenBrief(b) };
                 return (
-                  <tr key={b.id} onClick={() => handleOpenBrief(b)} className="tfa-dash-row" style={{ borderBottom: '1px solid #F3F1EA', cursor: 'pointer', background: ctx.unseen ? '#FBF9EC' : undefined }}>
+                  <tr key={b.id} onClick={() => handleOpenBrief(b)} className="tfa-dash-row" style={{ borderBottom: '1px solid #EEECE3', cursor: 'pointer', background: ctx.unseen ? '#FBF9EC' : undefined }}>
                     {activeColumns.map((c) => (
                       <td key={c.key} style={{ padding: '12px 16px', ...(c.cellStyle ? c.cellStyle(b, ctx) : null) }}>
                         {c.cell(b, ctx)}
@@ -1271,50 +1318,69 @@ export default function DashboardClient({ briefs, readOnly = false }) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#FFFFFF', borderRadius: 16, maxWidth: 640, width: '100%',
-              height: '82vh', maxHeight: 720, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              background: '#FFFFFF', borderRadius: 12, maxWidth: 800, width: '100%',
+              height: '86vh', maxHeight: 780, display: 'flex', flexDirection: 'column', overflow: 'hidden',
             }}
           >
-            <div style={{ padding: '26px 28px 0', flex: 'none' }}>
+            <div style={{ padding: '22px 28px 0', flex: 'none' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 24, margin: 0 }}>{selected.companyName || 'Nog geen bedrijfsnaam'}</h2>
-                <button type="button" onClick={() => setSelected(null)} style={{ border: 'none', background: 'transparent', fontSize: 18, cursor: 'pointer', flex: 'none' }}>✕</button>
+                <div style={{ minWidth: 0 }}>
+                  <h2 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-.01em', margin: 0, lineHeight: 1.25 }}>{selected.companyName || 'Nog geen bedrijfsnaam'}</h2>
+                  {/* Who this brief is about, at a glance: which agency it
+                      belongs to and who the contact is. These used to be
+                      buried in the Overzicht tab. */}
+                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12.5, color: '#5C5850' }}>
+                    <span style={{ background: '#F3F1EA', borderRadius: 999, padding: '2px 10px' }}>{agencyNameOf(selected)}</span>
+                    {selected.contactPerson && <span style={{ background: '#F3F1EA', borderRadius: 999, padding: '2px 10px' }}>{selected.contactPerson}</span>}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
+                  <StatusSelect disabled={readOnly} brief={selected} onChange={handleStatusChange} />
+                  <button
+                    type="button"
+                    onClick={() => setSelected(null)}
+                    aria-label="Sluiten"
+                    title="Sluiten"
+                    style={{ border: '1px solid #D2CFC8', background: '#FFFFFF', borderRadius: 999, width: 32, height: 32, fontSize: 15, lineHeight: 1, cursor: 'pointer', color: '#1D1D1D' }}
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
-              {/* Minimal header: just the workflow status here — the
-                  approval badge and the Frame.io link both already show up
-                  one tab away (Productie & review carries its own
-                  "Goedgekeurd" badge right on the tab button below, and the
-                  full approval/Frame.io detail lives in that tab's content),
-                  so repeating them again in a standalone stack right under
-                  the company name was pure duplication, not information.
-                  This used to be a 4-row stack (name, status, approved
-                  badge, Frame.io link) before the tabs even started. */}
-              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <StatusSelect disabled={readOnly} brief={selected} onChange={handleStatusChange} />
-              </div>
+              {!readOnly && selected.submittedAt && !selected.scriptsReleasedAt && !selected.finalizedAt && modalTab !== 'script' && (
+                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', background: '#FBF3F1', border: '1px solid #E3B0A8', borderRadius: 8, padding: '10px 14px' }}>
+                  <span style={{ fontSize: 13, color: '#8E3B2D', fontWeight: 600 }}>De scripts wachten op jou: nakijken en vrijgeven aan de klant.</span>
+                  <button type="button" onClick={() => setModalTab('script')} style={{ border: 'none', background: '#C2513F', color: '#fff', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Naar Script →</button>
+                </div>
+              )}
 
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 16, borderBottom: '1px solid #EEECE3', paddingBottom: 10 }}>
-                {modalTabsFor(selected).filter((t) => !readOnly || t.key === 'overzicht' || t.key === 'creatief').map((t) => {
+              {/* Underline tabs on one line (they used to be pills that
+                  wrapped onto two rows in the narrow dialog). The small dot
+                  after Productie / Uitlevering replaces the badge that used
+                  to be embedded in the tab itself. */}
+              <div role="tablist" style={{ display: 'flex', gap: 6, marginTop: 16, padding: '0 0 12px', borderBottom: '1px solid #E3E0D5', overflowX: 'auto' }}>
+                {modalTabsFor(selected).filter((t) => !readOnly || t.key === 'overzicht' || t.key === 'script' || t.key === 'creatief').map((t) => {
                   const active = modalTab === t.key;
                   return (
                     <button
                       key={t.key}
                       type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className="tfa-modal-tab"
                       onClick={() => { setModalTab(t.key); if (modalBodyRef.current) modalBodyRef.current.scrollTop = 0; }}
                       style={{
-                        border: 'none', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer',
-                        background: active ? '#1D1D1D' : '#F3F1EA', color: active ? '#FFFFFF' : '#5C5850',
+                        border: 'none', borderRadius: 999, padding: '8px 15px', fontSize: 13, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+                        background: active ? '#1D1D1D' : '#F3F1EA', color: active ? '#FFFFFF' : '#5C5850', boxShadow: active ? '0 0 0 2px rgba(230,200,88,.55)' : 'none',
                       }}
                     >
                       {t.label}
                       {t.key === 'productie' && selected.productionStatus && (
-                        <span style={{ marginLeft: 7 }}><ProductionBadge brief={selected} small /></span>
+                        <span aria-hidden="true" title={PRODUCTION_STATUS_LABELS[selected.productionStatus] || selected.productionStatus} style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 999, background: selected.reviewApprovedAt ? '#1D7A46' : '#E6C858', marginLeft: 7, verticalAlign: 'middle' }} />
                       )}
                       {t.key === 'uitlevering' && (
-                        <span style={{ marginLeft: 7, fontSize: 11, fontWeight: 700, color: selected.deliveredAt ? '#8FE0B0' : '#E6C858' }}>
-                          {selected.deliveredAt ? '✓' : '●'}
-                        </span>
+                        <span aria-hidden="true" title={selected.deliveredAt ? 'Geleverd' : 'Nog te leveren'} style={{ display: 'inline-block', width: 7, height: 7, borderRadius: 999, background: selected.deliveredAt ? '#1D7A46' : '#E6C858', marginLeft: 7, verticalAlign: 'middle' }} />
                       )}
                     </button>
                   );
@@ -1322,13 +1388,12 @@ export default function DashboardClient({ briefs, readOnly = false }) {
               </div>
             </div>
 
-            <div ref={modalBodyRef} style={{ flex: 1, overflowY: 'auto', padding: '0 28px 26px' }}>
+            <div ref={modalBodyRef} style={{ flex: 1, overflowY: 'auto', padding: '0 28px 26px', background: '#F6F4EC' }}>
 
             {modalTab === 'productie' && (
             <div
               style={{
-                marginTop: 16, background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 14, padding: '16px 18px',
-                boxShadow: '0 4px 18px rgba(230,200,88,.18)',
+                marginTop: 16, background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 12, padding: '16px 18px', boxShadow: '0 4px 18px rgba(230,200,88,.18)',
               }}
             >
               {(() => {
@@ -1443,8 +1508,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
             {modalTab === 'uitlevering' && selected.reviewApprovedAt && (
             <div
               style={{
-                marginTop: 16, background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 14, padding: '16px 18px',
-                boxShadow: '0 4px 18px rgba(230,200,88,.18)',
+                marginTop: 16, background: '#FBF9EC', border: '1.5px solid #E6C858', borderRadius: 12, padding: '16px 18px', boxShadow: '0 4px 18px rgba(230,200,88,.18)',
               }}
             >
               {/* Deliberately generic, not Advision-specific — this same tab
@@ -1539,8 +1603,11 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 <ModalSectionTitle>Levering</ModalSectionTitle>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <Field label="Hoofdspot">{selected.hoofdspotLength || '20'}″{variationsSummaryLabel(selected)}</Field>
-                  <Field label="Aangemaakt">{new Date(selected.createdAt).toLocaleString('nl-NL')}</Field>
-                  {selected.submittedAt && <Field label="Verzonden">{new Date(selected.submittedAt).toLocaleString('nl-NL')}</Field>}
+                  {selected.needsVariations && parseVariationInfo(selected).map((v, i, arr) => (
+                    <Field key={'vi' + i} label={arr.length > 1 ? `Variatie ${i + 1}` : 'Variatie'} empty={!variationInfoLabel(v)}>{variationInfoLabel(v) || 'Nog niet toegelicht'}</Field>
+                  ))}
+                  <Field label="Aangemaakt">{formatShortDateTime(selected.createdAt)}</Field>
+                  {selected.submittedAt && <Field label="Verzonden">{formatShortDateTime(selected.submittedAt)}</Field>}
                   <Field label="Op de radio" empty={!selected.airDate && !selected.dateUnknown}>{formatAirDate(selected)}</Field>
                   {/* Which referring agency this brief came in through — see
                       /dashboard/agencies. Shown here rather than only as a
@@ -1570,7 +1637,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 <ModalSectionTitle>Team</ModalSectionTitle>
                 <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 200px' }}>
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Toegewezen aan</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: '#5C5850', marginBottom: 4 }}>Toegewezen aan</div>
                     <select
                       value={ASSIGNEE_OPTIONS.includes(selected.assignedTo) ? selected.assignedTo : ''}
                       onChange={(e) => handleMetaChange(selected.id, { assignedTo: e.target.value })}
@@ -1592,7 +1659,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                         needs this on air (see formatAirDate in flowData.js).
                         Set on the client's own delivery step, not editable
                         by the team. */}
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Op de radio</div>
+                    <div style={{ fontSize: 12, fontWeight: 500, color: '#5C5850', marginBottom: 4 }}>Op de radio</div>
                     <div
                       style={{
                         width: '100%', border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13,
@@ -1606,7 +1673,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 </div>
 
                 <div style={{ marginTop: 16, paddingTop: 14, borderTop: '1px solid #EAE3C4' }}>
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500, color: '#5C5850', marginBottom: 8 }}>
                     Interne notities <span style={{ opacity: 0.7 }}>(niet zichtbaar voor de klant)</span>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 180, overflowY: 'auto', marginBottom: 10 }}>
@@ -1663,7 +1730,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                           >
                             <div style={{ fontSize: 13, color: '#1D1D1D', lineHeight: 1.5 }}>{n.text}</div>
                             <div style={{ fontSize: 11, color: '#8C8880', marginTop: 4 }}>
-                              {n.author || 'Team'} · {new Date(n.createdAt).toLocaleString('nl-NL')}{n.editedAt ? ' · bewerkt' : ''}
+                              {n.author || 'Team'} · {formatShortDateTime(n.createdAt)}{n.editedAt ? ' · bewerkt' : ''}
                             </div>
                           </div>
                         )}
@@ -1704,8 +1771,28 @@ export default function DashboardClient({ briefs, readOnly = false }) {
             </div>
             )}
 
-            {modalTab === 'creatief' && (
+            {modalTab === 'script' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
+              {!selected.submittedAt && (
+                <div style={{ ...refCardStyle, fontSize: 13.5, color: '#8C8880' }}>
+                  De klant heeft de brief nog niet verstuurd, dus er is nog geen script.
+                </div>
+              )}
+              {(() => {
+                const infos = parseVariationInfo(selected);
+                const filled = infos.filter((v) => v.kind || v.detail || v.airing);
+                if (!selected.needsVariations || !filled.length) return null;
+                return (
+                  <div style={refCardStyle}>
+                    <ModalSectionTitle>Waar gaan de variaties over?</ModalSectionTitle>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {infos.map((v, i) => (
+                        <Field key={i} label={infos.length > 1 ? `Variatie ${i + 1}` : 'Variatie'} empty={!variationInfoLabel(v)}>{variationInfoLabel(v) || 'Nog niet opgegeven'}</Field>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
               {!readOnly && selected.submittedAt && !selected.finalizedAt && (
                 <ScriptDraftsPanel
                   brief={selected}
@@ -1728,9 +1815,10 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 const mainText = selected.editedScript !== null && selected.editedScript !== undefined ? selected.editedScript : selected.generatedScript;
                 const variationCount = variationsCountOf(selected);
                 const variationScripts = parseVariationScripts(selected);
+                const variationInfos = parseVariationInfo(selected);
                 return (
                   <div style={refCardStyle}>
-                    <ModalSectionTitle>Script{variationCount > 0 ? ' · hoofdspot' : ''}</ModalSectionTitle>
+                    <ModalSectionTitle>{selected.scriptsReleasedAt && !selected.scriptApproved && !selected.finalizedAt ? 'Script (huidige keuze van de klant)' : 'Script'}{variationCount > 0 ? ' · hoofdspot' : ''}</ModalSectionTitle>
                     <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: mainText ? 'italic' : 'normal', fontSize: 14.5, lineHeight: 1.6, color: mainText ? '#1D1D1D' : '#9C9890' }}>
                       {mainText || 'Nog geen script goedgekeurd.'}
                     </div>
@@ -1743,7 +1831,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                           return (
                             <div key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
                               <div style={{ fontSize: 11, fontWeight: 600, color: '#5C5850', textTransform: 'uppercase', letterSpacing: '.03em' }}>
-                                {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{changed ? ': wat verschilt' : ''}
+                                {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{variationInfoLabel(variationInfos[idx]) ? ' · ' + variationInfoLabel(variationInfos[idx]) : ''}{changed ? ': wat verschilt' : ''}
                               </div>
                               {changed ? (
                                 <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 14.5, lineHeight: 1.6, marginTop: 6 }}>
@@ -1763,6 +1851,11 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 );
               })()}
 
+            </div>
+            )}
+
+            {modalTab === 'creatief' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginTop: 16 }}>
               <div style={refCardStyle}>
                 <ModalSectionTitle>Stem</ModalSectionTitle>
                 <Field label="Gekozen stem" empty={!selected.selectedVoiceLabel}>{selected.selectedVoiceLabel || 'Nog niet gekozen'}</Field>
@@ -1833,7 +1926,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
           .tfa-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
         .tfa-dash-row { transition: background .12s ease, box-shadow .12s ease; }
-        .tfa-dash-row:hover { background: rgba(230,200,88,.1); box-shadow: inset 0 0 0 1px rgba(230,200,88,.3); }
+        .tfa-dash-row:hover { background: rgba(230,200,88,.12); box-shadow: inset 3px 0 0 #E6C858, inset 0 0 0 1px rgba(230,200,88,.3); }
         .tfa-btn-glow { transition: filter .12s ease; }
         .tfa-btn-glow:hover { filter: brightness(1.08); }
         /* Summary tiles ("To-do", "Geleverd", ...) act as click-to-filter
@@ -1841,11 +1934,13 @@ export default function DashboardClient({ briefs, readOnly = false }) {
            glow (on top of tileStyle's own active-state highlight above) is
            what signals "this is clickable" on hover, same gold-glow
            language used on the sidebar and the client-portal step rail. */
-        .tfa-stat-tile:hover { box-shadow: 0 0 0 1px rgba(230,200,88,.4), 0 4px 18px rgba(230,200,88,.4); }
+        .tfa-stat-tile:hover { box-shadow: 0 0 0 1px rgba(230,200,88,.5), 0 4px 18px rgba(230,200,88,.4) !important; border-color: #E6C858 !important; }
+        .tfa-modal-tab:hover { box-shadow: 0 0 0 1px rgba(230,200,88,.5), 0 2px 10px rgba(230,200,88,.35) !important; }
+        .tfa-modal-tab:focus-visible, .tfa-stat-tile:focus-visible { outline: 2px solid #1D1D1D; outline-offset: 2px; }
         /* Sortable table headers — another spot that was clickable with no
            visual hint at all. */
         .tfa-sortable-th { transition: color .12s ease, box-shadow .12s ease; cursor: pointer; }
-        .tfa-sortable-th:hover { color: #1D1D1D; box-shadow: inset 0 -2px 0 rgba(230,200,88,.6); }
+        .tfa-sortable-th:hover { color: #1D1D1D; box-shadow: inset 0 -2px 0 rgba(230,200,88,.7); }
         @media (max-width: 560px) {
           .tfa-modal-grid { grid-template-columns: 1fr !important; }
         }

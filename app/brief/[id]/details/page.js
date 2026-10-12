@@ -7,7 +7,7 @@ import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { profileOfBrief, answersOfBrief } from '../../../../lib/formProfile';
 import { useBrief } from '../../../../components/useBrief';
-import { TONE_LABELS } from '../../../../components/flowData';
+import { TONE_LABELS, VARIATION_KINDS, parseVariationInfo } from '../../../../components/flowData';
 
 const MAX_TONES = 3;
 const TONE_ORDER = Object.keys(TONE_LABELS);
@@ -81,6 +81,8 @@ export default function DetailsPage({ params }) {
     cta: '', slogan: '', toneOfVoice: [], extraAnswers: {},
   });
   const [generating, setGenerating] = useState(false);
+  // What each requested variation is about (asked when the client wants variations).
+  const [varInfo, setVarInfo] = useState([]);
 
   // Hydrate from the brief once per id, not on every autosave echo — see the
   // long comment in contact/page.js's identical effect for why.
@@ -106,6 +108,7 @@ export default function DetailsPage({ params }) {
         toneOfVoice: tones,
         extraAnswers: answersOfBrief(brief),
       });
+      setVarInfo(parseVariationInfo(brief));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brief && brief.id]);
@@ -114,6 +117,12 @@ export default function DetailsPage({ params }) {
     const next = { ...form, [field]: value };
     setForm(next);
     schedulePatch({ [field]: field === 'toneOfVoice' || field === 'extraAnswers' ? JSON.stringify(value) : value });
+  }
+
+  function updateVar(i, partial) {
+    const next = varInfo.map((v, idx) => (idx === i ? { ...v, ...partial } : v));
+    setVarInfo(next);
+    schedulePatch({ variationDetail: JSON.stringify(next) });
   }
 
   function toggleTone(v) {
@@ -133,7 +142,7 @@ export default function DetailsPage({ params }) {
     setNavigating(true);
     flushPending();
     if (returnToOverview) {
-      await patch({ ...form, toneOfVoice: JSON.stringify(form.toneOfVoice), extraAnswers: JSON.stringify(form.extraAnswers) });
+      await patch({ ...form, variationDetail: JSON.stringify(varInfo), toneOfVoice: JSON.stringify(form.toneOfVoice), extraAnswers: JSON.stringify(form.extraAnswers) });
       router.push(`/brief/${id}/overview`);
       return;
     }
@@ -141,7 +150,7 @@ export default function DetailsPage({ params }) {
     // script drafts, emails the client a receipt and pings the team. The
     // client then waits on the status page until the scripts are released.
     setGenerating(true);
-    const saved = await patch({ ...form, toneOfVoice: JSON.stringify(form.toneOfVoice), extraAnswers: JSON.stringify(form.extraAnswers), submitted: true });
+    const saved = await patch({ ...form, variationDetail: JSON.stringify(varInfo), toneOfVoice: JSON.stringify(form.toneOfVoice), extraAnswers: JSON.stringify(form.extraAnswers), submitted: true });
     if (!saved) {
       setGenerating(false);
       setNavigating(false);
@@ -153,7 +162,9 @@ export default function DetailsPage({ params }) {
   const profile = profileOfBrief(brief);
   const hide = profile.hide;
   const extraQuestions = profile.extraQuestions;
-  const missingRequired = extraQuestions.some((q) => q.required && !String((form.extraAnswers || {})[q.key] || '').trim());
+  const wantsVariations = !!(brief && brief.needsVariations) && varInfo.length > 0;
+  const varMissing = wantsVariations && varInfo.some((v) => !v.kind || !String(v.detail || '').trim());
+  const missingRequired = varMissing || extraQuestions.some((q) => q.required && !String((form.extraAnswers || {})[q.key] || '').trim());
 
   if (showLoader) return <Preloader />;
   if (navigating) return generating ? <Preloader messages={sendPreloaderMessages(brief && brief.companyName)} /> : <Preloader />;
@@ -272,6 +283,42 @@ export default function DetailsPage({ params }) {
           Alleen invullen als er een tekst is die er om wettelijke of contractuele redenen letterlijk in moet staan. Deze
           tekst wordt woordelijk overgenomen in het script en blijft daarna overal zichtbaar, voor jou en voor TFA.
         </div>
+      </div>
+      )}
+
+      {wantsVariations && (
+      <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, color: '#1D1D1D' }}>
+          {varInfo.length > 1 ? 'Waar gaan je variaties over?' : 'Waar gaat je variatie over?'}
+        </div>
+        <div className="hint" style={{ margin: '4px 0 14px' }}>
+          Je koos voor {varInfo.length === 1 ? 'een variatie' : varInfo.length + ' variaties'} van de hoofdspot. Vertel kort wat er anders is, bijvoorbeeld een andere vestiging, website of actie, zodat onze copywriter er meteen een passende tekst voor schrijft.
+        </div>
+        {varInfo.map((v, i) => (
+          <div key={i} style={{ background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
+            {varInfo.length > 1 && (
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 8 }}>Variatie {i + 1}</div>
+            )}
+            <label className="field-label">Wat is er anders?</label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+              {Object.keys(VARIATION_KINDS).map((k) => (
+                <button key={k} type="button" className={'seg-btn' + (v.kind === k ? ' selected' : '')} style={{ flex: 'none' }} onClick={() => updateVar(i, { kind: k })}>{VARIATION_KINDS[k]}</button>
+              ))}
+            </div>
+            <label className="field-label">Vertel er kort meer over</label>
+            <textarea
+              style={{ minHeight: 56 }}
+              maxLength={400}
+              value={v.detail}
+              placeholder={v.kind === 'locatie' ? 'Bijv. filiaal in Zwolle, Diezerstraat 12' : v.kind === 'website' ? 'Bijv. de webshop voor zakelijke klanten: merk.nl/zakelijk' : v.kind === 'periode' ? 'Bijv. dezelfde spot, maar met Black Friday-aanbod' : 'Bijv. 20% korting op alle broodpakketten'}
+              onChange={(e) => updateVar(i, { detail: e.target.value })}
+            />
+            <div style={{ marginTop: 12 }}>
+              <label className="field-label">Wanneer wordt deze variatie uitgezonden? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+              <input type="text" maxLength={120} value={v.airing} placeholder="Bijv. week 48, rond Black Friday" onChange={(e) => updateVar(i, { airing: e.target.value })} />
+            </div>
+          </div>
+        ))}
       </div>
       )}
 

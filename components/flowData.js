@@ -181,6 +181,56 @@ export function variationsSummaryLabel(brief) {
   return n === 1 ? ' + 1x variatie' : ' + ' + n + 'x variaties';
 }
 
+
+// --- What each variation is about -----------------------------------------
+// Asked on the brief step (step 3) when the client wants variations, so TFA
+// already knows what differs (another branch, another website, another deal,
+// another air period ...). Stored as JSON in the existing variationDetail
+// column: [{ kind, detail, airing }], one entry per requested variation. A
+// plain (non-JSON) legacy string is treated as the detail of variation 1.
+export const VARIATION_KINDS = {
+  locatie: 'Andere vestiging of locatie',
+  website: 'Ander website of webadres',
+  aanbod: 'Ander aanbod of andere actie',
+  periode: 'Andere uitzendperiode (bijv. Black Friday)',
+  anders: 'Iets anders',
+};
+
+export function parseVariationInfo(brief) {
+  const count = variationsCountOf(brief);
+  let list = [];
+  const raw = brief && brief.variationDetail;
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) list = parsed;
+      else list = [{ kind: '', detail: String(raw), airing: '' }];
+    } catch (e) {
+      list = [{ kind: '', detail: String(raw), airing: '' }];
+    }
+  }
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const v = list[i] && typeof list[i] === 'object' ? list[i] : {};
+    out.push({
+      kind: VARIATION_KINDS[v.kind] ? v.kind : '',
+      detail: typeof v.detail === 'string' ? v.detail : '',
+      airing: typeof v.airing === 'string' ? v.airing : '',
+    });
+  }
+  return out;
+}
+
+// One human-readable line, e.g. "Andere vestiging of locatie: Filiaal Zwolle (uitzending: Black Friday)".
+export function variationInfoLabel(info) {
+  if (!info) return '';
+  const parts = [];
+  const head = [info.kind ? VARIATION_KINDS[info.kind] : '', info.detail].filter(Boolean).join(': ');
+  if (head) parts.push(head);
+  if (info.airing) parts.push('uitzending: ' + info.airing);
+  return parts.join(' · ');
+}
+
 // variationScripts holds one entry per requested variation — index i is
 // what a client (or producer, on the dashboard) actually approved/edited
 // for variation i+1, falling back to the main hoofdspot script wherever a
@@ -357,6 +407,24 @@ export function formatDateTime(iso) {
   if (isNaN(d.getTime())) return '';
   try {
     return new Intl.DateTimeFormat('nl-NL', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(d);
+  } catch (e) {
+    return iso;
+  }
+}
+
+// Compact timestamp for admin tables and lists ("11 okt, 12:24"; the year is
+// only added when it is not the current year). Shorter than formatDateTime
+// above on purpose: the dashboard table and the Team notes only need a quick
+// "when", not the full date.
+export function formatShortDateTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  try {
+    const sameYear = d.getFullYear() === new Date().getFullYear();
+    return new Intl.DateTimeFormat('nl-NL', {
+      day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }), hour: '2-digit', minute: '2-digit',
+    }).format(d).replace(/\./g, '');
   } catch (e) {
     return iso;
   }

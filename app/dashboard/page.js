@@ -27,14 +27,16 @@ export default async function DashboardPage() {
       <DashboardSidebar active="dashboard" unseenCount={isAgency ? 0 : unseenCount} role={viewer.role} />
 
       <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }} className="tfa-dash-main">
-        <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: '0 0 24px', color: '#1D1D1D', display: 'flex', alignItems: 'center', gap: 12 }}>
-          {isAgency ? viewer.agency.name : 'Dashboard'}
+        <header style={{ margin: '0 0 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <h1 style={{ fontWeight: 500, fontSize: 28, letterSpacing: '-.015em', lineHeight: 1.2, margin: 0, color: '#1D1D1D' }}>
+            {isAgency ? viewer.agency.name : 'Dashboard'}
+          </h1>
           {!isAgency && unseenCount > 0 && (
-            <span style={{ fontFamily: "'Geist', system-ui, sans-serif", fontSize: 13, fontWeight: 700, color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 8, padding: '4px 10px' }}>
+            <span style={{ fontSize: 12.5, fontWeight: 600, color: '#1D1D1D', background: '#E6C858', borderRadius: 999, padding: '3px 11px' }}>
               {unseenCount} nieuwe brief{unseenCount === 1 ? '' : 's'}
             </span>
           )}
-        </h1>
+        </header>
         <DashboardClient briefs={briefs} readOnly={isAgency} />
       </main>
 

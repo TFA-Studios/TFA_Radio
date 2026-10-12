@@ -6,7 +6,7 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { variationsCountOf, briefStageOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts, agencyNameOf } from '../../../../components/flowData';
+import { variationsCountOf, briefStageOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts, parseVariationInfo, variationInfoLabel, agencyNameOf } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
 
 function formatImpressions(brief) {
@@ -331,7 +331,7 @@ export default function OverviewPage({ params }) {
                 return (
                   <div key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
                     <div style={{ fontSize: 11.5, fontWeight: 600, color: '#5C5850', textTransform: 'uppercase' }}>
-                      {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{changed ? ': wat verschilt' : ''}
+                      {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{variationInfoLabel(parseVariationInfo(brief)[idx]) ? ' · ' + variationInfoLabel(parseVariationInfo(brief)[idx]) : ''}{changed ? ': wat verschilt' : ''}
                     </div>
                     {changed ? (
                       <div style={{ fontSize: 15, lineHeight: 1.7, marginTop: 6 }}>

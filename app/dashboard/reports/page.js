@@ -1,18 +1,21 @@
 import { requireStaffPage } from '../../../lib/access';
 import { listBriefs } from '../../../lib/db';
 import { buildReportData } from '../../../lib/reports';
+import PageHeader from '../../../components/PageHeader';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
 
 // Real, changing data — never statically cache this page.
 export const dynamic = 'force-dynamic';
 
-const cardStyle = { background: '#FFFFFF', borderRadius: 14, padding: '20px 22px', boxShadow: '0 1px 10px rgba(29,29,29,.05)' };
+const cardStyle = { background: '#FFFFFF', borderRadius: 12, padding: '16px 18px', border: '1px solid #D2CFC8', boxShadow: '0 1px 8px rgba(29,29,29,.07)' };
 
 function StatTile({ label, value, color }) {
   return (
     <div style={cardStyle}>
-      <div style={{ fontSize: 12, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</div>
-      <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 32, fontWeight: 600, marginTop: 6, color: color || '#1D1D1D' }}>
+      <div style={{ fontSize: 12.5, color: '#5C5850', display: 'flex', alignItems: 'center', gap: 7 }}>
+        {color && <span aria-hidden="true" style={{ width: 8, height: 8, borderRadius: 999, background: color, flex: 'none' }} />}{label}
+      </div>
+      <div style={{ fontSize: 30, fontWeight: 500, marginTop: 6, letterSpacing: '-.01em', color: '#1D1D1D' }}>
         {value}
       </div>
     </div>
@@ -63,7 +66,7 @@ function ToneLinksTable({ rows }) {
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: '#8C8880', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.03em' }}>
+              <tr style={{ textAlign: 'left', color: '#8C8880', fontSize: 11, }}>
                 <th style={{ padding: '0 10px 8px 0', fontWeight: 600 }}>Tone</th>
                 <th style={{ padding: '0 10px 8px 0', fontWeight: 600 }}>Briefs</th>
                 <th style={{ padding: '0 10px 8px 0', fontWeight: 600 }}>Populairste playlist</th>
@@ -102,7 +105,7 @@ function TrendCard({ months }) {
                 height: `${Math.max((m.count / max) * 84, m.count > 0 ? 6 : 2)}px`,
               }}
             />
-            <span style={{ fontSize: 11, color: '#5C5850', textTransform: 'uppercase' }}>{m.label}</span>
+            <span style={{ fontSize: 12, color: '#5C5850' }}>{m.label}</span>
           </div>
         ))}
       </div>
@@ -143,24 +146,20 @@ export default async function ReportsPage({ searchParams }) {
       <DashboardSidebar active="reports" />
 
       <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }} className="tfa-dash-main">
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 6, flexWrap: 'wrap' }}>
-          <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: 0, color: '#1D1D1D' }}>
-            Rapporten
-          </h1>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 0, flexWrap: 'wrap' }}>
+          <PageHeader title="Rapporten">
+            Hoeveel briefs er binnenkomen, waar ze in het proces staan en hoe de AI-scripts worden gebruikt. De CSV bevat elke brief als aparte rij.
+          </PageHeader>
           <a
             href={exportHref}
             style={{
               fontSize: 13, fontWeight: 600, color: '#1D1D1D', background: '#E6C858', textDecoration: 'none',
-              borderRadius: 10, padding: '10px 16px', whiteSpace: 'nowrap',
+              borderRadius: 999, padding: '10px 18px', whiteSpace: 'nowrap',
             }}
           >
             ⬇ Exporteer {hasRange ? 'deze periode' : 'alle briefs'} (CSV)
           </a>
         </div>
-        <p style={{ fontSize: 13.5, color: '#5C5850', margin: '0 0 16px', maxWidth: 720, lineHeight: 1.5 }}>
-          Een overzicht over al je briefs: hoeveel er binnenkomen, waar ze in het proces staan en hoe de AI-scriptgeneratie
-          wordt gebruikt. De CSV-export bevat elke brief als aparte rij, klaar om te openen in Excel of Google Sheets.
-        </p>
 
         {/* Custom date range — a plain GET form, no client JS needed: the
             browser re-navigates to this same page with ?from=&to= and the
@@ -169,18 +168,18 @@ export default async function ReportsPage({ searchParams }) {
           method="get"
           style={{
             display: 'flex', alignItems: 'flex-end', gap: 10, flexWrap: 'wrap', marginBottom: 24,
-            background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', boxShadow: '0 1px 10px rgba(29,29,29,.05)',
+            background: '#FFFFFF', borderRadius: 8, padding: '14px 16px', border: '1px solid #D2CFC8',
           }}
         >
           <div>
-            <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Van</label>
+            <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: '#1D1D1D', marginBottom: 4 }}>Van</label>
             <input type="date" name="from" defaultValue={from} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
           </div>
           <div>
-            <label style={{ display: 'block', fontSize: 10.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Tot</label>
+            <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: '#1D1D1D', marginBottom: 4 }}>Tot</label>
             <input type="date" name="to" defaultValue={to} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
           </div>
-          <button type="submit" style={{ border: 'none', borderRadius: 8, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600, padding: '9px 16px', cursor: 'pointer' }}>
+          <button type="submit" style={{ border: 'none', borderRadius: 999, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600, padding: '9px 18px', cursor: 'pointer' }}>
             Periode toepassen
           </button>
           {hasRange && (
@@ -233,7 +232,7 @@ export default async function ReportsPage({ searchParams }) {
         </div>
 
         <div style={{ margin: '24px 0 6px' }}>
-          <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 20, margin: '0 0 4px', color: '#1D1D1D' }}>
+          <h2 style={{ fontWeight: 500, fontSize: 18, margin: '0 0 4px', color: '#1D1D1D' }}>
             Muziek & stem
           </h2>
           <p style={{ fontSize: 12.5, color: '#5C5850', margin: 0, maxWidth: 720, lineHeight: 1.5 }}>

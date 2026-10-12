@@ -79,16 +79,16 @@ export default async function HelpPage() {
         </nav>
 
         <div style={{ flex: 1, minWidth: 0, maxWidth: 760 }}>
-          <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 30, margin: '0 0 6px', color: '#1D1D1D' }}>
+          <h1 style={{ fontWeight: 500, fontSize: 28, letterSpacing: '-.015em', margin: '0 0 6px', color: '#1D1D1D' }}>
             Help & uitleg
           </h1>
-          <p style={{ fontSize: 13, color: '#8C8880', margin: '0 0 32px' }}>
+          <p style={{ fontSize: 14, color: '#5C5850', margin: '0 0 32px' }}>
             Uitleg over hoe SpotFlow in elkaar zit — voor iedereen op het team, ook zonder technische achtergrond. Laatst bijgewerkt: {HELP_LAST_UPDATED}.
           </p>
 
           {HELP_SECTIONS.map((section) => (
             <section key={section.id} id={section.id} style={{ marginBottom: 40, scrollMarginTop: 24 }}>
-              <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 21, margin: '0 0 14px', color: '#1D1D1D', paddingBottom: 10, borderBottom: '1px solid #C9C5B9' }}>
+              <h2 style={{ fontWeight: 500, fontSize: 21, letterSpacing: '-.01em', margin: '0 0 14px', color: '#1D1D1D', paddingBottom: 10, borderBottom: '1px solid #C9C5B9' }}>
                 {section.title}
               </h2>
               {section.blocks.map((block, i) => (

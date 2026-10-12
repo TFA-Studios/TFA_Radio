@@ -39,6 +39,8 @@ export default function ScriptPage({ params }) {
   // resolves — see the identical comment in contact/page.js.
   const [navigating, setNavigating] = useState(false);
   const [scriptText, setScriptText] = useState('');
+  // The text as last saved on the server — drives the explicit "Wijziging opslaan" button.
+  const [savedValue, setSavedValue] = useState('');
   // Same "✓ Opgeslagen" confirmation the variations subpage also uses for
   // its own textareas — this used to save silently on every debounced edit
   // with no visible feedback at all, which is exactly why a client could
@@ -112,7 +114,7 @@ export default function ScriptPage({ params }) {
     if (!brief) return;
     const generatedText = brief.generatedScript || '';
     const text = brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript : generatedText;
-    if (!scriptFocused.current && !scriptSavePending.current) setScriptText(text);
+    if (!scriptFocused.current && !scriptSavePending.current) { setScriptText(text); setSavedValue(text); }
   }, [brief]);
 
   function scheduleScriptSave(value) {
@@ -126,6 +128,7 @@ export default function ScriptPage({ params }) {
       })
         .then((res) => {
           if (!res.ok) return;
+          setSavedValue(value);
           setScriptSavedFlash(true);
           clearTimeout(scriptSavedFlashTimer.current);
           scriptSavedFlashTimer.current = setTimeout(() => setScriptSavedFlash(false), 2000);
@@ -135,6 +138,27 @@ export default function ScriptPage({ params }) {
           scriptSavePending.current = false;
         });
     }, 350);
+  }
+
+  // Explicit "save my edit" — same save as the automatic one, just immediate,
+  // so it is obvious the edit has been kept. It does not approve anything.
+  async function saveEditNow() {
+    clearTimeout(saveTimer.current);
+    scriptSavePending.current = true;
+    try {
+      const res = await fetch(`/api/briefs/${id}/edit`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ editedScript: scriptText }),
+      });
+      if (res.ok) {
+        setSavedValue(scriptText);
+        setScriptSavedFlash(true);
+        clearTimeout(scriptSavedFlashTimer.current);
+        scriptSavedFlashTimer.current = setTimeout(() => setScriptSavedFlash(false), 2500);
+      }
+    } catch (e) {}
+    scriptSavePending.current = false;
   }
 
   function onScriptChange(e) {
@@ -230,10 +254,13 @@ export default function ScriptPage({ params }) {
   const barPct = Math.min((seconds / target) * 100, 140) + '%';
   const unchanged = trimmed === generatedText.trim();
 
+  // The big button only ever means "approve and go on" (it also keeps any
+  // pending edit). Saving an edit has its own small button under the text box.
+  const dirty = trimmed !== (savedValue || '').trim();
   let approveLabel;
-  if (!hasVariation) approveLabel = returnToOverview ? 'Wijzigingen opslaan: terug naar overzicht' : (unchanged ? 'Goedkeuren, dit is prima zo' : 'Wijzigingen opslaan en goedkeuren');
-  else if (!scriptApproved) approveLabel = unchanged ? 'Goedkeuren en verder naar de variatie' + (variationCount > 1 ? 's' : '') : 'Wijzigingen opslaan en verder naar de variatie' + (variationCount > 1 ? 's' : '');
-  else approveLabel = unchanged ? 'Goedgekeurd ✓: bekijk je variatie' + (variationCount > 1 ? 's' : '') : 'Wijzigingen opslaan';
+  if (!hasVariation) approveLabel = returnToOverview ? 'Terug naar overzicht' : 'Goedkeuren en verder naar de stem';
+  else if (!scriptApproved) approveLabel = 'Goedkeuren en verder naar de variatie' + (variationCount > 1 ? 's' : '');
+  else approveLabel = 'Verder naar de variatie' + (variationCount > 1 ? 's' : '') + ' →';
 
   return (
     <StepShell
@@ -323,8 +350,8 @@ export default function ScriptPage({ params }) {
         <h3 style={{ fontSize: 14, fontWeight: 600, margin: '6px 0 4px' }}>Wil je iets aanpassen?</h3>
         <p style={{ fontSize: 12.5, color: '#5C5850', margin: '0 0 10px', lineHeight: 1.5 }}>
           Dit vak hieronder is van jou: typ er zelf in om woorden toe te voegen, te wijzigen of te verwijderen, precies
-          zoals je zelf een tekstbericht zou aanpassen. Alles wat je typt wordt automatisch bewaard, je hoeft dus nergens
-          apart op &ldquo;opslaan&rdquo; te klikken. Let er wel op dat het script in {spotLength} seconden moet blijven passen.
+          zoals je zelf een tekstbericht zou aanpassen. Alles wat je typt wordt automatisch bewaard; met &ldquo;Aanpassing
+          opslaan&rdquo; onder het vak zie je meteen dat het is vastgelegd. Goedkeuren doe je pas met de grote knop onderaan. Let er wel op dat het script in {spotLength} seconden moet blijven passen.
         </p>
         <textarea
           style={{ minHeight: 130 }}
@@ -333,12 +360,19 @@ export default function ScriptPage({ params }) {
           onBlur={() => { scriptFocused.current = false; }}
           onChange={onScriptChange}
         />
-        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: scriptSavedFlash ? '#1D7A46' : '#9C9890' }}>
-          {scriptSavedFlash ? (
-            <>✓ Opgeslagen</>
-          ) : (
-            <>Wordt automatisch opgeslagen terwijl je typt</>
-          )}
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+          <div style={{ fontSize: 12, color: scriptSavedFlash || !dirty ? '#1D7A46' : '#9C9890' }}>
+            {scriptSavedFlash ? '✓ Je aanpassing is opgeslagen' : dirty ? 'Wordt automatisch opgeslagen terwijl je typt' : '✓ Alles is opgeslagen'}
+          </div>
+          <button
+            type="button"
+            className="ghost-btn"
+            disabled={!dirty}
+            onClick={saveEditNow}
+            style={{ width: 'auto', flex: 'none', padding: '6px 14px', fontSize: 12.5, opacity: dirty ? 1 : 0.5 }}
+          >
+            Aanpassing opslaan
+          </button>
         </div>
         <div style={{ marginTop: 12 }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5C5850' }}>
@@ -365,21 +399,6 @@ export default function ScriptPage({ params }) {
         )}
         <button type="button" className="btn-primary" disabled={!hasGenerated} onClick={approveAndContinue}>{approveLabel}</button>
       </div>
-
-      {hasVariation && scriptApproved && (
-        <div style={{ marginTop: 30, padding: '16px 18px', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 12.5, color: '#5C5850' }}>
-            Script goedgekeurd. Je variatie{variationCount > 1 ? 's staan' : ' staat'} klaar om aan te passen.
-          </div>
-          <a
-            href={`/brief/${id}/script/variations`}
-            className="btn-primary"
-            style={{ display: 'inline-flex', alignItems: 'center', textDecoration: 'none', whiteSpace: 'nowrap', padding: '11px 20px', flex: 'none' }}
-          >
-            Bekijk variatie{variationCount > 1 ? 's' : ''} →
-          </a>
-        </div>
-      )}
 
       <p style={{ marginTop: 20, fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>
         Je krijgt na deze stap nog één moment om het script bij te stellen, voordat de opname start.
