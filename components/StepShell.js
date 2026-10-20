@@ -396,7 +396,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
             {bigNum}
           </div>
         ) : null}
-        <div style={{ position: 'relative', zIndex: 1, maxWidth: 880 }}>
+        <div style={{ position: 'relative', zIndex: 1 }}>
           {/* The sidebar links are hidden on the slim mobile rail, so phones get
               this small one at the top of the page instead. */}
           <Link href="/" onClick={(e) => askLeave(e, '/')} className="tfa-home-link-mobile">⌂ Homepage</Link>
