@@ -202,12 +202,22 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
   // they want a way back in later.
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [leaveCopyState, setLeaveCopyState] = useState('idle');
+  // Where "leave" goes: the homepage, or a fresh brief (/start, with this
+  // brief's own access code filled in so an agency client isn't asked for it
+  // again). Every way out of the flow (logo, the "Naar de homepage" and
+  // "Nieuwe brief starten" links) goes through the same confirm below.
+  const [leaveTarget, setLeaveTarget] = useState('/');
+  const startHref = brief && brief.agencyCode ? '/start?code=' + encodeURIComponent(brief.agencyCode) : '/start';
 
-  function handleLogoClick(e) {
+  function askLeave(e, target) {
     if (current > 1) {
       e.preventDefault();
+      setLeaveTarget(target);
       setShowLeaveConfirm(true);
     }
+  }
+  function handleLogoClick(e) {
+    askLeave(e, '/');
   }
 
   async function copyLeaveLink() {
@@ -359,11 +369,17 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
             mobile rail (there's no room, and it's not step-navigation) —
             autosave still runs exactly the same either way, the client just
             can't copy/email the resume link from here on a small screen. */}
-        {brief && briefId && (
-          <div className="tfa-sidebar-extra" style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #33301F' }}>
-            <ResumeCard briefId={briefId} defaultEmail={brief.contactEmail} />
+        <div className="tfa-sidebar-extra" style={{ marginTop: 'auto', paddingTop: 20, borderTop: '1px solid #33301F' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: brief && briefId ? 14 : 0 }}>
+            <Link href="/" onClick={(e) => askLeave(e, '/')} className="tfa-sidebar-link">
+              <span aria-hidden="true" className="tfa-sidebar-link-icon">⌂</span> Naar de homepage
+            </Link>
+            <Link href={startHref} onClick={(e) => askLeave(e, startHref)} className="tfa-sidebar-link">
+              <span aria-hidden="true" className="tfa-sidebar-link-icon">↺</span> Nieuwe brief starten
+            </Link>
           </div>
-        )}
+          {brief && briefId && <ResumeCard briefId={briefId} defaultEmail={brief.contactEmail} />}
+        </div>
       </div>
 
       <div
@@ -380,7 +396,10 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
             {bigNum}
           </div>
         ) : null}
-        <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 880 }}>
+          {/* The sidebar links are hidden on the slim mobile rail, so phones get
+              this small one at the top of the page instead. */}
+          <Link href="/" onClick={(e) => askLeave(e, '/')} className="tfa-home-link-mobile">⌂ Homepage</Link>
           {backHref ? (
             <div style={{ marginBottom: 18 }}>
               <Link href={backHref} style={{ fontSize: 12, color: '#8C8880', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
@@ -424,10 +443,11 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
               ×
             </button>
             <h3 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 19, margin: '0 26px 10px 0', color: '#1D1D1D' }}>
-              Terug naar de homepage?
+              {leaveTarget === '/' ? 'Terug naar de homepage?' : 'Een nieuwe brief starten?'}
             </h3>
             <p style={{ fontSize: 13, lineHeight: 1.6, color: '#5C5850', margin: '0 0 22px' }}>
-              Je voortgang is al automatisch opgeslagen. Kopieer de link om later verder te gaan, of ga direct terug naar de homepage.
+              Je voortgang is al automatisch opgeslagen. Kopieer de link om later verder te gaan met deze brief
+              {leaveTarget === '/' ? ', of ga direct terug naar de homepage.' : '. Wil je een nieuwe brief beginnen? Dan blijft deze brief gewoon bewaard onder de link.'}
             </p>
             {/* Both actions share one button style — same size, padding and
                 weight — instead of borrowing the app-wide .btn-primary
@@ -446,7 +466,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
                 {leaveCopyState === 'copied' ? '✓ Link gekopieerd' : leaveCopyState === 'error' ? 'Kon niet kopiëren' : 'Kopieer link om later verder te gaan'}
               </button>
               <Link
-                href="/"
+                href={leaveTarget}
                 style={{
                   border: '1px solid #C9C5B9', borderRadius: 10, background: 'transparent', color: '#5C5850',
                   fontFamily: "'Geist', system-ui, sans-serif", fontWeight: 600, fontSize: 13.5,
@@ -454,7 +474,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
                   textDecoration: 'none', display: 'block', boxSizing: 'border-box',
                 }}
               >
-                Ga toch naar de homepage
+                {leaveTarget === '/' ? 'Ga toch naar de homepage' : 'Ga naar een nieuwe brief'}
               </Link>
             </div>
           </div>
@@ -641,6 +661,20 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
         /* "Kopieer link" / "E-mail mij de link" — same glow language as the
            step rows above, on the two dark-sidebar buttons that had no
            hover state at all before. */
+        .tfa-sidebar-link {
+          display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-radius: 6px;
+          font-size: 13px; color: #B9B6AC; text-decoration: none; transition: background .12s ease, color .12s ease;
+        }
+        .tfa-sidebar-link-icon { display: inline-block; width: 14px; text-align: center; }
+        .tfa-sidebar-link:hover { background: rgba(255,255,255,.07); color: #FFFFFF; }
+        .tfa-sidebar-link:focus-visible { outline: 2px solid #E6C858; outline-offset: 2px; }
+        .tfa-home-link-mobile { display: none; }
+        @media (max-width: 900px) {
+          .tfa-home-link-mobile {
+            display: inline-block; position: absolute; top: -14px; right: 0; font-size: 12px; color: #5C5850;
+            text-decoration: none; padding: 6px 10px; border: 1px solid #C9C5B9; border-radius: 999px; background: #FFFFFF;
+          }
+        }
         .tfa-sidebar-mini-btn { transition: box-shadow .12s ease, border-color .12s ease; }
         .tfa-sidebar-mini-btn:hover { box-shadow: 0 0 0 1px rgba(230,200,88,.5), 0 0 12px rgba(230,200,88,.35); border-color: #E6C858; }
       `}</style>

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { rateLimit, clientIp, tooManyRequests } from '../../../../../lib/rateLimit';
 import { getBrief } from '../../../../../lib/db';
 import { sendResumeLinkEmail } from '../../../../../lib/email';
 
@@ -13,6 +14,12 @@ import { sendResumeLinkEmail } from '../../../../../lib/email';
 // the link.
 export async function POST(request, { params }) {
   const { id } = params;
+  // This sends an email to an address the caller types: keep it from being used
+  // to spam someone (5 / 10 min per address+brief, 20 / 10 min per address).
+  const ip = clientIp(request);
+  const rl = rateLimit('resume:' + ip + ':' + id, 5, 600000);
+  const rl2 = rateLimit('resume-ip:' + ip, 20, 600000);
+  if (!rl.ok || !rl2.ok) return tooManyRequests(Math.max(rl.retryAfter, rl2.retryAfter));
   const brief = await getBrief(id);
   if (!brief) return NextResponse.json({ error: 'not-found' }, { status: 404 });
 

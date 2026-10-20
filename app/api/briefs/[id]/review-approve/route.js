@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { toPublicBrief } from '../../../../../lib/publicBrief';
 import { approveReview, markAdminNotified } from '../../../../../lib/db';
 import { notifyDelivered } from '../../../../../lib/slack';
 
@@ -35,5 +36,5 @@ export async function POST(request, { params }) {
     console.error('[api/briefs/:id/review-approve] markAdminNotified failed:', err && err.message);
   }
 
-  return NextResponse.json(updated);
+  return NextResponse.json(toPublicBrief(updated));
 }

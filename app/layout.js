@@ -30,6 +30,13 @@ const fontLink = (
 
 const baseStyle = (
   <style>{`
+    /* Shared design tokens — reference these in new styles instead of
+       hard-coding another radius / grey / gold. */
+    :root {
+      --tfa-gold: #E6C858; --tfa-ink: #1D1D1D; --tfa-ink-2: #5C5850; --tfa-ink-3: #8C8880;
+      --tfa-line: #E3E0D5; --tfa-line-strong: #C9C5B9; --tfa-surface: #FFFFFF; --tfa-surface-tint: #FBF9EC;
+      --tfa-radius-sm: 8px; --tfa-radius: 10px; --tfa-radius-lg: 12px;
+    }
     * { box-sizing: border-box; }
     html, body { margin: 0; background: #DEDCD7; }
     body { font-family: 'Geist', system-ui, sans-serif; color: #1D1D1D; }
@@ -85,6 +92,9 @@ const baseStyle = (
     .field-grid .full { grid-column: 1 / -1; }
     label.check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #1D1D1D; cursor: pointer; }
     label.check input { width: 16px; height: 16px; accent-color: #E6C858; cursor: pointer; }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
     @media (max-width: 700px) {
       .field-grid { grid-template-columns: 1fr; }
     }

@@ -27,6 +27,13 @@ export async function PATCH(request, { params }) {
   // unchecked brief" highlight on the list disappears. Never a way to
   // un-seen a brief from the client, deliberately.
   if (body && body.seen === true) patch.seen = true;
+  // The producer fixes the real first live date once it is known (the client
+  // often only knows a month when filling in the form). Empty string clears it.
+  if (Object.prototype.hasOwnProperty.call(body || {}, 'airDate')) {
+    const d = typeof body.airDate === 'string' ? body.airDate.trim() : '';
+    if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d)) return NextResponse.json({ error: 'invalid_date' }, { status: 400 });
+    patch.airDate = d;
+  }
 
   // Read the brief before the update so an assignedTo change can be
   // detected — the assignment email should fire only when it actually

@@ -7,7 +7,7 @@ import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { profileOfBrief, answersOfBrief } from '../../../../lib/formProfile';
 import { useBrief } from '../../../../components/useBrief';
-import { TONE_LABELS, VARIATION_KINDS, parseVariationInfo } from '../../../../components/flowData';
+import { TONE_LABELS, VARIATION_KINDS, parseVariationInfo, parseGenderSplit, describeGenderSplit } from '../../../../components/flowData';
 
 const MAX_TONES = 3;
 const TONE_ORDER = Object.keys(TONE_LABELS);
@@ -37,6 +37,7 @@ const FIELD_LIMITS = {
   product: 1200,
   decisionMaker: 200,
   audienceAgeInterests: 1000,
+  genderSplit: 60,
   usp: 1200,
   priceDetail: 150,
   mainMessage: 1200,
@@ -76,7 +77,7 @@ export default function DetailsPage({ params }) {
   // navigation actually happened. Now the preloader takes over immediately.
   const [navigating, setNavigating] = useState(false);
   const [form, setForm] = useState({
-    disclaimerText: '', product: '', audience: 'b2b', decisionMaker: '',
+    disclaimerText: '', product: '', audience: 'b2b', audienceBoth: '', genderSplit: '', decisionMaker: '',
     audienceAgeInterests: '', usp: '', price: null, priceDetail: '', mainMessage: '',
     cta: '', slogan: '', toneOfVoice: [], extraAnswers: {},
   });
@@ -97,6 +98,8 @@ export default function DetailsPage({ params }) {
         disclaimerText: brief.disclaimerText || '',
         product: brief.product || '',
         audience: brief.audience || 'b2b',
+        audienceBoth: brief.audienceBoth || '',
+        genderSplit: brief.genderSplit || '',
         decisionMaker: brief.decisionMaker || '',
         audienceAgeInterests: brief.audienceAgeInterests || '',
         usp: brief.usp || '',
@@ -160,6 +163,7 @@ export default function DetailsPage({ params }) {
   }
 
   const profile = profileOfBrief(brief);
+  const genderRead = parseGenderSplit(form.genderSplit);
   const hide = profile.hide;
   const extraQuestions = profile.extraQuestions;
   const wantsVariations = !!(brief && brief.needsVariations) && varInfo.length > 0;
@@ -184,19 +188,70 @@ export default function DetailsPage({ params }) {
           <button type="button" className={'seg-btn' + (form.audience === 'b2b' ? ' selected' : '')} onClick={() => update('audience', 'b2b')}>Vooral bedrijven (B2B)</button>
           <button type="button" className={'seg-btn' + (form.audience === 'b2c' ? ' selected' : '')} onClick={() => update('audience', 'b2c')}>Vooral consumenten (B2C)</button>
         </div>
-        {form.audience === 'b2b' ? (
-          <div style={{ marginTop: 12 }}>
-            <label className="field-label">Wie neemt daar de beslissing?</label>
+        {/* Deliberately low-key: a commercial aimed at everyone is aimed at no
+            one, so "both" is available but not promoted. */}
+        {form.audience !== 'both' ? (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#8C8880' }}>
+            Heb je echt beide doelgroepen nodig?{' '}
+            <button type="button" onClick={() => update('audience', 'both')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#5C5850', textDecoration: 'underline', cursor: 'pointer' }}>
+              Kies dan beide
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginTop: 12, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '12px 14px' }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#1D1D1D' }}>Je koos voor bedrijven én consumenten</div>
+            <div className="hint" style={{ margin: '3px 0 10px' }}>
+              Dat kan. Een commercial die zich op één doelgroep richt werkt meestal wel sterker. Vertel ons hoe je het wilt aanpakken:
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <button type="button" className={'seg-btn' + (form.audienceBoth === 'whole' ? ' selected' : '')} style={{ textAlign: 'left' }} onClick={() => update('audienceBoth', 'whole')}>
+                Eén commercial die beide doelgroepen aanspreekt
+              </button>
+              <button type="button" className={'seg-btn' + (form.audienceBoth === 'variations' ? ' selected' : '')} style={{ textAlign: 'left' }} onClick={() => update('audienceBoth', 'variations')}>
+                De hoofdspot blijft gelijk, het verschil zit in de variaties
+              </button>
+            </div>
+            {form.audienceBoth === 'variations' && !(brief && brief.needsVariations) && (
+              <div className="hint" style={{ marginTop: 8 }}>
+                Dan heb je variaties nodig. Je kunt die op de vorige stap kiezen (&ldquo;Terug naar levering&rdquo;); anders spreken we dit nog met je door.
+              </div>
+            )}
+            <div style={{ marginTop: 8 }}>
+              <button type="button" onClick={() => update('audience', 'b2b')} style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: '#8C8880', textDecoration: 'underline', cursor: 'pointer' }}>
+                Toch liever één doelgroep kiezen
+              </button>
+            </div>
+          </div>
+        )}
+        {(form.audience === 'b2b' || form.audience === 'both') && (
+          <div style={{ marginTop: 18 }}>
+            <label className="field-label">Zakelijk: wie neemt daar de beslissing?</label>
             <input type="text" maxLength={FIELD_LIMITS.decisionMaker} value={form.decisionMaker} placeholder="Bijv. IT-directeur, inkoopmanager" onChange={(e) => update('decisionMaker', e.target.value)} />
             <CharCount field="decisionMaker" value={form.decisionMaker} />
           </div>
-        ) : (
-          <div style={{ marginTop: 12 }}>
-            <label className="field-label">Leeftijd en interesses van je doelgroep</label>
+        )}
+        {(form.audience === 'b2c' || form.audience === 'both') && (
+          <div style={{ marginTop: 18 }}>
+            <label className="field-label">Consumenten: leeftijd en interesses van je doelgroep</label>
             <input type="text" maxLength={FIELD_LIMITS.audienceAgeInterests} value={form.audienceAgeInterests} placeholder="Bijv. 30–50 jaar, gezinnen" onChange={(e) => update('audienceAgeInterests', e.target.value)} />
             <CharCount field="audienceAgeInterests" value={form.audienceAgeInterests} />
           </div>
         )}
+        <div style={{ marginTop: 18 }}>
+          <label className="field-label">Verdeling man / vrouw <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+          <input type="text" maxLength={FIELD_LIMITS.genderSplit} value={form.genderSplit} placeholder="Bijv. man / vrouw - 30 / 70" onChange={(e) => update('genderSplit', e.target.value)} />
+          {!form.genderSplit.trim() ? (
+            <div className="hint" style={{ marginTop: 5 }}>Weet je hoe je doelgroep verdeeld is? Schrijf het gewoon op, bijvoorbeeld &ldquo;man / vrouw - 30 / 70&rdquo;: dat betekent 30% mannen en 70% vrouwen.</div>
+          ) : genderRead && genderRead.off ? (
+            <div style={{ fontSize: 11.5, color: '#8C6D1F', marginTop: 5 }}>De percentages tellen niet op tot 100. Klopt dat zo? Je kunt het gewoon laten staan.</div>
+          ) : genderRead ? (
+            <div style={{ fontSize: 12, color: '#1D7A46', marginTop: 5 }}>
+              We lezen dit als: <b>{describeGenderSplit(form.genderSplit)}</b>.{genderRead.assumed ? ' (Zonder man/vrouw erbij gaan we uit van man eerst, dan vrouw.)' : ''}
+            </div>
+          ) : (
+            <div style={{ fontSize: 11.5, color: '#8C8880', marginTop: 5 }}>We nemen dit over zoals je het schrijft.</div>
+          )}
+        </div>
       </div>
       )}
 
@@ -310,7 +365,7 @@ export default function DetailsPage({ params }) {
               style={{ minHeight: 56 }}
               maxLength={400}
               value={v.detail}
-              placeholder={v.kind === 'locatie' ? 'Bijv. filiaal in Zwolle, Diezerstraat 12' : v.kind === 'website' ? 'Bijv. de webshop voor zakelijke klanten: merk.nl/zakelijk' : v.kind === 'periode' ? 'Bijv. dezelfde spot, maar met Black Friday-aanbod' : 'Bijv. 20% korting op alle broodpakketten'}
+              placeholder={v.kind === 'locatie' ? 'Bijv. filiaal in Zwolle, Diezerstraat 12' : v.kind === 'website' ? 'Bijv. de webshop voor zakelijke klanten: merk.nl/zakelijk' : v.kind === 'periode' ? 'Bijv. dezelfde spot, maar met Black Friday-aanbod' : v.kind === 'doelgroep' ? 'Bijv. deze variatie richt zich op zakelijke klanten in plaats van consumenten' : 'Bijv. 20% korting op alle broodpakketten'}
               onChange={(e) => updateVar(i, { detail: e.target.value })}
             />
             <div style={{ marginTop: 12 }}>

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import { rateLimit, clientIp, tooManyRequests } from '../../../lib/rateLimit';
+import { toPublicBrief } from '../../../lib/publicBrief';
 import { nanoid } from 'nanoid';
 import { createBrief, findAgencyByCode } from '../../../lib/db';
 
@@ -23,6 +25,9 @@ function legacyCodeOk(bodyCode) {
 }
 
 export async function POST(request) {
+  // Public endpoint: cap how many briefs one address can create (30 / 10 min).
+  const rl = rateLimit('create:' + clientIp(request), 30, 600000);
+  if (!rl.ok) return tooManyRequests(rl.retryAfter);
   let bodyCode;
   try {
     const body = await request.json();
@@ -39,7 +44,7 @@ export async function POST(request) {
 
   const id = nanoid(12);
   const brief = await createBrief(id, agency);
-  return NextResponse.json(brief, { status: 201 });
+  return NextResponse.json(toPublicBrief(brief), { status: 201 });
 }
 
 // NOTE: there used to be a public GET here that returned every client's brief.

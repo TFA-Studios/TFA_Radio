@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  poweredByHeader: false,
   reactStrictMode: true,
   // pdfkit (used by lib/briefPdf.js for the dashboard's "Download PDF"
   // button) ships its built-in font metrics as .afm files that it reads
@@ -19,5 +20,20 @@ const nextConfig = {
     },
   },
 };
+
+// Conservative security headers for every response. Deliberately no
+// Content-Security-Policy: Clerk, Google Fonts and Vercel Blob load from several
+// origins, and a wrong CSP breaks sign-in; add one only with a staging test.
+nextConfig.headers = async () => [
+  {
+    source: '/:path*',
+    headers: [
+      { key: 'X-Content-Type-Options', value: 'nosniff' },
+      { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+      { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+      { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=()' },
+    ],
+  },
+];
 
 module.exports = nextConfig;

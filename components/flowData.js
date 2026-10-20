@@ -114,12 +114,8 @@ export const MONTH_NAMES_LOWER = MONTH_NAMES.map((m) => m.toLowerCase());
 export function formatAirDate(brief) {
   if (!brief) return 'Nog niet opgegeven';
   if (brief.dateUnknown) {
-    if (brief.airMonth) {
-      const idx = parseInt(brief.airMonth, 10) - 1;
-      const name = MONTH_NAMES_LOWER[idx];
-      return name ? 'Nog niet exact bekend, gepland voor ' + name : 'Nog niet bekend';
-    }
-    return 'Nog niet bekend';
+    const label = airMonthLabel(brief);
+    return label ? 'Nog niet exact bekend, gepland voor ' + label : 'Nog niet bekend';
   }
   if (brief.airDate) {
     const d = new Date(brief.airDate + 'T00:00:00');
@@ -127,6 +123,199 @@ export function formatAirDate(brief) {
     return brief.airDate;
   }
   return 'Nog niet opgegeven';
+}
+
+// The rough month a client gave when they don't know the exact live date yet.
+// New briefs store 'YYYY-MM' (so a campaign planned for March 2027 can be
+// entered in November 2026); older briefs only stored the month number of
+// the year they were created in.
+export function airMonthLabel(brief) {
+  const raw = brief && brief.airMonth ? String(brief.airMonth) : '';
+  if (!raw) return '';
+  let year = null;
+  let month = null;
+  const m = raw.match(/^(\d{4})-(\d{1,2})$/);
+  if (m) { year = parseInt(m[1], 10); month = parseInt(m[2], 10); }
+  else if (/^\d{1,2}$/.test(raw)) {
+    month = parseInt(raw, 10);
+    const created = brief.createdAt ? new Date(brief.createdAt) : null;
+    year = created && !isNaN(created.getTime()) ? created.getFullYear() : null;
+  }
+  const name = month ? MONTH_NAMES_LOWER[month - 1] : '';
+  if (!name) return '';
+  return name + (year ? ' ' + year : '');
+}
+
+// Month choices for "I don't know the exact date yet": this month and the
+// next 17, each with its year, as { value: 'YYYY-MM', label: 'Maart 2027' }.
+export function upcomingMonthOptions(count = 18, from = new Date()) {
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(from.getFullYear(), from.getMonth() + i, 1);
+    out.push({ value: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'), label: MONTH_NAMES[d.getMonth()] + ' ' + d.getFullYear() });
+  }
+  return out;
+}
+
+// --- Impressions: free text, understood -----------------------------------
+// Clients type whatever feels natural: "500.000", "500000", "500k",
+// "1,5 miljoen", "2 mln", "750 duizend". Returns { value, ok }: value is the
+// whole number (or null when nothing sensible could be read).
+export function parseImpressions(text) {
+  let t = String(text || '').toLowerCase().trim();
+  if (!t) return { value: null, ok: false, empty: true };
+  t = t.replace(/(impressies|impressions|imps|stuks|ongeveer|circa|ca\.?|approx|~|±|€)/g, ' ').replace(/\s+/g, ' ').trim();
+  let mult = 1;
+  const suf = t.match(/^([\d.,'\s]+?)\s*(k|duizend|dzd|m|mln|mio|miljoen|million|mil)\.?$/);
+  let numPart = t;
+  if (suf) {
+    numPart = suf[1].trim();
+    mult = /^(k|duizend|dzd)$/.test(suf[2]) ? 1000 : 1000000;
+  }
+  if (!/^\d[\d.,'\s]*$/.test(numPart)) return { value: null, ok: false };
+  let n;
+  if (mult > 1) {
+    // "1,5 miljoen" / "1.5m" / "2 mln": the separator is a decimal point here.
+    const cleaned = numPart.replace(/[\s']/g, '');
+    const seps = (cleaned.match(/[.,]/g) || []).length;
+    if (seps > 1 && !/^\d{1,3}([.,]\d{3})+$/.test(cleaned)) return { value: null, ok: false };
+    n = /^\d{1,3}([.,]\d{3})+$/.test(cleaned) ? parseFloat(cleaned.replace(/[.,]/g, '')) : parseFloat(cleaned.replace(',', '.'));
+  } else {
+    // Without a suffix a separator followed by exactly three digits is a thousands separator.
+    const cleaned = numPart.replace(/[\s']/g, '');
+    if (/^\d+$/.test(cleaned)) n = parseInt(cleaned, 10);
+    else if (/^\d{1,3}([.,]\d{3})+$/.test(cleaned)) n = parseInt(cleaned.replace(/[.,]/g, ''), 10);
+    else return { value: null, ok: false };
+  }
+  if (!isFinite(n) || n <= 0) return { value: null, ok: false };
+  const value = Math.round(n * mult);
+  if (value < 1000 || value > 5000000000) return { value, ok: false, implausible: true };
+  return { value, ok: true };
+}
+
+export function formatNumberNl(n) {
+  return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+}
+
+// Numeric value of a brief's impressions: new briefs store the parsed whole
+// number in `impressions`; older ones used fixed choices (and 'meer' + a
+// typed `impressionsCustom`).
+export function impressionsValueOf(brief) {
+  if (!brief || !brief.impressions) return null;
+  if (/^\d+$/.test(String(brief.impressions))) return parseInt(brief.impressions, 10);
+  if (brief.impressions === 'meer') {
+    const p = parseImpressions(brief.impressionsCustom);
+    return p.ok ? p.value : null;
+  }
+  return null;
+}
+
+// Short form used in tables and CSV: "500.000", "Meer dan 500.000", "—".
+export function impressionsShort(brief) {
+  if (!brief || !brief.impressions) return '';
+  if (brief.impressions === 'meer' && impressionsValueOf(brief) === null) return brief.impressionsCustom || 'Meer dan 500.000';
+  const v = impressionsValueOf(brief);
+  return v === null ? String(brief.impressions) : formatNumberNl(v);
+}
+
+// Long form used in the overview, emails and PDF.
+export function formatImpressions(brief) {
+  if (!brief || !brief.impressions) return 'Niet opgegeven';
+  const short = impressionsShort(brief);
+  return short + ' impressies';
+}
+
+// Reports bucket (arbitrary numbers grouped into ranges).
+export const IMPRESSION_BUCKETS = [
+  { key: 'lt50', label: 'Minder dan 50.000', max: 50000 },
+  { key: '50-100', label: '50.000 tot 100.000', max: 100000 },
+  { key: '100-250', label: '100.000 tot 250.000', max: 250000 },
+  { key: '250-500', label: '250.000 tot 500.000', max: 500000 },
+  { key: '500-1m', label: '500.000 tot 1 miljoen', max: 1000000 },
+  { key: 'gt1m', label: '1 miljoen of meer', max: Infinity },
+];
+export function impressionsBucketKey(brief) {
+  const v = impressionsValueOf(brief);
+  if (v === null) return '';
+  return IMPRESSION_BUCKETS.find((b) => v < b.max).key;
+}
+
+// --- Audience --------------------------------------------------------------
+// audience: 'b2b' | 'b2c' | 'both'. For 'both', audienceBoth says whether one
+// commercial is aimed at both ('whole') or the B2B/B2C difference only sits in
+// the variations ('variations').
+export function audienceLabel(brief) {
+  if (!brief || !brief.audience) return '';
+  if (brief.audience === 'b2b') return 'B2B';
+  if (brief.audience === 'b2c') return 'B2C';
+  if (brief.audience === 'both') {
+    const how = brief.audienceBoth === 'variations' ? ' (verschilt per variatie)' : brief.audienceBoth === 'whole' ? ' (één commercial voor beide)' : '';
+    return 'B2B en B2C' + how;
+  }
+  return '';
+}
+
+// One line for emails/PDF/overview: "B2C · 30% mannen en 70% vrouwen (vooral vrouwen)".
+export function audienceSummary(brief) {
+  const base = audienceLabel(brief);
+  if (!base) return '';
+  const g = brief.genderSplit ? (describeGenderSplit(brief.genderSplit) || String(brief.genderSplit).trim()) : '';
+  return g ? base + ' · ' + g : base;
+}
+
+// Gender split typed by the client, e.g. "man / vrouw - 30 / 70" (30% men,
+// 70% women), "70% vrouw", "m/v 40/60", "v/m 60/40" or just "30/70" (then the
+// Dutch m/v order is assumed). Returns { men, women, assumed } or null.
+export function parseGenderSplit(text) {
+  const t = String(text || '').toLowerCase().replace(/\s+/g, ' ').trim();
+  if (!t) return null;
+  const nums = (t.match(/\d+(?:[.,]\d+)?/g) || []).map((x) => parseFloat(x.replace(',', '.')));
+  if (!nums.length || nums.length > 2) return null;
+  const LABEL = /(mannen|man|heren|male|men|m(?![a-z])|vrouwen|vrouw|dames|female|women|woman|v(?![a-z])|f(?![a-z]))/g;
+  const kindOf = (w) => (/^(mannen|man|heren|male|men|m)$/.test(w) ? 'm' : 'v');
+  const labels = [];
+  let mm;
+  const textNoNums = t;
+  while ((mm = LABEL.exec(textNoNums))) labels.push({ kind: kindOf(mm[1]), idx: mm.index });
+  let men = null;
+  let women = null;
+  let assumed = false;
+  // "70% vrouw" / "vrouw 70%": a number directly next to a label.
+  const adj = [];
+  const adjRe = /(\d+(?:[.,]\d+)?)\s*%?\s*(mannen|man|heren|male|men|vrouwen|vrouw|dames|female|women|woman)\b|\b(mannen|man|heren|male|men|vrouwen|vrouw|dames|female|women|woman)\s*[:=]?\s*(\d+(?:[.,]\d+)?)/g;
+  while ((mm = adjRe.exec(t))) {
+    const num = parseFloat((mm[1] || mm[4]).replace(',', '.'));
+    adj.push({ kind: kindOf(mm[2] || mm[3]), num });
+  }
+  if (adj.length) {
+    for (const a of adj) { if (a.kind === 'm' && men === null) men = a.num; if (a.kind === 'v' && women === null) women = a.num; }
+  } else if (nums.length === 2 && labels.length >= 2 && labels[0].kind !== labels[1].kind) {
+    // "man / vrouw - 30 / 70": labels first, numbers in the same order.
+    if (labels[0].kind === 'm') { men = nums[0]; women = nums[1]; } else { women = nums[0]; men = nums[1]; }
+  } else if (nums.length === 2) {
+    men = nums[0]; women = nums[1]; assumed = true;
+  } else if (nums.length === 1 && labels.length === 1) {
+    if (labels[0].kind === 'm') men = nums[0]; else women = nums[0];
+  } else if (nums.length === 1) {
+    // A lone number without a label: read it as the share of women? Too
+    // ambiguous: don't guess.
+    return null;
+  }
+  if (men === null && women === null) return null;
+  if (men === null) men = 100 - women;
+  if (women === null) women = 100 - men;
+  if (men < 0 || women < 0 || men > 100 || women > 100) return null;
+  const sum = men + women;
+  if (Math.abs(sum - 100) > 0.5) return { men, women, assumed, off: true };
+  return { men, women, assumed };
+}
+
+export function describeGenderSplit(text) {
+  const g = parseGenderSplit(text);
+  if (!g || g.off) return '';
+  const fmt = (n) => (Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10).replace('.', ','));
+  const lead = g.men === g.women ? 'gelijk verdeeld' : g.women > g.men ? 'vooral vrouwen' : 'vooral mannen';
+  return fmt(g.men) + '% mannen en ' + fmt(g.women) + '% vrouwen (' + lead + ')';
 }
 
 // Dashboard-table/Team-tab display of the delivery deadline above: a short
@@ -155,6 +344,52 @@ export function estimateSeconds(words) {
 export function wordCountOf(text) {
   const t = (text || '').trim();
   return t ? t.split(/\s+/).length : 0;
+}
+
+// What the client changed in the scripts after TFA's proposals: the main
+// script (editedScript differs from the proposal) and/or variation texts that
+// differ from the copywriter's draft variation. Drives the "script check"
+// that TFA does before anything counts as approved.
+export function scriptChangesOf(brief) {
+  const out = { main: false, variations: [], any: false };
+  if (!brief || !brief.generatedScript) return out;
+  const generated = brief.generatedScript.trim();
+  const edited = brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript.trim() : generated;
+  out.main = edited !== generated;
+  const count = variationsCountOf(brief);
+  if (count) {
+    let drafts = [];
+    try {
+      const hist = JSON.parse(brief.scriptHistory || '[]');
+      const entry = (Array.isArray(hist) ? hist : []).find((h) => h.createdAt === brief.scriptGeneratedAt);
+      if (entry) drafts = Array.isArray(entry.variations) && entry.variations.length ? entry.variations : (entry.variation ? [entry.variation] : []);
+    } catch (e) {}
+    let stored = [];
+    try { const p = JSON.parse(brief.variationScripts || '[]'); stored = Array.isArray(p) ? p : []; } catch (e) {}
+    for (let i = 0; i < count; i++) {
+      const cur = stored[i];
+      if (cur === undefined || cur === null || cur === '') continue;
+      const orig = drafts[i] !== undefined && drafts[i] !== '' ? drafts[i] : generated;
+      // When the main script was edited, the variation is expected to carry
+      // that edit too: compare against the main edit applied to the draft.
+      if (cur.trim() !== String(orig).trim() && !(out.main && cur.trim() === edited)) out.variations.push(i);
+    }
+  }
+  out.any = out.main || out.variations.length > 0;
+  return out;
+}
+
+// Where a brief stands in the script check, for badges in the dashboard:
+// 'nofit' (client said no proposal fits) | 'pending' (changes to look at) |
+// 'counter' (we sent a counter proposal) | '' (nothing to do).
+export function scriptCheckState(brief) {
+  if (!brief) return '';
+  if (brief.scriptAuditStatus === 'nofit' && brief.scriptsReleasedAt && !brief.finalizedAt) return 'nofit';
+  if (!brief.finalizedAt) return '';
+  if (brief.scriptAuditStatus === 'approved') return '';
+  if (brief.scriptAuditStatus === 'counter') return 'counter';
+  if (brief.scriptAuditStatus === 'pending' || scriptChangesOf(brief).any) return 'pending';
+  return '';
 }
 
 // Number of variations of the hoofdspot a brief has asked for (0 = none).
@@ -193,6 +428,7 @@ export const VARIATION_KINDS = {
   website: 'Ander website of webadres',
   aanbod: 'Ander aanbod of andere actie',
   periode: 'Andere uitzendperiode (bijv. Black Friday)',
+  doelgroep: 'Andere doelgroep (zakelijk of consument)',
   anders: 'Iets anders',
 };
 

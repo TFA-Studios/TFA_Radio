@@ -20,6 +20,7 @@ export function useBrief(id) {
   const [notFound, setNotFound] = useState(false);
   const [saveState, setSaveState] = useState('');
   const saveTimer = useRef(null);
+  const pendingBody = useRef(null);
 
   const load = useCallback(async () => {
     if (!id) {
@@ -77,8 +78,13 @@ export function useBrief(id) {
     (body, delay = 350) => {
       clearTimeout(saveTimer.current);
       setSaveState('Opslaan…');
+      // Merge with a still-pending body so quick edits to different fields
+      // are not dropped by the debounce.
+      pendingBody.current = { ...(pendingBody.current || {}), ...body };
       saveTimer.current = setTimeout(() => {
-        patch(body);
+        const b = pendingBody.current;
+        pendingBody.current = null;
+        patch(b);
       }, delay);
     },
     [patch]
@@ -86,6 +92,7 @@ export function useBrief(id) {
 
   const flushPending = useCallback(() => {
     clearTimeout(saveTimer.current);
+    pendingBody.current = null;
   }, []);
 
   return { brief, setBrief, loading, notFound, saveState, setSaveState, patch, schedulePatch, flushPending, reload: load };

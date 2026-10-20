@@ -90,6 +90,9 @@ export async function PATCH(request, { params }) {
   if (typeof body.main === 'string') data.main = body.main;
   if (typeof body.variation === 'string') data.variation = body.variation;
   if (Array.isArray(body.variations)) data.variations = body.variations.map((v) => String(v || ''));
+  // TFA's recommendation among the proposals (optional, with an optional reason).
+  if (typeof body.recommended === 'boolean') data.recommended = body.recommended;
+  if (typeof body.reason === 'string') data.reason = body.reason;
   const updated = await updateScriptDraft(params.id, versionId, data);
   if (!updated) return NextResponse.json({ error: 'not_found_or_released' }, { status: 404 });
   return NextResponse.json(updated);

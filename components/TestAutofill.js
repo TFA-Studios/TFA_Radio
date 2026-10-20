@@ -51,6 +51,7 @@ function sampleData(brief) {
     audience: 'b2c',
     decisionMaker: '',
     audienceAgeInterests: 'Gezinnen en 30-55 jarigen die houden van vers, lokaal en goed eten',
+    genderSplit: 'man / vrouw - 30 / 70',
     usp: 'Alles wordt dagelijks vers bereid met streekproducten, zonder bakmixen of kunstmatige toevoegingen. Onze deegrijstijd is 24 uur.',
     price: true,
     priceDetail: 'Dit voorjaar: 2e brood voor de halve prijs',

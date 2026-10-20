@@ -6,16 +6,9 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { variationsCountOf, briefStageOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, parseVariationScripts, parseVariationInfo, variationInfoLabel, agencyNameOf } from '../../../../components/flowData';
+import { variationsCountOf, briefStageOf, PRODUCTION_STATUS_LABELS, revisionDisclaimerText, ipRightsDisclaimerText, formatAirDate, formatImpressions, audienceSummary, scriptChangesOf, parseVariationScripts, parseVariationInfo, variationInfoLabel, agencyNameOf } from '../../../../components/flowData';
 import { diffWords, hasDiff, DiffPreview } from '../../../../components/textDiff';
 
-function formatImpressions(brief) {
-  const v = brief.impressions;
-  if (!v) return 'Niet opgegeven';
-  if (v === 'meer') return brief.impressionsCustom ? brief.impressionsCustom + ' impressies' : 'Meer dan 500.000 impressies';
-  const n = parseInt(v, 10);
-  return (isNaN(n) ? v : n.toLocaleString('nl-NL')) + ' impressies';
-}
 // Step 7 — final confirmation. CRITICAL: this is the ONLY place in the whole
 // flow that sends {finalized:true} — that flag means "the client confirmed
 // script, voice and music", which fires the confirmation email + Slack ping.
@@ -23,7 +16,7 @@ function formatImpressions(brief) {
 // brief is sent to the copywriters.)
 export default function OverviewPage({ params }) {
   const { id } = params;
-  const { brief, loading, patch } = useBrief(id);
+  const { brief, loading, patch, setBrief } = useBrief(id);
   const router = useRouter();
   const stageNow = brief ? briefStageOf(brief) : '';
   useEffect(() => {
@@ -37,6 +30,23 @@ export default function OverviewPage({ params }) {
   const [submitError, setSubmitError] = useState(false);
   const [voicesPool, setVoicesPool] = useState([]);
   const [tracksPool, setTracksPool] = useState([]);
+  // Script check (see ScriptCheckNotice below): answering TFA's counter proposal.
+  const [auditBusy, setAuditBusy] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyText, setReplyText] = useState('');
+  async function answerAudit(action) {
+    if (auditBusy) return;
+    setAuditBusy(true);
+    try {
+      const res = await fetch(`/api/briefs/${id}/script-audit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(action === 'reply' ? { action, message: replyText } : { action }),
+      });
+      if (res.ok) { setBrief(await res.json()); setReplyOpen(false); setReplyText(''); }
+    } catch (e) {}
+    setAuditBusy(false);
+  }
 
   useEffect(() => {
     setConsentChecked(false);
@@ -170,6 +180,54 @@ export default function OverviewPage({ params }) {
             reageren als er nog iets aangepast moet worden.
           </p>
         </div>
+
+        {(() => {
+          const st = brief.scriptAuditStatus || '';
+          const changed = scriptChangesOf(brief).any;
+          if (st === 'counter') {
+            return (
+              <div style={{ marginBottom: 22, background: '#FFFFFF', border: '1.5px solid #E6C858', borderRadius: 14, padding: '20px 22px' }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 6 }}>Een voorstel van TFA voor je script</div>
+                {brief.scriptAuditNote && <p style={{ fontSize: 14, lineHeight: 1.6, color: '#1D1D1D', margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>{brief.scriptAuditNote}</p>}
+                {brief.scriptCounterText && (
+                  <div style={{ fontSize: 15.5, fontWeight: 500, lineHeight: 1.65, background: '#FFF8D9', borderLeft: '3px solid #E6C858', borderRadius: 8, padding: '12px 14px', margin: '0 0 14px', whiteSpace: 'pre-wrap' }}>{brief.scriptCounterText}</div>
+                )}
+                {!replyOpen ? (
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <button type="button" className="btn-primary" disabled={auditBusy} onClick={() => answerAudit('accept')} style={{ flex: 'none', padding: '11px 18px' }}>
+                      {auditBusy ? 'Bezig…' : brief.scriptCounterText ? 'Ons voorstel overnemen' : 'Akkoord'}
+                    </button>
+                    <button type="button" className="ghost-btn" disabled={auditBusy} onClick={() => setReplyOpen(true)} style={{ width: 'auto', flex: 'none' }}>Ik wil hierop reageren</button>
+                  </div>
+                ) : (
+                  <div>
+                    <textarea style={{ minHeight: 80 }} maxLength={800} value={replyText} placeholder="Laat weten wat je liever hebt, dan stemmen we het af" onChange={(e) => setReplyText(e.target.value)} />
+                    <div style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                      <button type="button" className="ghost-btn" onClick={() => setReplyOpen(false)} style={{ width: 'auto', flex: 'none', padding: '6px 14px', fontSize: 12 }}>Annuleren</button>
+                      <button type="button" className="btn-primary" disabled={auditBusy || !replyText.trim()} onClick={() => answerAudit('reply')} style={{ flex: 'none', padding: '8px 16px' }}>{auditBusy ? 'Bezig…' : 'Verstuur reactie'}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          }
+          if (st !== 'approved' && (st === 'pending' || changed)) {
+            return (
+              <div style={{ marginBottom: 22, background: '#FFFFFF', border: '1px solid #E3DFD2', borderRadius: 14, padding: '16px 20px', fontSize: 13.5, lineHeight: 1.6, color: '#5C5850' }}>
+                <b style={{ color: '#1D1D1D' }}>Je script wordt nog gecontroleerd.</b> Je hebt aanpassingen gemaakt in de tekst. Ons team leest die eerst na, zodat alles past bij de stijl en de lengte van de commercial. Je hoort van ons zodra het akkoord is. Als we iets willen afstemmen, nemen we contact met je op.
+                {brief.scriptAuditReply && <div style={{ marginTop: 8, fontSize: 12.5, color: '#8C8880' }}>Je reactie is doorgegeven: &ldquo;{brief.scriptAuditReply}&rdquo;</div>}
+              </div>
+            );
+          }
+          if (st === 'approved' && changed) {
+            return (
+              <div style={{ marginBottom: 22, background: '#F2F8F4', border: '1px solid #BFDCCB', borderRadius: 14, padding: '14px 20px', fontSize: 13.5, color: '#1D7A46' }}>
+                ✓ Je aanpassingen aan het script zijn gecontroleerd en akkoord.
+              </div>
+            );
+          }
+          return null;
+        })()}
 
         <div style={{ marginBottom: 8, fontSize: 12.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C8880' }}>
           Wat gebeurt er nu?
@@ -311,6 +369,7 @@ export default function OverviewPage({ params }) {
           </div>
           <div style={{ fontSize: 13, marginTop: 9 }}>Hoofdspot · {spotLength}″{variationCount > 0 ? (variationCount === 1 ? ' + 1 variatie' : ` + ${variationCount} variaties`) : ''}</div>
           <div style={{ fontSize: 13, marginTop: 2 }}>{formatImpressions(brief)}</div>
+          {audienceSummary(brief) && <div style={{ fontSize: 13, marginTop: 2 }}>Doelgroep: {audienceSummary(brief)}</div>}
           <div style={{ fontSize: 13, marginTop: 2 }}>Eerste uitzending: {formatAirDate(brief)}</div>
         </div>
 
@@ -319,7 +378,7 @@ export default function OverviewPage({ params }) {
             <div style={featureHeaderStyle}>Script · hoofdspot {spotLength}″</div>
             <a href={`/brief/${id}/script?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
-          <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: mainText ? 'italic' : 'normal', fontSize: 17.5, lineHeight: 1.7, marginTop: 16, color: mainText ? '#1D1D1D' : '#9C9890' }}>
+          <div style={{ fontSize: 16, fontWeight: mainText ? 500 : 400, lineHeight: 1.65, marginTop: 16, color: mainText ? '#1D1D1D' : '#9C9890', background: mainText ? '#FFF8D9' : 'transparent', borderLeft: mainText ? '3px solid #E6C858' : 'none', borderRadius: 8, padding: mainText ? '12px 14px' : 0 }}>
             {mainText || 'Nog geen script goedgekeurd.'}
           </div>
           {variationCount > 0 && (

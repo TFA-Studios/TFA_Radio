@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { toPublicBrief } from '../../../../../lib/publicBrief';
 import { getBrief, selectScriptVersion } from '../../../../../lib/db';
 
 // Public (like the rest of /api/briefs/*) — the client-flow script step
@@ -21,5 +22,5 @@ export async function POST(request, { params }) {
   if (existing.finalizedAt) return NextResponse.json({ error: 'already_finalized' }, { status: 409 });
   const updated = await selectScriptVersion(params.id, versionId);
   if (!updated) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  return NextResponse.json(updated);
+  return NextResponse.json(toPublicBrief(updated));
 }

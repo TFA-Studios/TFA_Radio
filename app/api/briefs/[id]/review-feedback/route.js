@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { toPublicBrief } from '../../../../../lib/publicBrief';
 import { addReviewFeedback } from '../../../../../lib/db';
 import { notifyFeedback } from '../../../../../lib/slack';
 
@@ -35,5 +36,5 @@ export async function POST(request, { params }) {
     console.error('[api/briefs/:id/review-feedback] notifyFeedback failed:', err && err.message);
   }
 
-  return NextResponse.json(brief);
+  return NextResponse.json(toPublicBrief(brief));
 }

@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "node --experimental-default-type=module --test tests/unit.test.mjs",
+    "loadtest": "node tests/load/loadtest.mjs"
   },
   "dependencies": {
     "@clerk/nextjs": "^5.7.5",

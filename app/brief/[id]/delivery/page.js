@@ -7,7 +7,7 @@ import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
-import { MONTH_NAMES } from '../../../../components/flowData';
+import { upcomingMonthOptions, parseImpressions, formatNumberNl } from '../../../../components/flowData';
 
 // Used to be a fixed row of segmented buttons capped at 6 — some
 // productions genuinely need 12 or more variations, so this is now a plain
@@ -33,7 +33,7 @@ export default function DeliveryPage({ params }) {
     needsVariations: null,
     variationsCount: '1',
     impressions: '',
-    impressionsCustom: '',
+    impressionsRaw: '',
     airDate: '',
     dateUnknown: false,
     airMonth: '',
@@ -48,7 +48,8 @@ export default function DeliveryPage({ params }) {
         needsVariations: brief.needsVariations,
         variationsCount: brief.variationsCount && brief.variationsCount !== '0' ? brief.variationsCount : '1',
         impressions: brief.impressions || '',
-        impressionsCustom: brief.impressionsCustom || '',
+        // Older briefs used fixed choices: show them as plain numbers.
+        impressionsRaw: brief.impressionsCustom || (/^\d+$/.test(brief.impressions || '') ? formatNumberNl(parseInt(brief.impressions, 10)) : ''),
         airDate: brief.airDate || '',
         dateUnknown: !!brief.dateUnknown,
         airMonth: brief.airMonth || '',
@@ -60,29 +61,36 @@ export default function DeliveryPage({ params }) {
   function update(patchObj) {
     const next = { ...form, ...patchObj };
     setForm(next);
-    schedulePatch(patchObj);
+    const toSave = { ...patchObj };
+    if (Object.prototype.hasOwnProperty.call(toSave, 'impressionsRaw')) {
+      const p = parseImpressions(toSave.impressionsRaw);
+      toSave.impressionsCustom = toSave.impressionsRaw;
+      toSave.impressions = p.ok ? String(p.value) : '';
+      delete toSave.impressionsRaw;
+      next.impressions = toSave.impressions;
+      setForm(next);
+    }
+    schedulePatch(toSave);
   }
 
-  // The custom impressions field used to take any free text at all with no
-  // check — someone could leave it blank or type "geen idee" and it would
-  // flow straight through into the delivery summary and the reports
-  // dashboard as if it were a real number. Only actually gates when "Meer
-  // dan 500.000" is selected, since that's the only case this field means
-  // anything; strips thousands separators (dots/spaces) before checking so
-  // "750.000" still counts as valid.
-  const impressionsCustomValid =
-    form.impressions !== 'meer' || /^\d+$/.test(form.impressionsCustom.trim().replace(/[.\s]/g, ''));
+  // Impressions is an open field: clients type "500.000", "500k", "1,5 miljoen"
+  // and so on; parseImpressions() understands those. The parsed whole number
+  // is what gets stored in `impressions` (the raw text stays in
+  // impressionsCustom), so the rest of the app only ever sees a number.
+  const parsedImpressions = parseImpressions(form.impressionsRaw);
+  const impressionsValid = !form.impressionsRaw.trim() || parsedImpressions.ok;
   // Since the variation count is now a free numeric input rather than a
   // fixed set of buttons, it can be left blank/invalid mid-typing — gate
   // continuing the same way impressionsCustomValid does above.
   const variationsCountValid = !form.needsVariations || /^\d+$/.test(String(form.variationsCount).trim());
-  const canContinue = impressionsCustomValid && variationsCountValid;
+  const canContinue = impressionsValid && variationsCountValid;
 
   async function next() {
     if (!canContinue) return;
     setNavigating(true);
     flushPending();
-    await patch(form);
+    const { impressionsRaw, ...rest } = form;
+    await patch({ ...rest, impressionsCustom: impressionsRaw });
     router.push(returnToOverview ? `/brief/${id}/overview` : `/brief/${id}/details`);
   }
 
@@ -90,9 +98,13 @@ export default function DeliveryPage({ params }) {
 
   const hide = profileOfBrief(brief).hide;
   const todayISO = new Date().toISOString().slice(0, 10);
-  const currentMonth = new Date().getMonth() + 1;
-  const monthOptions = [];
-  for (let m = currentMonth; m <= 12; m++) monthOptions.push({ value: String(m), label: MONTH_NAMES[m - 1] });
+  // This month and the next 17, each with its year (a campaign planned for
+  // March 2027 can be entered in November 2026).
+  const monthOptions = upcomingMonthOptions(18);
+  // Briefs saved with the old "month number only" format: map to a full option.
+  const airMonthValue = /^\d{1,2}$/.test(form.airMonth || '')
+    ? (monthOptions.find((o) => parseInt(o.value.slice(5), 10) === parseInt(form.airMonth, 10)) || {}).value || ''
+    : form.airMonth;
 
   const summaryParts = ['1x hoofdspot (' + form.hoofdspotLength + '″)'];
   if (form.needsVariations) {
@@ -106,25 +118,27 @@ export default function DeliveryPage({ params }) {
         {!hide.includes('impressions') && (
         <div>
           <label className="field-label">Aantal impressies</label>
-          <select value={form.impressions} onChange={(e) => update({ impressions: e.target.value })}>
-            <option value="">Kies een aantal</option>
-            <option value="25000">25.000</option>
-            <option value="50000">50.000</option>
-            <option value="100000">100.000</option>
-            <option value="150000">150.000</option>
-            <option value="250000">250.000</option>
-            <option value="500000">500.000</option>
-            <option value="meer">Meer dan 500.000</option>
-          </select>
-          {form.impressions === 'meer' && (
-            <div style={{ marginTop: 10 }}>
-              <label className="field-label">Hoeveel ongeveer?</label>
-              <input type="text" value={form.impressionsCustom} placeholder="Bijv. 750.000" onChange={(e) => update({ impressionsCustom: e.target.value })} />
-              {!impressionsCustomValid && (
-                <div style={{ fontSize: 11.5, color: '#C2513F', marginTop: 4 }}>
-                  Vul een aantal in cijfers in (bijv. 750.000).
-                </div>
-              )}
+          <input
+            type="text"
+            inputMode="text"
+            maxLength={30}
+            value={form.impressionsRaw}
+            placeholder="Bijv. 250.000, 500k of 1,5 miljoen"
+            onChange={(e) => update({ impressionsRaw: e.target.value })}
+          />
+          {form.impressionsRaw.trim() && parsedImpressions.ok && (
+            <div style={{ fontSize: 12, color: '#1D7A46', marginTop: 5 }}>
+              We lezen dit als <b>{formatNumberNl(parsedImpressions.value)}</b> impressies.
+            </div>
+          )}
+          {form.impressionsRaw.trim() && !parsedImpressions.ok && (
+            <div style={{ fontSize: 11.5, color: '#C2513F', marginTop: 5 }}>
+              Dat kunnen we niet goed lezen. Typ bijvoorbeeld 250.000, 500k of 1,5 miljoen.
+            </div>
+          )}
+          {!form.impressionsRaw.trim() && (
+            <div className="hint" style={{ marginTop: 5 }}>
+              Typ het gewoon zoals jij het schrijft: met punten (250.000), als 500k of als 1,5 miljoen. Weet je het nog niet precies? Geef dan een schatting.
             </div>
           )}
         </div>
@@ -193,6 +207,7 @@ export default function DeliveryPage({ params }) {
       {!hide.includes('airDate') && (
       <div style={{ marginTop: 24 }}>
         <label className="field-label">Eerste uitzenddatum</label>
+        <div className="hint" style={{ marginBottom: 7 }}>Staat de live-datum nog niet vast? Geen probleem. Geef een schatting of alleen een maand; TFA stemt de definitieve datum later met je af.</div>
         <input
           type="date"
           min={todayISO}
@@ -211,9 +226,9 @@ export default function DeliveryPage({ params }) {
         </label>
         {form.dateUnknown && (
           <div className="box" style={{ marginTop: 10 }}>
-            <div className="hint" style={{ marginBottom: 8 }}>Geen probleem, geef ons dan in elk geval een maand, zodat we het project goed kunnen inplannen.</div>
+            <div className="hint" style={{ marginBottom: 8 }}>Geen probleem, geef ons dan in elk geval een maand, zodat we het project goed kunnen inplannen. Ook een maand volgend jaar kan.</div>
             <label className="field-label">Welke maand ongeveer?</label>
-            <select value={form.airMonth} onChange={(e) => update({ airMonth: e.target.value })}>
+            <select value={airMonthValue} onChange={(e) => update({ airMonth: e.target.value })}>
               <option value="">Kies een maand</option>
               {monthOptions.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
@@ -227,8 +242,8 @@ export default function DeliveryPage({ params }) {
       <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         {!canContinue && (
           <div style={{ fontSize: 12, color: '#8C8880' }}>
-            {!impressionsCustomValid
-              ? 'Vul hierboven een geldig aantal impressies in om verder te gaan.'
+            {!impressionsValid
+              ? 'Vul hierboven een aantal impressies in dat we kunnen lezen (bijv. 250.000 of 500k), of laat het leeg.'
               : 'Vul hierboven een geldig aantal variaties in om verder te gaan.'}
           </div>
         )}

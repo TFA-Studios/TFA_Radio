@@ -1,4 +1,5 @@
 import { handleUpload } from '@vercel/blob/client';
+import { requireStaffApi } from '../../../../lib/access';
 
 // Client-side direct-to-Blob upload handshake for the library's music/voice
 // audio files. The old approach sent the audio file itself through a Server
@@ -23,6 +24,10 @@ export async function POST(request) {
   }
 
   const body = await request.json();
+  // Issuing an upload token lets the caller write up to 300MB into our Blob
+  // store, so only signed-in TFA staff may ask for one.
+  const denied = await requireStaffApi();
+  if (denied) return denied;
   try {
     const jsonResponse = await handleUpload({
       body,

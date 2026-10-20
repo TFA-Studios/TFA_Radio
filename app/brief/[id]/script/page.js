@@ -39,6 +39,10 @@ export default function ScriptPage({ params }) {
   // resolves — see the identical comment in contact/page.js.
   const [navigating, setNavigating] = useState(false);
   const [scriptText, setScriptText] = useState('');
+  // The quiet "none of these fit" route (see the small link under the proposals).
+  const [noFitOpen, setNoFitOpen] = useState(false);
+  const [noFitText, setNoFitText] = useState('');
+  const [noFitBusy, setNoFitBusy] = useState(false);
   // The text as last saved on the server — drives the explicit "Wijziging opslaan" button.
   const [savedValue, setSavedValue] = useState('');
   // Same "✓ Opgeslagen" confirmation the variations subpage also uses for
@@ -176,6 +180,20 @@ export default function ScriptPage({ params }) {
     setBrief((b) => (b ? { ...b, editedScript: null } : b));
   }
 
+  async function sendNoFit() {
+    if (noFitBusy) return;
+    setNoFitBusy(true);
+    try {
+      const res = await fetch(`/api/briefs/${id}/no-fit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: noFitText }),
+      });
+      if (res.ok) setBrief(await res.json());
+    } catch (e) {}
+    setNoFitBusy(false);
+  }
+
   async function approveAndContinue() {
     if (!brief || !brief.generatedScript) return;
     // Approving now always navigates somewhere — either on to the voice
@@ -190,7 +208,9 @@ export default function ScriptPage({ params }) {
       await fetch(`/api/briefs/${id}/edit`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ editedScript: scriptText }),
+        // syncVariations: the server carries this edit into the variations
+        // too, so they build on the script the client actually chose.
+        body: JSON.stringify({ editedScript: scriptText, syncVariations: true }),
       });
     } catch (e) {}
 
@@ -304,8 +324,15 @@ export default function ScriptPage({ params }) {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: isActive ? '#8C6D1F' : '#8C8880' }}>
-                      Voorstel {i + 1}{isActive && history.length > 1 ? ' · gekozen ✓' : ''}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: isActive ? '#8C6D1F' : '#8C8880' }}>
+                        Voorstel {i + 1}{isActive && history.length > 1 ? ' · gekozen ✓' : ''}
+                      </div>
+                      {h.recommended && history.length > 1 && (
+                        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em', color: '#8C6D1F', border: '1px solid #E6D9A3', borderRadius: 999, padding: '2px 8px', background: '#FFFDF3' }}>
+                          Onze aanbeveling
+                        </span>
+                      )}
                     </div>
                     {history.length > 1 && !isActive && !finalized && (
                       <button
@@ -319,13 +346,55 @@ export default function ScriptPage({ params }) {
                       </button>
                     )}
                   </div>
-                  <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 15.5, lineHeight: 1.6, color: '#1D1D1D' }}>
+                  {/* The script is the most important text in the whole flow: plain
+                      body font (like the rest of the form) but set apart with a
+                      tinted block and a gold edge so it stands out. */}
+                  <div style={{ fontSize: 15.5, lineHeight: 1.65, fontWeight: 500, color: '#1D1D1D', background: isActive ? '#FFF8D9' : '#FBF9EC', borderLeft: '3px solid #E6C858', borderRadius: 8, padding: '12px 14px' }}>
                     {h.main}
                   </div>
+                  {h.recommended && h.reason && history.length > 1 && (
+                    <div style={{ marginTop: 9, fontSize: 12.5, lineHeight: 1.5, color: '#5C5850' }}>
+                      <span style={{ fontWeight: 600, color: '#8C6D1F' }}>Waarom wij hiervoor kiezen: </span>{h.reason}
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
+        </div>
+      )}
+      {hasGenerated && history.length > 0 && !finalized && (
+        <div style={{ margin: '10px 0 0' }}>
+          {brief.scriptAuditStatus === 'nofit' ? (
+            <div style={{ background: '#F6F4EC', border: '1px solid #E3DFD2', borderRadius: 10, padding: '10px 14px', fontSize: 12.5, color: '#5C5850', lineHeight: 1.5 }}>
+              Bedankt voor je terugkoppeling. We hebben doorgekregen dat deze voorstellen nog niet passen en nemen contact met je op.
+            </div>
+          ) : !noFitOpen ? (
+            <button
+              type="button"
+              onClick={() => setNoFitOpen(true)}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11.5, color: '#9C9890', textDecoration: 'underline', cursor: 'pointer' }}
+            >
+              Past geen van deze voorstellen bij je?
+            </button>
+          ) : (
+            <div style={{ background: '#F6F4EC', border: '1px solid #E3DFD2', borderRadius: 10, padding: '12px 14px' }}>
+              <div style={{ fontSize: 12.5, color: '#5C5850', marginBottom: 8, lineHeight: 1.5 }}>
+                Geen probleem. Vertel kort wat je mist of wat anders moet, dan komen we hierop terug.
+              </div>
+              <textarea
+                style={{ minHeight: 70 }}
+                maxLength={800}
+                value={noFitText}
+                placeholder="Bijv. de toon is te zakelijk, of het aanbod komt te weinig terug"
+                onChange={(e) => setNoFitText(e.target.value)}
+              />
+              <div style={{ marginTop: 8, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                <button type="button" className="ghost-btn" onClick={() => setNoFitOpen(false)} style={{ width: 'auto', flex: 'none', padding: '6px 14px', fontSize: 12 }}>Annuleren</button>
+                <button type="button" className="ghost-btn" disabled={noFitBusy} onClick={sendNoFit} style={{ width: 'auto', flex: 'none', padding: '6px 14px', fontSize: 12 }}>{noFitBusy ? 'Bezig…' : 'Verstuur'}</button>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {!hasGenerated && (
@@ -354,7 +423,7 @@ export default function ScriptPage({ params }) {
           opslaan&rdquo; onder het vak zie je meteen dat het is vastgelegd. Goedkeuren doe je pas met de grote knop onderaan. Let er wel op dat het script in {spotLength} seconden moet blijven passen.
         </p>
         <textarea
-          style={{ minHeight: 130 }}
+          style={{ minHeight: 140, fontSize: 15.5, lineHeight: 1.65, fontWeight: 500, background: '#FFFDF3', borderLeft: '3px solid #E6C858' }}
           value={scriptText}
           onFocus={() => { scriptFocused.current = true; }}
           onBlur={() => { scriptFocused.current = false; }}

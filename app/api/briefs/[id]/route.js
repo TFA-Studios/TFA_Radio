@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
+import { rateLimit, clientIp, tooManyRequests } from '../../../../lib/rateLimit';
+import { toPublicBrief } from '../../../../lib/publicBrief';
 import { waitUntil } from '@vercel/functions';
-import { getBrief, updateBrief, saveScriptDrafts, listAgencies } from '../../../../lib/db';
+import { getBrief, updateBrief, saveScriptDrafts, saveScriptAudit, listAgencies } from '../../../../lib/db';
+import { scriptChangesOf } from '../../../../components/flowData';
 import { sendBriefReceivedEmail, sendConfirmationEmail } from '../../../../lib/email';
-import { notifyNewBrief, notifyClientConfirmed } from '../../../../lib/slack';
+import { notifyNewBrief, notifyClientConfirmed, notifyScriptCheck } from '../../../../lib/slack';
 import { draftScriptVersions } from '../../../../lib/scriptgen';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +21,7 @@ const DRAFT_TIMEOUT_MS = 45000;
 export async function GET(request, { params }) {
   const brief = await getBrief(params.id);
   if (!brief) return NextResponse.json({ error: 'not_found' }, { status: 404 });
-  return NextResponse.json(brief);
+  return NextResponse.json(toPublicBrief(brief));
 }
 
 function withTimeout(promise, ms) {
@@ -32,6 +35,9 @@ function withTimeout(promise, ms) {
 }
 
 export async function PATCH(request, { params }) {
+  // Autosave fires often; this ceiling (600 / min per address) only stops a runaway script.
+  const rl = rateLimit('patch:' + clientIp(request), 600, 60000);
+  if (!rl.ok) return tooManyRequests(rl.retryAfter);
   const body = await request.json().catch(() => ({}));
 
   const before = await getBrief(params.id);
@@ -115,6 +121,13 @@ export async function PATCH(request, { params }) {
   // full overview + terms email goes out, and the team hears the brief is
   // ready for production.
   if (body && body.finalized && !wasFinalized && brief.finalizedAt) {
+    // If the client changed the script (or a variation) after TFA's proposals,
+    // nothing counts as approved yet: it goes to the script check first, and
+    // the confirmation email below says so.
+    const changed = scriptChangesOf(brief).any;
+    if (changed) {
+      brief = (await saveScriptAudit(params.id, { scriptAuditStatus: 'pending', scriptAuditedAt: '' })) || brief;
+    }
     try {
       await sendConfirmationEmail(brief, appUrl);
     } catch (err) {
@@ -122,10 +135,11 @@ export async function PATCH(request, { params }) {
     }
     try {
       await notifyClientConfirmed(brief, dashboardUrl);
+      if (changed) await notifyScriptCheck(brief, dashboardUrl);
     } catch (err) {
       console.error('[api/briefs/:id] notifyClientConfirmed failed:', err && err.message);
     }
   }
 
-  return NextResponse.json(brief);
+  return NextResponse.json(toPublicBrief(brief));
 }
