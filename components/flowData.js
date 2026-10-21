@@ -457,14 +457,50 @@ export function parseVariationInfo(brief) {
   return out;
 }
 
-// One human-readable line, e.g. "Andere vestiging of locatie: Filiaal Zwolle (uitzending: Black Friday)".
+// Short name of a variation kind without the example in brackets ("Andere
+// uitzendperiode (bijv. Black Friday)" -> "Andere uitzendperiode"). The example
+// only helps while choosing; it must never read as something the client wrote.
+export function variationKindShort(kind) {
+  return kind && VARIATION_KINDS[kind] ? VARIATION_KINDS[kind].replace(/\s*\(.*\)\s*$/, '') : '';
+}
+
+// What the CLIENT wrote about a variation, and nothing else: their own words
+// (+ when it airs). Used wherever the client or an email/PDF to the client reads
+// it back. Falls back to the short kind name only when they wrote no detail.
 export function variationInfoLabel(info) {
   if (!info) return '';
   const parts = [];
-  const head = [info.kind ? VARIATION_KINDS[info.kind] : '', info.detail].filter(Boolean).join(': ');
+  const head = (info.detail || '').trim() || variationKindShort(info.kind);
   if (head) parts.push(head);
   if (info.airing) parts.push('uitzending: ' + info.airing);
   return parts.join(' · ');
+}
+
+// Producer-facing: "Andere vestiging of locatie: Filiaal Zwolle · uitzending: ...".
+export function variationInfoLabelFull(info) {
+  if (!info) return '';
+  const parts = [];
+  const head = [variationKindShort(info.kind), (info.detail || '').trim()].filter(Boolean).join(': ');
+  if (head) parts.push(head);
+  if (info.airing) parts.push('uitzending: ' + info.airing);
+  return parts.join(' · ');
+}
+
+// A website exactly as the client typed it, turned into a link that is safe to
+// render: only http(s) is ever returned ("bakkerij.nl" -> "https://bakkerij.nl"),
+// anything else (javascript:, data:, garbage) gives ''.
+export function safeWebsiteUrl(raw) {
+  const t = String(raw || '').trim();
+  if (!t || /\s/.test(t)) return '';
+  const withProto = /^[a-z][a-z0-9+.-]*:/i.test(t) ? t : 'https://' + t;
+  try {
+    const u = new URL(withProto);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+    if (!u.hostname.includes('.')) return '';
+    return u.href;
+  } catch (e) {
+    return '';
+  }
 }
 
 // variationScripts holds one entry per requested variation — index i is

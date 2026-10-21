@@ -5,7 +5,8 @@ import { mergeEditIntoVariation } from '../lib/scriptMerge.js';
 import { rateLimit, _resetForTests } from '../lib/rateLimit.js';
 import { toPublicBrief } from '../lib/publicBrief.js';
 import { fetchWithTimeout, fetchWithRetry } from '../lib/http.js';
-import { parseImpressions, parseGenderSplit } from '../components/flowData.js';
+import { parseImpressions, parseGenderSplit, variationInfoLabel, safeWebsiteUrl, briefStageOf } from '../components/flowData.js';
+import { matchVoices } from '../lib/voiceMatch.js';
 
 test('merge: an edit to the main script reaches the variation', () => {
   const r = mergeEditIntoVariation('Koop nu bij Jansen.', 'Koop nu bij Jansen in Zwolle.', 'Koop nu bij Jansen. Black Friday!');
@@ -58,4 +59,33 @@ test('impressions: free-text input is understood', () => {
 test('gender split: "man / vrouw - 30 / 70" is 30% men', () => {
   const g = parseGenderSplit('man / vrouw - 30 / 70');
   assert.equal(g.men, 30); assert.equal(g.women, 70);
+});
+test('voice match: "no preference" on gender never blocks the age filter', () => {
+  const pool = [
+    { id: 'a', gender: 'man', ageRange: '18-34', tags: [] },
+    { id: 'b', gender: 'vrouw', ageRange: '55+', tags: [] },
+    { id: 'c', gender: 'vrouw', ageRange: '18-34', tags: [] },
+  ];
+  const r = matchVoices(pool, { gender: null, age: '18-34', tags: [] });
+  assert.deepEqual(r.voices.map((v) => v.id), ['a', 'c']);
+  assert.deepEqual(r.relaxed, []);
+});
+test('voice match: relaxes and reports only criteria the client actually set', () => {
+  const pool = [{ id: 'a', gender: 'man', ageRange: '55+', tags: ['warm'] }];
+  const r = matchVoices(pool, { gender: 'man', age: '18-34', tags: [] });
+  assert.equal(r.voices.length, 1);
+  assert.deepEqual(r.relaxed, ['leeftijd']);
+});
+test('variation label shows only what the client wrote', () => {
+  assert.equal(variationInfoLabel({ kind: 'periode', detail: 'Black Friday', airing: 'nov' }), 'Black Friday · uitzending: nov');
+  assert.ok(!/bijv/i.test(variationInfoLabel({ kind: 'periode', detail: '' })));
+});
+test('website links: only safe http(s) hosts', () => {
+  assert.equal(safeWebsiteUrl('bakkerij.nl'), 'https://bakkerij.nl/');
+  assert.equal(safeWebsiteUrl('javascript:alert(1)'), '');
+  assert.equal(safeWebsiteUrl('localhost'), '');
+});
+test('stage: released scripts mean the client is choosing', () => {
+  assert.equal(briefStageOf({ submittedAt: 'x', scriptsReleasedAt: 'y' }), 'choosing');
+  assert.equal(briefStageOf({ submittedAt: 'x', scriptsReleasedAt: 'y', finalizedAt: 'z' }), 'final');
 });

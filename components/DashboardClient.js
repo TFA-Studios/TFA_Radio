@@ -5,7 +5,7 @@ import {
   variationsSummaryLabel, variationsCountOf, parseVariationScripts, parseReviewRounds as parseReviewRoundsOf,
   reviewOverIncludedCap, PRODUCTION_STATUS_LABELS, INCLUDED_REVISIONS, formatRoundLabel, formatDateTime, formatShortDateTime,
   formatAirDate, deliveryDeadlineMeta, TONE_LABELS, finalTrackOf, agencyNameOf, agencyContactEmailOf,
-  parseVariationInfo, variationInfoLabel, impressionsShort, audienceLabel, describeGenderSplit, scriptChangesOf, scriptCheckState,
+  parseVariationInfo, variationInfoLabelFull, safeWebsiteUrl, impressionsShort, audienceLabel, describeGenderSplit, scriptChangesOf, scriptCheckState,
 } from './flowData';
 import { profileOfBrief, answersOfBrief } from '../lib/formProfile';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
@@ -104,24 +104,16 @@ const COLUMN_STORAGE_KEY = 'tfa-dashboard-columns-v1';
 // until they actually open "Kolommen" and pick something new.
 const DEFAULT_COLUMN_KEYS = ['hoofdspotLength', 'assignedTo', 'airDate', 'updatedAt'];
 
-// Sections of the brief detail modal — see the `modalTab` state on
-// DashboardClient. Grouped by what a producer actually comes to look at:
-// the client's own answers (Overzicht), the post-production review
-// workflow (Productie & review), the creative deliverables (Creatief), and
-// internal team logistics (Team) each get their own tab instead of all six
-// sections stacking in one long scroll. Productie & review sits second
-// (not last) since it's the tab a producer needs most often once a brief
-// is actually in production — see the modalTab default-tab logic below,
-// which now opens straight to it in that case.
+// Sections of the brief detail modal (see the `modalTab` state on DashboardClient).
+// Order follows the pipeline: who the client is -> who owns it and when it
+// must be live -> the scripts -> what the client picked (voice, music) ->
+// production and review -> (once approved) hand-off.
 const MODAL_TABS = [
   { key: 'overzicht', label: 'Overzicht' },
-  // All script work lives here: the drafts to check and release, the chosen
-  // script and what each variation is about. (It used to be hidden inside
-  // "Creatief", which made it easy to miss that a script was waiting.)
-  { key: 'script', label: 'Script' },
-  { key: 'productie', label: 'Productie & review' },
-  { key: 'creatief', label: 'Stem & muziek' },
   { key: 'team', label: 'Team' },
+  { key: 'script', label: 'Script' },
+  { key: 'creatief', label: 'Stem & muziek' },
+  { key: 'productie', label: 'Productie & review' },
 ];
 // Appended only once the client has approved (see modalTabsFor below) — the
 // final WAV hand-off to whoever needs it (Advision Media today, potentially
@@ -273,8 +265,35 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   const [ownVariations, setOwnVariations] = useState([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [active, setActive] = useState(0);
+  // Optimistic recommendation tick: the checkbox flips instantly, the save
+  // runs silently in the background and is rolled back if it fails.
+  const [recPending, setRecPending] = useState(null);
 
-  useEffect(() => { setEdits({}); setError(''); }, [brief.id, brief.scriptGeneratedAt]);
+  useEffect(() => { setEdits({}); setError(''); setActive(0); setRecPending(null); }, [brief.id, brief.scriptGeneratedAt]);
+
+  function isRec(d) {
+    if (!recPending) return !!d.recommended;
+    if (recPending.on) return d.id === recPending.id;
+    return d.id === recPending.id ? false : !!d.recommended;
+  }
+  async function toggleRec(d, on) {
+    setRecPending({ id: d.id, on });
+    setError('');
+    try {
+      const res = await fetch(`/api/dashboard/briefs/${brief.id}/scripts`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ versionId: d.id, recommended: on }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.message || 'Dat is niet gelukt. Probeer het opnieuw.');
+      else onUpdated(data);
+    } catch (e) {
+      setError('Geen verbinding. Probeer het opnieuw.');
+    }
+    setRecPending(null);
+  }
 
   function valueOf(d, field) {
     const e = edits[d.id];
@@ -340,6 +359,8 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   }
 
   const dirty = Object.keys(edits).length > 0;
+  const scriptBox = { background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#1D1D1D' };
+  const arrowStyle = (off) => ({ flex: 'none', width: 30, height: 30, borderRadius: 8, border: '1px solid #D8D4C8', background: '#fff', fontSize: 18, lineHeight: 1, cursor: off ? 'default' : 'pointer', opacity: off ? 0.35 : 1 });
   const taStyle = { width: '100%', minHeight: 90, fontSize: 13, lineHeight: 1.55, padding: '9px 11px', border: '1px solid #DAD6C8', borderRadius: 8, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' };
 
   return (
@@ -398,7 +419,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
           {Array.from({ length: varCount }).map((_, i) => (
             <div key={i}>
               <div style={{ fontSize: 11, color: '#8C8880', margin: '8px 0 4px' }}>
-                {varCount > 1 ? 'Variatie ' + (i + 1) : 'Variatie'}{variationInfoLabel(varInfos[i]) ? ' · ' + variationInfoLabel(varInfos[i]) : ''} (optioneel)
+                {varCount > 1 ? 'Variatie ' + (i + 1) : 'Variatie'}{variationInfoLabelFull(varInfos[i]) ? ' · ' + variationInfoLabelFull(varInfos[i]) : ''} (optioneel)
               </div>
               <textarea style={{ ...taStyle, minHeight: 64 }} value={ownVariations[i] || ''} onChange={(e) => setOwnVariations((cur) => { const n = cur.slice(); n[i] = e.target.value; return n; })} placeholder="Variatietekst" />
             </div>
@@ -419,64 +440,69 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
         </div>
       )}
 
-      {drafts.map((d, i) => (
-        <div key={d.id} style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 5 }}>
-            Voorstel {i + 1}{d.source === 'template' ? ' · sjabloon (geen AI beschikbaar)' : d.source === 'agency' ? ' · script van agentschap' : ''}
-          </div>
-          {released ? (
-            <>
-              <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 14, lineHeight: 1.6 }}>{d.main}</div>
-              {d.recommended && (
-                <div style={{ marginTop: 6, fontSize: 12, color: '#5C5850' }}>
-                  <b style={{ color: '#8C6D1F' }}>Onze aanbeveling aan de klant</b>{d.reason ? ': ' + d.reason : ''}
-                </div>
-              )}
-              {Array.from({ length: varCount }).map((_, vi) => (variationsOf(d)[vi] ? (
-                <div key={vi} style={{ marginTop: 8 }}>
-                  <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 3 }}>{varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'}</div>
-                  <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: 'italic', fontSize: 13.5, lineHeight: 1.6 }}>{variationsOf(d)[vi]}</div>
-                </div>
-              ) : null))}
-            </>
-          ) : (
-            <>
-              <textarea style={taStyle} value={valueOf(d, 'main')} onChange={(e) => setField(d, 'main', e.target.value)} onBlur={() => saveDraft(d)} />
-              {drafts.length > 1 && (
-                <div style={{ marginTop: 6 }}>
-                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#5C5850', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={!!d.recommended}
-                      disabled={!!busy}
-                      onChange={(e) => call('PATCH', { versionId: d.id, recommended: e.target.checked }, 'rec-' + d.id)}
-                    />
-                    Hier neigen wij naar (aanbeveling, optioneel)
-                  </label>
-                  {d.recommended && (
-                    <textarea
-                      style={{ ...taStyle, minHeight: 48, marginTop: 6 }}
-                      value={valueOf(d, 'reason')}
-                      placeholder="Waarom neigen jullie hiernaar? (optioneel, de klant ziet dit onder het voorstel)"
-                      maxLength={600}
-                      onChange={(e) => setField(d, 'reason', e.target.value)}
-                      onBlur={() => saveDraft(d)}
-                    />
-                  )}
-                </div>
-              )}
-              {Array.from({ length: varCount }).map((_, vi) => (
-                <div key={vi}>
-                  <div style={{ fontSize: 11, color: '#8C8880', margin: '6px 0 4px' }}>
-                    {varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'} bij dit voorstel{variationInfoLabel(varInfos[vi]) ? ' · ' + variationInfoLabel(varInfos[vi]) : ''}
+      {drafts.length > 0 && (() => {
+        const i = Math.min(active, drafts.length - 1);
+        const d = drafts[i];
+        const rec = isRec(d);
+        return (
+          <div key={d.id} style={{ marginBottom: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <button type="button" aria-label="Vorig voorstel" disabled={i === 0} onClick={() => setActive(i - 1)} style={arrowStyle(i === 0)}>‹</button>
+              <div style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#8C6D1F' }}>
+                Voorstel {i + 1} van {drafts.length}{d.source === 'template' ? ' · sjabloon (geen AI beschikbaar)' : d.source === 'agency' ? ' · script van agentschap' : ''}
+                {rec && <span style={{ marginLeft: 8, background: '#E6C858', color: '#383209', borderRadius: 999, padding: '2px 8px', letterSpacing: 0, textTransform: 'none' }}>✓ Onze aanbeveling</span>}
+              </div>
+              <button type="button" aria-label="Volgend voorstel" disabled={i === drafts.length - 1} onClick={() => setActive(i + 1)} style={arrowStyle(i === drafts.length - 1)}>›</button>
+            </div>
+            {released ? (
+              <>
+                <div style={scriptBox}>{d.main}</div>
+                {rec && d.reason && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: '#5C5850' }}>
+                    <b style={{ color: '#8C6D1F' }}>Reden</b>: {d.reason}
                   </div>
-                  <textarea style={{ ...taStyle, minHeight: 64 }} value={variationsOf(d)[vi] || ''} onChange={(e) => setVariation(d, vi, e.target.value)} onBlur={() => saveDraft(d)} />
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-      ))}
+                )}
+                {Array.from({ length: varCount }).map((_, vi) => (variationsOf(d)[vi] ? (
+                  <div key={vi} style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 3 }}>{varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'}</div>
+                    <div style={{ ...scriptBox, fontSize: 13 }}>{variationsOf(d)[vi]}</div>
+                  </div>
+                ) : null))}
+              </>
+            ) : (
+              <>
+                <textarea style={taStyle} value={valueOf(d, 'main')} onChange={(e) => setField(d, 'main', e.target.value)} onBlur={() => saveDraft(d)} />
+                {drafts.length > 1 && (
+                  <div style={{ marginTop: 6 }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#5C5850', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={rec} onChange={(e) => toggleRec(d, e.target.checked)} />
+                      Hier neigen wij naar (aanbeveling, optioneel)
+                    </label>
+                    {rec && (
+                      <textarea
+                        style={{ ...taStyle, minHeight: 48, marginTop: 6 }}
+                        value={valueOf(d, 'reason')}
+                        placeholder="Waarom neigen jullie hiernaar? (optioneel, de klant ziet dit onder het voorstel)"
+                        maxLength={600}
+                        onChange={(e) => setField(d, 'reason', e.target.value)}
+                        onBlur={() => saveDraft(d)}
+                      />
+                    )}
+                  </div>
+                )}
+                {Array.from({ length: varCount }).map((_, vi) => (
+                  <div key={vi}>
+                    <div style={{ fontSize: 11, color: '#8C8880', margin: '6px 0 4px' }}>
+                      {varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'} bij dit voorstel{variationInfoLabelFull(varInfos[vi]) ? ' · ' + variationInfoLabelFull(varInfos[vi]) : ''}
+                    </div>
+                    <textarea style={{ ...taStyle, minHeight: 64 }} value={variationsOf(d)[vi] || ''} onChange={(e) => setVariation(d, vi, e.target.value)} onBlur={() => saveDraft(d)} />
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        );
+      })()}
 
       {error && <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, marginBottom: 8 }}>{error}</div>}
 
@@ -708,6 +734,13 @@ export default function DashboardClient({ briefs, readOnly = false }) {
   // but there was previously no way to just find "that one brief" once the
   // list grows past a page or two, short of paging through by eye.
   const [searchQuery, setSearchQuery] = useState('');
+  // Soft archive ("opruimen"): archived briefs are hidden from the working
+  // view, never deleted. Staff can look at them and restore them.
+  const [showArchived, setShowArchived] = useState(false);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveError, setArchiveError] = useState('');
 
   // Which optional columns are on, plus whether the "Kolommen" picker
   // dropdown is open. Starts at DEFAULT_COLUMN_KEYS (matches the table's
@@ -918,6 +951,33 @@ export default function DashboardClient({ briefs, readOnly = false }) {
       setDeliveryError(true);
     } finally {
       setDeliveryBusy(false);
+    }
+  }
+
+  // Archive or restore briefs: optimistic, rolled back if the save fails.
+  async function setArchived(ids, archived) {
+    if (!ids.length) return;
+    const prev = rows;
+    const stamp = archived ? new Date().toISOString() : null;
+    const idSet = new Set(ids);
+    setRows((cur) => cur.map((b) => (idSet.has(b.id) ? { ...b, archivedAt: stamp } : b)));
+    setArchiveBusy(true);
+    setArchiveError('');
+    try {
+      const res = await fetch('/api/dashboard/briefs/archive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, archived }),
+      });
+      if (!res.ok) throw new Error('archive failed');
+      setSelected((cur) => (cur && idSet.has(cur.id) ? null : cur));
+      setCleanupOpen(false);
+      setExportDone(false);
+    } catch (err) {
+      setRows(prev);
+      setArchiveError('Archiveren is niet gelukt. Er is niets aangepast.');
+    } finally {
+      setArchiveBusy(false);
     }
   }
 
@@ -1191,12 +1251,15 @@ export default function DashboardClient({ briefs, readOnly = false }) {
   ];
   const activeColumns = COLUMN_DEFS.filter((c) => c.core || visibleColumns.includes(c.key));
 
+  const archivedCount = useMemo(() => rows.filter((b) => !!b.archivedAt).length, [rows]);
+  const scopeRows = useMemo(() => rows.filter((b) => (showArchived ? !!b.archivedAt : !b.archivedAt)), [rows, showArchived]);
+
   const filtered = useMemo(() => {
     const ms = rangeToMs(range);
-    if (!ms) return rows;
+    if (!ms) return scopeRows;
     const cutoff = Date.now() - ms;
-    return rows.filter((b) => new Date(b.createdAt).getTime() >= cutoff);
-  }, [rows, range]);
+    return scopeRows.filter((b) => new Date(b.createdAt).getTime() >= cutoff);
+  }, [scopeRows, range]);
 
   const visible = useMemo(() => {
     if (!activeTile) return filtered;
@@ -1298,6 +1361,26 @@ export default function DashboardClient({ briefs, readOnly = false }) {
             {r.label}
           </button>
         ))}
+        {!readOnly && (
+          <>
+            <button
+              type="button"
+              onClick={() => { setShowArchived((v) => !v); setCleanupOpen(false); setPage(1); }}
+              style={{ border: '1px solid #C9C5B9', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, cursor: 'pointer', background: showArchived ? '#1D1D1D' : '#FFFFFF', color: showArchived ? '#FFFFFF' : '#5C5850' }}
+            >
+              {showArchived ? '← Terug naar dashboard' : `Archief (${archivedCount})`}
+            </button>
+            {!showArchived && (
+              <button
+                type="button"
+                onClick={() => { setCleanupOpen((v) => !v); setExportDone(false); setArchiveError(''); }}
+                style={{ border: '1px solid #C9C5B9', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, cursor: 'pointer', background: cleanupOpen ? '#FBF0C8' : '#FFFFFF', color: '#5C5850' }}
+              >
+                Opruimen…
+              </button>
+            )}
+          </>
+        )}
         {/* Free-text search — filters on top of whichever range/status
             filter is already active, rather than replacing them, so
             "find this client within the last month" still works. */}
@@ -1325,6 +1408,52 @@ export default function DashboardClient({ briefs, readOnly = false }) {
           )}
         </div>
       </div>
+
+      {!readOnly && cleanupOpen && !showArchived && (
+        <div style={{ ...cardStyle, marginBottom: 20, border: '1.5px solid #E6C858', background: '#FBF9EC' }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 6 }}>Dashboard opruimen</div>
+          <div style={{ fontSize: 12.5, color: '#5C5850', lineHeight: 1.55, marginBottom: 12 }}>
+            Er wordt niets verwijderd. De briefs in de huidige weergave ({searched.length}) gaan naar het archief en kunnen daar op elk moment worden teruggezet. Download eerst een export, zodat je de gegevens ook buiten de app hebt.
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}>
+            <a
+              href="/api/dashboard/reports/export"
+              onClick={() => setExportDone(true)}
+              style={{ border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, color: '#1D1D1D', textDecoration: 'none' }}
+            >
+              1. Download export (CSV, alle briefs)
+            </a>
+            <button
+              type="button"
+              disabled={!exportDone || archiveBusy || searched.length === 0}
+              onClick={() => setArchived(searched.map((b) => b.id), true)}
+              className="btn-primary"
+              style={{ padding: '9px 16px', flex: 'none', opacity: !exportDone || searched.length === 0 ? 0.5 : 1 }}
+            >
+              {archiveBusy ? 'Bezig…' : `2. Archiveer ${searched.length} brief${searched.length === 1 ? '' : 's'}`}
+            </button>
+          </div>
+          <div style={{ fontSize: 11.5, color: '#8C8880', marginTop: 8 }}>
+            Tip: gebruik de periode- of statusfilters en de zoekbalk om precies te kiezen wat er in het archief komt.
+          </div>
+          {archiveError && <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, marginTop: 8 }}>{archiveError}</div>}
+        </div>
+      )}
+
+      {!readOnly && showArchived && (
+        <div style={{ ...cardStyle, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 12.5, color: '#5C5850' }}>Je bekijkt het archief ({searched.length}). Niets hiervan is verwijderd.</div>
+          <button
+            type="button"
+            disabled={archiveBusy || searched.length === 0}
+            onClick={() => setArchived(searched.map((b) => b.id), false)}
+            style={{ border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {archiveBusy ? 'Bezig…' : `Zet ${searched.length} brief${searched.length === 1 ? '' : 's'} terug`}
+          </button>
+          {archiveError && <div style={{ width: '100%', fontSize: 12.5, color: '#C2513F', fontWeight: 600 }}>{archiveError}</div>}
+        </div>
+      )}
 
       <div
         style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(visibleStatTiles.length + 1, 6)}, 1fr)`, gap: 14, marginBottom: 26 }}
@@ -1507,16 +1636,19 @@ export default function DashboardClient({ briefs, readOnly = false }) {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ minWidth: 0 }}>
                   <h2 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-.01em', margin: 0, lineHeight: 1.25 }}>{selected.companyName || 'Nog geen bedrijfsnaam'}</h2>
-                  {/* Who this brief is about, at a glance: which agency it
-                      belongs to and who the contact is. These used to be
-                      buried in the Overzicht tab. */}
-                  <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 6, fontSize: 12.5, color: '#5C5850' }}>
-                    <span style={{ background: '#F3F1EA', borderRadius: 999, padding: '2px 10px' }}>{agencyNameOf(selected)}</span>
-                    {selected.contactPerson && <span style={{ background: '#F3F1EA', borderRadius: 999, padding: '2px 10px' }}>{selected.contactPerson}</span>}
-                  </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 'none' }}>
                   <StatusSelect disabled={readOnly} brief={selected} onChange={handleStatusChange} />
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      disabled={archiveBusy}
+                      onClick={() => setArchived([selected.id], !selected.archivedAt)}
+                      style={{ border: '1px solid #D2CFC8', background: '#FFFFFF', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#5C5850' }}
+                    >
+                      {selected.archivedAt ? 'Terugzetten' : 'Archiveren'}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setSelected(null)}
@@ -1772,6 +1904,20 @@ export default function DashboardClient({ briefs, readOnly = false }) {
 
             {modalTab === 'overzicht' && (
             <div className="tfa-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: 16 }}>
+              <div style={{ ...refCardStyle, gridColumn: '1 / -1' }}>
+                <ModalSectionTitle>Over het bedrijf</ModalSectionTitle>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
+                  <Field label="Wat voor bedrijf" empty={!selected.companyDescription}>{selected.companyDescription || 'Nog niet opgegeven'}</Field>
+                  <Field label="Website" empty={!selected.website}>
+                    {selected.website
+                      ? (safeWebsiteUrl(selected.website)
+                        ? <a href={safeWebsiteUrl(selected.website)} target="_blank" rel="noopener noreferrer" style={{ color: '#1F6F8C', textDecoration: 'none', wordBreak: 'break-all' }}>{selected.website} ↗</a>
+                        : selected.website)
+                      : 'Nog niet opgegeven'}
+                  </Field>
+                </div>
+              </div>
+
               <div style={refCardStyle}>
                 <ModalSectionTitle>Contact</ModalSectionTitle>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1793,7 +1939,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   <Field label="Hoofdspot">{selected.hoofdspotLength || '20'}″{variationsSummaryLabel(selected)}</Field>
                   {selected.needsVariations && parseVariationInfo(selected).map((v, i, arr) => (
-                    <Field key={'vi' + i} label={arr.length > 1 ? `Variatie ${i + 1}` : 'Variatie'} empty={!variationInfoLabel(v)}>{variationInfoLabel(v) || 'Nog niet toegelicht'}</Field>
+                    <Field key={'vi' + i} label={arr.length > 1 ? `Variatie ${i + 1}` : 'Variatie'} empty={!variationInfoLabelFull(v)}>{variationInfoLabelFull(v) || 'Nog niet toegelicht'}</Field>
                   ))}
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     <Field label="Op de radio" empty={!selected.airDate && !selected.dateUnknown}>{formatAirDate(selected)}</Field>
@@ -2003,7 +2149,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                     <ModalSectionTitle>Waar gaan de variaties over?</ModalSectionTitle>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {infos.map((v, i) => (
-                        <Field key={i} label={infos.length > 1 ? `Variatie ${i + 1}` : 'Variatie'} empty={!variationInfoLabel(v)}>{variationInfoLabel(v) || 'Nog niet opgegeven'}</Field>
+                        <Field key={i} label={infos.length > 1 ? `Variatie ${i + 1}` : 'Variatie'} empty={!variationInfoLabelFull(v)}>{variationInfoLabelFull(v) || 'Nog niet opgegeven'}</Field>
                       ))}
                     </div>
                   </div>
@@ -2043,7 +2189,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 return (
                   <div style={refCardStyle}>
                     <ModalSectionTitle>{selected.scriptsReleasedAt && !selected.scriptApproved && !selected.finalizedAt ? 'Script (huidige keuze van de klant)' : 'Script'}{variationCount > 0 ? ' · hoofdspot' : ''}</ModalSectionTitle>
-                    <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontStyle: mainText ? 'italic' : 'normal', fontSize: 14.5, lineHeight: 1.6, color: mainText ? '#1D1D1D' : '#9C9890' }}>
+                    <div style={mainText ? { background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#1D1D1D' } : { fontSize: 13.5, color: '#9C9890' }}>
                       {mainText || 'Nog geen script goedgekeurd.'}
                     </div>
                     {variationCount > 0 && (
@@ -2055,10 +2201,10 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                           return (
                             <div key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
                               <div style={{ fontSize: 11, fontWeight: 600, color: '#5C5850', textTransform: 'uppercase', letterSpacing: '.03em' }}>
-                                {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{variationInfoLabel(variationInfos[idx]) ? ' · ' + variationInfoLabel(variationInfos[idx]) : ''}{changed ? ': wat verschilt' : ''}
+                                {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{variationInfoLabelFull(variationInfos[idx]) ? ' · ' + variationInfoLabelFull(variationInfos[idx]) : ''}{changed ? ': wat verschilt' : ''}
                               </div>
                               {changed ? (
-                                <div style={{ fontFamily: "'Playfair Display', Georgia, serif", fontSize: 14.5, lineHeight: 1.6, marginTop: 6 }}>
+                                <div style={{ fontSize: 13.5, lineHeight: 1.6, marginTop: 6, whiteSpace: 'pre-wrap' }}>
                                   <DiffPreview tokens={tokens} />
                                 </div>
                               ) : (

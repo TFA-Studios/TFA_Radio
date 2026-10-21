@@ -3,18 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
+import AudioScrubber, { PlayIcon } from '../../../../components/AudioScrubber';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
 
 const MAX_TRACKS = 3;
-
-function formatTime(sec) {
-  if (!isFinite(sec) || sec < 0) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
 
 // Step 6 — mirrors public/music.html: browse curated playlists, pick up to
 // 3 favorite tracks. Tracks come from the producer's real library (added
@@ -112,20 +106,9 @@ export default function MusicPage({ params }) {
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  // ±5s skip and drag-to-seek for the currently playing preview — see the
-  // identical pair in voice/page.js.
-  function skipPreview(delta) {
+  function seekPreview(t) {
     const audio = audioRef.current;
     if (!audio) return;
-    const max = duration || audio.duration || 0;
-    audio.currentTime = Math.max(0, Math.min(max, audio.currentTime + delta));
-    setCurrentTime(audio.currentTime);
-  }
-
-  function seekPreview(e) {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const t = parseFloat(e.target.value);
     audio.currentTime = t;
     setCurrentTime(t);
   }
@@ -249,9 +232,9 @@ export default function MusicPage({ params }) {
   const atLimit = selectedTracks.length >= MAX_TRACKS;
 
   return (
-    <StepShell briefId={id} current={6} brief={brief} bigNum="06" kicker="Onze voorstellen voor jou" title="Kies je muziek" hint={'TFA curateert deze playlists. Open een categorie, beluister een track en kies degene die het beste bij ' + name + ' past.'} backHref={`/brief/${id}/voice`} backLabel="Terug naar de stem">
+    <StepShell briefId={id} current={6} brief={brief} bigNum="06" kicker="Onze voorstellen voor jou" title="Kies je muziek" hint={'Open een categorie, beluister een paar tracks en kies degene die het beste bij ' + name + ' past.'} backHref={`/brief/${id}/voice`} backLabel="Terug naar de stem">
       <div className="box" style={{ border: '1px dashed #E6C858', fontSize: 12, color: '#383209', marginBottom: 20 }}>
-        Je kunt tot <b>3 tracks</b> kiezen als favoriet. TFA combineert er uiteindelijk één met de gekozen stem tot je definitieve mix.
+        Wij adviseren <b>één track</b>: de muziek die voor jou het beste voelt. Twijfel je? Kies er dan maximaal <b>drie</b>, dan kiest TFA er één uit die het best bij je stem en script past.
       </div>
 
       {poolLoading ? (
@@ -301,8 +284,8 @@ export default function MusicPage({ params }) {
                             cursor: atLimit && !selected ? 'not-allowed' : 'pointer',
                           }}
                         >
-                          <button type="button" onClick={(e) => { e.stopPropagation(); playPreview(track); }} style={{ flex: 'none', width: 30, height: 30, borderRadius: '50%', border: '1px solid #C9C5B9', background: '#FBF9EC', cursor: 'pointer' }}>
-                            {isPlaying ? '❚❚' : '▶'}
+                          <button type="button" onClick={(e) => { e.stopPropagation(); playPreview(track); }} style={{ flex: 'none', width: 32, height: 32, borderRadius: '50%', border: 'none', background: '#1D1D1D', color: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <PlayIcon playing={isPlaying} />
                           </button>
                           {/* The title stays visible whether or not this track is
                               playing — it used to be swapped out for the scrubber,
@@ -316,21 +299,7 @@ export default function MusicPage({ params }) {
                             <div style={{ fontSize: 11, color: '#8C8880', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist}{track.artist && track.duration ? ' · ' : ''}{track.duration}</div>
                           </div>
                           {isPlaying && track.audioUrl && (
-                            <div onClick={(e) => e.stopPropagation()} style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <button type="button" onClick={() => skipPreview(-5)} title="5 seconden terug" style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#5C5850', flex: 'none', padding: '2px' }}>⏮</button>
-                              <span style={{ fontSize: 10.5, color: '#8C6D1F', flex: 'none', width: 28, textAlign: 'right' }}>{formatTime(currentTime)}</span>
-                              <input
-                                type="range"
-                                min={0}
-                                max={duration || 0}
-                                step={0.01}
-                                value={Math.min(currentTime, duration || 0)}
-                                onChange={seekPreview}
-                                style={{ flex: 1, minWidth: 0, accentColor: '#E6C858', cursor: 'pointer' }}
-                              />
-                              <span style={{ fontSize: 10.5, color: '#8C6D1F', flex: 'none', width: 28 }}>{formatTime(duration)}</span>
-                              <button type="button" onClick={() => skipPreview(5)} title="5 seconden vooruit" style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#5C5850', flex: 'none', padding: '2px' }}>⏭</button>
-                            </div>
+                            <AudioScrubber currentTime={currentTime} duration={duration} onSeek={seekPreview} />
                           )}
                           <button
                             type="button"
@@ -358,7 +327,7 @@ export default function MusicPage({ params }) {
 
       {selectedTracks.length > 0 && (
         <div style={{ marginTop: 16, borderRadius: 10, padding: '14px 16px', fontSize: 12.5, color: '#383209', lineHeight: 1.5, background: '#E6C858' }}>
-          <div>{selectedTracks.length > 1 ? 'Gekozen tracks (max. 3, TFA levert er 1):' : 'Gekozen track:'}</div>
+          <div>{selectedTracks.length > 1 ? 'Gekozen tracks (TFA kiest er één uit):' : 'Gekozen track:'}</div>
           {selectedTracks.map((t, i) => {
             // The saved selection only stores id/title/artist/playlist — not
             // audioUrl — so look the full track up in the loaded pool to get
@@ -373,9 +342,9 @@ export default function MusicPage({ params }) {
                   <button
                     type="button"
                     onClick={() => playPreview(fullTrack)}
-                    style={{ flex: 'none', width: 26, height: 26, borderRadius: '50%', border: '1px solid #C9C5B9', background: '#FBF9EC', cursor: 'pointer', fontSize: 11 }}
+                    style={{ flex: 'none', width: 28, height: 28, borderRadius: '50%', border: 'none', background: '#1D1D1D', color: '#FFFFFF', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    {isPlaying ? '❚❚' : '▶'}
+                    <PlayIcon playing={isPlaying} />
                   </button>
                 )}
                 <div style={{ flex: isPlaying && fullTrack && fullTrack.audioUrl ? '0 1 34%' : '1 1 auto', minWidth: 0 }}>
@@ -383,21 +352,7 @@ export default function MusicPage({ params }) {
                   <div style={{ fontSize: 11, color: '#5C5850', marginTop: 1 }}>{t.playlistName}</div>
                 </div>
                 {isPlaying && fullTrack && fullTrack.audioUrl && (
-                  <div style={{ flex: '1 1 auto', minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <button type="button" onClick={() => skipPreview(-5)} title="5 seconden terug" style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#5C5850', flex: 'none', padding: '2px' }}>⏮</button>
-                    <span style={{ fontSize: 10.5, color: '#8C6D1F', flex: 'none', width: 28, textAlign: 'right' }}>{formatTime(currentTime)}</span>
-                    <input
-                      type="range"
-                      min={0}
-                      max={duration || 0}
-                      step={0.01}
-                      value={Math.min(currentTime, duration || 0)}
-                      onChange={seekPreview}
-                      style={{ flex: 1, minWidth: 0, accentColor: '#E6C858', cursor: 'pointer' }}
-                    />
-                    <span style={{ fontSize: 10.5, color: '#8C6D1F', flex: 'none', width: 28 }}>{formatTime(duration)}</span>
-                    <button type="button" onClick={() => skipPreview(5)} title="5 seconden vooruit" style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#5C5850', flex: 'none', padding: '2px' }}>⏭</button>
-                  </div>
+                  <AudioScrubber currentTime={currentTime} duration={duration} onSeek={seekPreview} />
                 )}
                 <button type="button" onClick={() => removeTrack(t.id)} aria-label="Verwijderen" style={{ flex: 'none', width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent', cursor: 'pointer' }}>✕</button>
               </div>

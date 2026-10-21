@@ -19,7 +19,7 @@ export default function ContactPage({ params }) {
   const returnToOverview = useSearchParams().get('from') === 'overview';
   const { brief, loading, schedulePatch, flushPending, patch } = useBrief(id);
   const showLoader = useMinDelay(loading, 700);
-  const [form, setForm] = useState({ companyName: '', contactPerson: '', contactEmail: '', additionalContacts: [] });
+  const [form, setForm] = useState({ companyName: '', companyDescription: '', website: '', contactPerson: '', contactEmail: '', additionalContacts: [] });
   // Set the instant the client clicks "Volgende" — before the save even
   // starts — so the preloader takes over immediately instead of the client
   // sitting on the current page while the autosave/patch call is in flight.
@@ -47,6 +47,8 @@ export default function ContactPage({ params }) {
       }
       setForm({
         companyName: brief.companyName || '',
+        companyDescription: brief.companyDescription || '',
+        website: brief.website || '',
         contactPerson: brief.contactPerson || '',
         contactEmail: brief.contactEmail || '',
         additionalContacts,
@@ -118,6 +120,14 @@ export default function ContactPage({ params }) {
         <div className="full">
           <label className="field-label">Bedrijfsnaam</label>
           <input type="text" value={form.companyName} placeholder="Bijv. Jouw Bedrijfsnaam" onChange={(e) => update('companyName', e.target.value)} />
+        </div>
+        <div>
+          <label className="field-label">Wat voor bedrijf is het? <span style={{ color: '#8C8880', fontWeight: 400 }}>(kort)</span></label>
+          <input type="text" maxLength={300} value={form.companyDescription} placeholder="Bijv. bakkerij in Utrecht, autodealer, webshop in tuinmeubels" onChange={(e) => update('companyDescription', e.target.value)} />
+        </div>
+        <div>
+          <label className="field-label">Website <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+          <input type="text" inputMode="url" maxLength={200} value={form.website} placeholder="bijv. bakkerijvandijk.nl" onChange={(e) => update('website', e.target.value)} />
         </div>
         <div>
           <label className="field-label">Contactpersoon</label>

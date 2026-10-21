@@ -18,13 +18,14 @@ function isUnseenBrief(b) {
 
 export default async function DashboardPage() {
   const viewer = await getViewer();
-  const briefs = scopeBriefs(viewer, await listBriefs());
+  // Staff-archived briefs stay out of an agency's view; staff see them in the archive.
+  const briefs = scopeBriefs(viewer, await listBriefs()).filter((b) => viewer.role !== 'agency' || !b.archivedAt);
   const isAgency = viewer.role === 'agency';
-  const unseenCount = briefs.filter(isUnseenBrief).length;
+  const unseenCount = briefs.filter((b) => !b.archivedAt && isUnseenBrief(b)).length;
 
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
-      <DashboardSidebar active="dashboard" unseenCount={isAgency ? 0 : unseenCount} role={viewer.role} />
+      <DashboardSidebar active="dashboard" unseenCount={isAgency ? 0 : unseenCount} role={viewer.role} partnerLogo={isAgency ? viewer.agency.logoDark || '' : ''} />
 
       <main style={{ flex: 1, padding: '32px 36px', minWidth: 0 }} className="tfa-dash-main">
         <header style={{ margin: '0 0 22px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>

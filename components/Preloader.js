@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 
 // Full-screen loading state built from the client's animated brand mark
 // (public/brand/preloader.mp4) instead of a blank page or a generic spinner.
@@ -48,10 +49,14 @@ export default function Preloader({ fullScreen = true, messages }) {
   const [msgIdx, setMsgIdx] = useState(0);
   // Partner co-branding (see useBrief's rememberPartnerLogo). Read after mount
   // so server and client render the same first paint.
+  const pathname = usePathname();
   const [partnerLogo, setPartnerLogo] = useState('');
   useEffect(() => {
-    try { setPartnerLogo(window.sessionStorage.getItem('tfa_partner_logo') || ''); } catch (e) {}
-  }, []);
+    // Dashboard pages read the agency-login key, client-flow pages the
+    // agency-code key: a logo never leaks from one to the other.
+    const key = pathname && pathname.startsWith('/dashboard') ? 'tfa_partner_logo_dash' : 'tfa_partner_logo';
+    try { setPartnerLogo(window.sessionStorage.getItem(key) || ''); } catch (e) {}
+  }, [pathname]);
   useEffect(() => {
     if (!messages || messages.length < 2) return undefined;
     const reduceMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;

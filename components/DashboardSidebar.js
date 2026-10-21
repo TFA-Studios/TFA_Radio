@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import SpotFlowLogo from './SpotFlowLogo';
+import PartnerLogoSync from './PartnerLogoSync';
 
 // Shared producer-dashboard sidebar — single source of truth for the nav
 // links + logout footer, used by every /dashboard/* page instead of each
@@ -26,7 +27,7 @@ async function HeaderUser() {
   return <UserButton afterSignOutUrl="/" />;
 }
 
-export default function DashboardSidebar({ active, unseenCount = 0, role = 'staff' }) {
+export default function DashboardSidebar({ active, unseenCount = 0, role = 'staff', partnerLogo = '' }) {
   // Agency logins only get the dashboard (their own briefs) — see lib/access.js.
   const navItems = role === 'agency' ? NAV_ITEMS.filter((i) => i.key === 'dashboard') : NAV_ITEMS;
   return (
@@ -37,6 +38,7 @@ export default function DashboardSidebar({ active, unseenCount = 0, role = 'staf
       }}
       className="tfa-dash-sidebar"
     >
+      <PartnerLogoSync logo={partnerLogo} />
       <Link href="/" style={{ textDecoration: 'none' }}>
         <SpotFlowLogo size={24} variant="dark" className="tfa-dash-sidebar-brand" />
       </Link>

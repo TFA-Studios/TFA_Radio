@@ -3,17 +3,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
+import AudioScrubber, { PlayIcon } from '../../../../components/AudioScrubber';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
 import { AGE_LABELS } from '../../../../components/flowData';
-
-function formatTime(sec) {
-  if (!isFinite(sec) || sec < 0) return '0:00';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${String(s).padStart(2, '0')}`;
-}
+import { matchVoices } from '../../../../lib/voiceMatch';
 
 // Step 5 — mirrors public/voice.html (questions phase, then a curated
 // shortlist of voices to pick from). Voices come from the producer's real
@@ -109,22 +104,9 @@ export default function VoicePage({ params }) {
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  // ±5s skip and drag-to-seek for the currently playing preview — kept as
-  // free functions (rather than baked into playPreview) so the compact
-  // inline controls below can call them directly without re-triggering the
-  // play/stop toggle.
-  function skipPreview(delta) {
+  function seekPreview(t) {
     const audio = audioRef.current;
     if (!audio) return;
-    const max = duration || audio.duration || 0;
-    audio.currentTime = Math.max(0, Math.min(max, audio.currentTime + delta));
-    setCurrentTime(audio.currentTime);
-  }
-
-  function seekPreview(e) {
-    const audio = audioRef.current;
-    if (!audio) return;
-    const t = parseFloat(e.target.value);
     audio.currentTime = t;
     setCurrentTime(t);
   }
@@ -188,30 +170,8 @@ export default function VoicePage({ params }) {
     const wantAge = form.voiceAgeRange || null;
     const wantTags = form.voiceStyleTags;
 
-    function matches({ gender, age, tags }) {
-      return voicePool.filter((v) => {
-        if (gender && v.gender !== wantGender) return false;
-        if (age && v.ageRange !== wantAge) return false;
-        if (tags && wantTags.length && !wantTags.some((t) => (v.tags || []).includes(t))) return false;
-        return true;
-      });
-    }
-
-    if (!wantGender && !wantAge && wantTags.length === 0) {
-      return { voices: voicePool, relaxed: [] };
-    }
-
-    const attempts = [
-      { criteria: { gender: true, age: true, tags: true }, relaxed: [] },
-      { criteria: { gender: true, age: true, tags: false }, relaxed: ['karakter'] },
-      { criteria: { gender: true, age: false, tags: false }, relaxed: ['karakter', 'leeftijd'] },
-      { criteria: { gender: false, age: false, tags: false }, relaxed: ['karakter', 'leeftijd', 'geslacht'] },
-    ];
-    for (const attempt of attempts) {
-      const found = matches(attempt.criteria);
-      if (found.length) return { voices: found, relaxed: attempt.relaxed };
-    }
-    return { voices: voicePool, relaxed: ['karakter', 'leeftijd', 'geslacht'] };
+    const { voices, relaxed } = matchVoices(voicePool, { gender: wantGender, age: wantAge, tags: wantTags });
+    return { voices, relaxed };
   }
 
   function selectVoice(voice) {
@@ -272,11 +232,11 @@ export default function VoicePage({ params }) {
   }
 
   return (
-    <StepShell briefId={id} current={5} brief={brief} bigNum="05" kicker={phase === 'questions' ? 'Voor je voorstellen' : 'Onze voorstellen voor jou'} title={phase === 'questions' ? 'Welke stem past bij jou?' : 'Kies je stem'} backHref={`/brief/${id}/script`} backLabel="Terug naar je script">
+    <StepShell briefId={id} current={5} brief={brief} bigNum="05" kicker={phase === 'questions' ? 'Voor je voorstellen' : 'Onze voorstellen voor jou'} title={phase === 'questions' ? 'Welke stem past bij jou?' : 'Kies je stem'} backHref={phase === 'questions' ? `/brief/${id}/script` : undefined} backLabel="Terug naar je script" onBack={phase === 'questions' ? undefined : () => { stopAudio(); setPlayingId(null); setPhase('questions'); }} backText="Terug naar je stemvoorkeuren">
       {phase === 'questions' ? (
         <>
           <p style={{ fontSize: 13.5, lineHeight: 1.55, color: '#5C5850', margin: '0 0 26px' }}>
-            Beantwoord een paar korte vragen, dan stelt TFA daarna twee of drie stemmen voor die daarbij passen.
+            Beantwoord een paar korte vragen, dan stelt TFA daarna twee of drie stemmen voor die daarbij passen. Geen idee wat bij jullie past? Laat dan alles open: je hoort dan een brede selectie en kiest op gehoor.
           </p>
           <div style={{ marginTop: 10 }}>
             <label className="field-label">Geslacht van de stem</label>
@@ -351,27 +311,15 @@ export default function VoicePage({ params }) {
                         onClick={(e) => e.stopPropagation()}
                         style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 6, width: '100%', border: '1px solid #E6C858', borderRadius: 9, background: 'rgba(230,200,88,.14)', padding: '7px 10px' }}
                       >
-                        <button type="button" onClick={() => skipPreview(-5)} title="5 seconden terug" style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#383209', flex: 'none', padding: '2px' }}>⏮</button>
                         <button
                           type="button"
                           onClick={() => playPreview(voice)}
                           title="Pauzeer"
-                          style={{ width: 26, height: 26, borderRadius: '50%', border: 'none', background: '#1D1D1D', color: '#FFFFFF', cursor: 'pointer', fontSize: 11, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                          style={{ width: 30, height: 30, borderRadius: '50%', border: 'none', background: '#1D1D1D', color: '#FFFFFF', cursor: 'pointer', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          ❚❚
+                          <PlayIcon playing />
                         </button>
-                        <button type="button" onClick={() => skipPreview(5)} title="5 seconden vooruit" style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 14, color: '#383209', flex: 'none', padding: '2px' }}>⏭</button>
-                        <span style={{ fontSize: 10.5, color: '#8C6D1F', flex: 'none', width: 30, textAlign: 'right' }}>{formatTime(currentTime)}</span>
-                        <input
-                          type="range"
-                          min={0}
-                          max={duration || 0}
-                          step={0.01}
-                          value={Math.min(currentTime, duration || 0)}
-                          onChange={seekPreview}
-                          style={{ flex: 1, accentColor: '#E6C858', cursor: 'pointer' }}
-                        />
-                        <span style={{ fontSize: 10.5, color: '#8C6D1F', flex: 'none', width: 30 }}>{formatTime(duration)}</span>
+                        <AudioScrubber currentTime={currentTime} duration={duration} onSeek={seekPreview} />
                       </div>
                     ) : (
                       <button

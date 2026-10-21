@@ -34,6 +34,8 @@ function isoDateInDays(n) {
 function sampleData(brief) {
   const data = {
     companyName: 'Bakkerij Van Dijk',
+    companyDescription: 'Ambachtelijke bakkerij in Utrecht',
+    website: 'bakkerijvandijk.example',
     contactPerson: 'Karim (test)',
     contactEmail: TEST_EMAIL,
     additionalContacts: '[]',

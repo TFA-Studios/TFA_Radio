@@ -126,7 +126,7 @@ function ResumeCard({ briefId, defaultEmail }) {
 // On a narrow (<=900px) screen the sidebar stays down the LEFT EDGE as a
 // slim step-number rail instead of stacking full-width above the form —
 // see the mobile media query below for why and how.
-export default function StepShell({ briefId, current, brief, subtitle, bigNum, kicker, title, hint, backHref, backLabel, children, showWipe = false }) {
+export default function StepShell({ briefId, current, brief, subtitle, bigNum, kicker, title, hint, backHref, backLabel, onBack, backText, children, showWipe = false }) {
   usePartnerTitle(brief);
   const reached = computeReached(brief);
   // Steps 4-7 only open once TFA's copywriters released the scripts: anyone
@@ -138,6 +138,10 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
     if (guardStage === 'writing') stageRouter.replace(`/brief/${briefId}/review`);
     else if (guardStage === 'filling') stageRouter.replace(`/brief/${briefId}/details`);
   }, [guardStage, briefId, stageRouter]);
+  // Once TFA released the scripts, the contact/delivery/brief steps are
+  // history: the sidebar shows them as done but they no longer link back.
+  // The overview's own "Wijzig" links stay the one way to correct a detail.
+  const stepsLocked = brief ? ['choosing', 'final'].includes(briefStageOf(brief)) : false;
   const companyName = brief && brief.companyName && brief.companyName.trim() ? brief.companyName : null;
   const pathname = usePathname();
   // Once the main script is approved AND the client asked for variation(s),
@@ -282,7 +286,8 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
         <div className="tfa-step-nav" style={{ marginTop: 28, display: 'flex', flexDirection: 'column', gap: 1 }}>
           {STEPS.map((step) => {
             const isCurrent = step.n === current;
-            const isDone = !isCurrent && (step.n < current || !!reached[step.n]);
+            const locked = stepsLocked && step.n <= 3;
+            const isDone = !isCurrent && (step.n < current || !!reached[step.n] || locked);
             // Background/border-left are only set inline for the CURRENT
             // step. For every other row they're left to the "tfa-step-item"
             // CSS class below instead of being inlined as 'transparent' —
@@ -291,7 +296,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
             // cancelling out the hover highlight on every clickable step.
             const rowStyle = {
               display: 'flex', alignItems: 'center', gap: 10, padding: isCurrent ? '10px 12px' : '9px 10px',
-              borderRadius: '0 6px 6px 0', textDecoration: 'none', cursor: isDone ? 'pointer' : 'default',
+              borderRadius: '0 6px 6px 0', textDecoration: 'none', cursor: isDone && !locked ? 'pointer' : 'default',
               ...(isCurrent ? { borderLeft: '2px solid #E6C858', background: 'rgba(230,200,88,.10)' } : null),
             };
             const numColor = isCurrent || isDone ? '#E6C858' : '#77746A';
@@ -336,7 +341,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
                 ↳ Variaties
               </Link>
             ) : null;
-            if (isDone && briefId) {
+            if (isDone && briefId && !locked) {
               return (
                 <span key={step.n} style={{ display: 'contents' }}>
                   <Link href={`/brief/${briefId}/${step.path}`} style={rowStyle} className="tfa-step-item tfa-step-row">
@@ -348,7 +353,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
             }
             return (
               <span key={step.n} style={{ display: 'contents' }}>
-                <div style={rowStyle} className="tfa-step-item">
+                <div style={rowStyle} className="tfa-step-item" title={locked ? 'Dit stuk is afgerond. Aanpassen kan via het overzicht.' : undefined}>
                   {inner}
                 </div>
                 {variationsSubRow}
@@ -400,7 +405,13 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
           {/* The sidebar links are hidden on the slim mobile rail, so phones get
               this small one at the top of the page instead. */}
           <Link href="/" onClick={(e) => askLeave(e, '/')} className="tfa-home-link-mobile">⌂ Homepage</Link>
-          {backHref ? (
+          {onBack ? (
+            <div style={{ marginBottom: 18 }}>
+              <a href="#" onClick={(e) => { e.preventDefault(); onBack(); }} style={{ fontSize: 12, color: '#8C8880', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                ← {backText || 'Terug'}
+              </a>
+            </div>
+          ) : backHref ? (
             <div style={{ marginBottom: 18 }}>
               <Link href={backHref} style={{ fontSize: 12, color: '#8C8880', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 ← {backLabel || 'Terug'}
