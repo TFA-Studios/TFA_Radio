@@ -1,6 +1,6 @@
 import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
-import { addReviewRound } from '../../../../../../lib/db';
+import { addReviewRound, logBriefEvent } from '../../../../../../lib/db';
 import { sendReviewReadyEmail } from '../../../../../../lib/email';
 
 // Producer-only — gated by middleware.js (isProtectedRoute matches
@@ -38,6 +38,7 @@ export async function POST(request, { params }) {
   } catch (e) {
     rounds = [];
   }
+  await logBriefEvent(params.id, { actor: 'tfa', type: 'review_round', text: 'TFA deelde een review-ronde' + (note ? ': ' + note : ''), detail: frameioLink });
   const newRound = Array.isArray(rounds) && rounds.length ? rounds[rounds.length - 1] : null;
 
   const reviewUrl = appUrl ? appUrl + '/brief/' + brief.id + '/review' : '';

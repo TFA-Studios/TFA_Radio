@@ -421,6 +421,7 @@ export default function ScriptPage({ params }) {
           Dit vak hieronder is van jou: typ er zelf in om woorden toe te voegen, te wijzigen of te verwijderen, precies
           zoals je zelf een tekstbericht zou aanpassen. Alles wat je typt wordt automatisch bewaard; met &ldquo;Aanpassing
           opslaan&rdquo; onder het vak zie je meteen dat het is vastgelegd. Goedkeuren doe je pas met de grote knop onderaan. Let er wel op dat het script in {spotLength} seconden moet blijven passen.
+          {hasVariation && ' Je variaties bouwen voort op dit hoofdscript: een aanpassing aan tekst die in alle versies hetzelfde is, nemen wij automatisch mee in je ' + (variationCount > 1 ? 'variaties' : 'variatie') + '. Je hoeft dat dus niet per variatie opnieuw te doen.'}
         </p>
         <textarea
           style={{ minHeight: 140, fontSize: 15.5, lineHeight: 1.65, fontWeight: 500, background: '#FFFDF3', borderLeft: '3px solid #E6C858' }}

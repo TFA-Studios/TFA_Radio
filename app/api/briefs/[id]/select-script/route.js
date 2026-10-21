@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
-import { getBrief, selectScriptVersion } from '../../../../../lib/db';
+import { getBrief, selectScriptVersion, logBriefEvent } from '../../../../../lib/db';
 
 // Public (like the rest of /api/briefs/*) — the client-flow script step
 // uses this so the client can pick their favorite of the (up to 3) script
@@ -22,5 +22,8 @@ export async function POST(request, { params }) {
   if (existing.finalizedAt) return NextResponse.json({ error: 'already_finalized' }, { status: 409 });
   const updated = await selectScriptVersion(params.id, versionId);
   if (!updated) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  let n = 0;
+  try { n = (JSON.parse(existing.scriptHistory || '[]').findIndex((h) => h.id === versionId)) + 1; } catch (e) {}
+  await logBriefEvent(params.id, { actor: 'klant', type: 'script_chosen', text: 'Klant koos ' + (n ? 'voorstel ' + n : 'een voorstel'), detail: updated.generatedScript || '' });
   return NextResponse.json(toPublicBrief(updated));
 }

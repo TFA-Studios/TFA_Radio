@@ -1,6 +1,6 @@
 import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
-import { reopenScripts } from '../../../../../../lib/db';
+import { reopenScripts, logBriefEvent } from '../../../../../../lib/db';
 
 // Producer-only — gated by middleware.js. Takes the released script proposals
 // back (used when the client said none of them fit) so the copywriter stage
@@ -12,5 +12,6 @@ export async function POST(request, { params }) {
   if (denied) return denied;
   const brief = await reopenScripts(params.id);
   if (!brief) return NextResponse.json({ error: 'not_available', message: 'Kan de voorstellen niet terugnemen (al bevestigd door de klant?).' }, { status: 409 });
+  await logBriefEvent(params.id, { actor: 'tfa', type: 'reopened', text: 'TFA nam de voorstellen terug om nieuwe te schrijven' });
   return NextResponse.json(brief);
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
-import { getBrief, saveEdit, saveScriptAudit, addInternalNote } from '../../../../../lib/db';
+import { getBrief, saveEdit, saveScriptAudit, addInternalNote, logBriefEvent } from '../../../../../lib/db';
 import { syncVariationsPatch } from '../../../../../lib/scriptSync';
 import { notifyAuditReply } from '../../../../../lib/slack';
 
@@ -28,11 +28,13 @@ export async function POST(request, { params }) {
     }
     current = (await saveScriptAudit(params.id, { scriptAuditStatus: 'approved', scriptAuditedAt: now, scriptAuditReply: '' })) || current;
     await addInternalNote(params.id, { author: 'Klant', text: 'Klant nam ons tegenvoorstel voor het script over.' }).catch(() => {});
+    await logBriefEvent(params.id, { actor: 'klant', type: 'counter_accepted', text: 'Klant nam ons tegenvoorstel over', detail: current.editedScript || '' });
   } else if (body.action === 'reply') {
     message = typeof body.message === 'string' ? body.message.trim().slice(0, 800) : '';
     if (!message) return NextResponse.json({ error: 'empty' }, { status: 400 });
     current = (await saveScriptAudit(params.id, { scriptAuditStatus: 'pending', scriptAuditReply: message, scriptAuditedAt: '' })) || current;
     await addInternalNote(params.id, { author: 'Klant', text: 'Reactie op ons scriptvoorstel: ' + message }).catch(() => {});
+    await logBriefEvent(params.id, { actor: 'klant', type: 'counter_replied', text: 'Klant hield de eigen versie en reageerde', detail: message });
   } else {
     return NextResponse.json({ error: 'invalid_action' }, { status: 400 });
   }

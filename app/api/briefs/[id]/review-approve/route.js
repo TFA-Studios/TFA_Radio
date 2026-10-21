@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
-import { approveReview, markAdminNotified } from '../../../../../lib/db';
+import { approveReview, markAdminNotified, logBriefEvent } from '../../../../../lib/db';
 import { notifyDelivered } from '../../../../../lib/slack';
 
 // Public (like the rest of /api/briefs/*) — the client's private review
@@ -16,6 +16,7 @@ export async function POST(request, { params }) {
   const brief = await approveReview(params.id);
   if (!brief) return NextResponse.json({ error: 'not_found_or_no_round' }, { status: 404 });
 
+  await logBriefEvent(params.id, { actor: 'klant', type: 'review_approved', text: 'Klant keurde de review goed' });
   let dashboardUrl;
   try {
     dashboardUrl = new URL(request.url).origin + '/dashboard';

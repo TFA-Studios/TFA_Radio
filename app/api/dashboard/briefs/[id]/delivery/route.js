@@ -1,6 +1,6 @@
 import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
-import { saveDelivery } from '../../../../../../lib/db';
+import { saveDelivery, logBriefEvent } from '../../../../../../lib/db';
 import { sendDeliveryEmail } from '../../../../../../lib/email';
 
 // Producer-only — gated by middleware.js, same as the other dashboard-only
@@ -26,6 +26,7 @@ export async function POST(request, { params }) {
   const brief = await saveDelivery(params.id, { link, recipientEmail });
   if (!brief) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
+  await logBriefEvent(params.id, { actor: 'tfa', type: 'delivered', text: 'Definitieve audio geleverd aan ' + recipientEmail, detail: link });
   // Never let a Resend/email hiccup undo the save above — the link and
   // recipient are already on record either way (same never-blocks
   // philosophy as every other notification in this app).

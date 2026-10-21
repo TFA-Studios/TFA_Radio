@@ -7,6 +7,9 @@ import {
   formatAirDate, deliveryDeadlineMeta, TONE_LABELS, finalTrackOf, agencyNameOf, agencyContactEmailOf,
   parseVariationInfo, variationInfoLabelFull, safeWebsiteUrl, impressionsShort, audienceLabel, describeGenderSplit, scriptChangesOf, scriptCheckState,
 } from './flowData';
+import AutoTextarea from './AutoTextarea';
+import Indicator from './Indicator';
+import { scriptIndicator, productionIndicator } from './statusIndicators';
 import { profileOfBrief, answersOfBrief } from '../lib/formProfile';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
 import { SCRIPT_SOURCE_META } from '../lib/reports';
@@ -123,8 +126,12 @@ const MODAL_TABS = [
 // (the air-date question); reusing it here for a completely different,
 // producer-only thing would read as the same feature.
 const DELIVERY_TAB = { key: 'uitlevering', label: 'Uitlevering' };
+// Last and low-key: the full log of what was changed and decided, only for
+// when you need to trace something back (see HistoryPanel).
+const HISTORY_TAB = { key: 'historie', label: 'Historie' };
 function modalTabsFor(brief) {
-  return brief && brief.reviewApprovedAt ? MODAL_TABS.concat([DELIVERY_TAB]) : MODAL_TABS;
+  const base = brief && brief.reviewApprovedAt ? MODAL_TABS.concat([DELIVERY_TAB]) : MODAL_TABS;
+  return base.concat([HISTORY_TAB]);
 }
 
 function rangeToMs(key) {
@@ -166,41 +173,6 @@ function statusMetaOf(brief) {
   return STATUS_META[brief.status] || STATUS_META.todo;
 }
 
-// Short badge shown right in the table (and echoed at the top of the
-// modal) so a review round in flight is visible without opening the brief
-// at all. Separate from the producer-editable `status` pill — this reads
-// productionStatus directly, which lib/db.js's addReviewRound/
-// addReviewFeedback/approveReview keep in sync with `status` behind the
-// scenes (awaiting_review -> pending_customer, in_revision -> in_progress,
-// approved -> done), but the wording here is specific to the review step
-// rather than the generic 4-value workflow status.
-const PRODUCTION_BADGE_META = {
-  // Copywriter workflow (see briefStageOf in components/flowData.js): the
-  // brief is in, the drafts are waiting for the producer to check and
-  // release — then the client picks. Producer-facing wording, so
-  // script_writing reads as the TFA to-do it is, not the client's "being
-  // written" copy.
-  script_writing: { label: 'Script nakijken', color: '#C2513F', bg: 'rgba(194,81,63,.12)' },
-  script_choosing: { label: 'Klant kiest script', color: '#8C6D1F', bg: 'rgba(230,200,88,.22)' },
-  awaiting_review: { label: 'Review verzonden', color: '#8C6D1F', bg: 'rgba(230,200,88,.22)' },
-  in_revision: { label: 'Feedback ontvangen', color: '#C2513F', bg: 'rgba(194,81,63,.12)' },
-  approved: { label: 'Goedgekeurd', color: '#1D7A46', bg: 'rgba(29,122,70,.12)' },
-};
-function ProductionBadge({ brief, small }) {
-  const meta = PRODUCTION_BADGE_META[brief.productionStatus];
-  if (!meta) return null;
-  return (
-    <span
-      style={{
-        display: 'inline-block', fontSize: small ? 10.5 : 11.5, fontWeight: 600, color: meta.color, background: meta.bg,
-        borderRadius: 999, padding: small ? '2px 7px' : '3px 9px', whiteSpace: 'nowrap',
-      }}
-    >
-      {meta.label}
-    </span>
-  );
-}
-
 function StatusSelect({ brief, onChange, compact, disabled }) {
   const meta = statusMetaOf(brief);
   return (
@@ -215,8 +187,8 @@ function StatusSelect({ brief, onChange, compact, disabled }) {
         padding: compact ? '3px 8px' : '6px 10px',
         borderRadius: 999,
         color: meta.color,
-        background: meta.bg,
-        border: `1px solid ${meta.color}33`,
+        background: '#F4F2EA',
+        border: '1px solid #DAD6C8',
         cursor: disabled ? 'default' : 'pointer',
         appearance: 'none',
         WebkitAppearance: 'none',
@@ -251,6 +223,70 @@ function Field({ label, children, empty }) {
 // edits them, regenerates if they are off, and releases them to the client
 // (who gets an email). Once released the drafts are read-only here — the
 // client now owns the choice and their own edits.
+// The one look for script text everywhere in the dashboard: readable width,
+// generous line height, a calm highlight box. The script is the content;
+// everything around it is quieter.
+const SCRIPT_BOX = { background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '14px 16px', fontSize: 14.5, lineHeight: 1.7, whiteSpace: 'pre-wrap', color: '#1D1D1D', maxWidth: '72ch' };
+const META_TEXT = { fontSize: 12, color: '#6B675D', lineHeight: 1.5 };
+
+// Copies a script to the clipboard (for pasting into the voice-over brief).
+function CopyButton({ text }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={async () => {
+        try { await navigator.clipboard.writeText(text); setDone(true); setTimeout(() => setDone(false), 1500); } catch (e) {}
+      }}
+      style={{ flex: 'none', border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer', color: '#383209' }}
+    >
+      {done ? '✓ Gekopieerd' : 'Kopieer'}
+    </button>
+  );
+}
+
+// The full history of a brief, newest first: who did what and when, with
+// the script texts behind a toggle so the list itself stays calm.
+function HistoryPanel({ brief, cardStyle }) {
+  let events = [];
+  try {
+    const parsed = brief.eventLog ? JSON.parse(brief.eventLog) : [];
+    if (Array.isArray(parsed)) events = parsed.slice().reverse();
+  } catch (e) {}
+  const ACTOR = { klant: { label: 'Klant', color: '#6B4FA0' }, tfa: { label: 'TFA', color: '#8C6D1F' }, systeem: { label: 'Systeem', color: '#8C8880' } };
+  return (
+    <div style={cardStyle}>
+      <ModalSectionTitle>Historie</ModalSectionTitle>
+      <div style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5, marginBottom: 12 }}>
+        Wat er met deze brief is gebeurd: wat de klant koos en aanpaste, en wat wij deden. Alleen zichtbaar voor TFA.
+      </div>
+      {events.length === 0 && <div style={{ fontSize: 13, color: '#8C8880' }}>Nog niets vastgelegd. Alles vanaf nu komt hier te staan.</div>}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
+        {events.map((e) => {
+          const a = ACTOR[e.actor] || ACTOR.systeem;
+          return (
+            <div key={e.id} style={{ display: 'flex', gap: 12, padding: '9px 0', borderTop: '1px solid #F0EEE6' }}>
+              <div style={{ flex: 'none', width: 118, fontSize: 11.5, color: '#8C8880' }}>{formatShortDateTime(e.at)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, lineHeight: 1.45 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: a.color, marginRight: 8 }}>{a.label}</span>
+                  {e.text}
+                </div>
+                {e.detail && (
+                  <details style={{ marginTop: 4 }}>
+                    <summary style={{ cursor: 'pointer', fontSize: 11.5, color: '#8C8880' }}>Toon tekst</summary>
+                    <div style={{ marginTop: 6, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px', fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{e.detail}</div>
+                  </details>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   let drafts = [];
   try {
@@ -266,6 +302,9 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [active, setActive] = useState(0);
+  // Per-proposal "opmerking voor opnieuw schrijven" and the one for a new extra proposal.
+  const [comments, setComments] = useState({});
+  const [addComment, setAddComment] = useState('');
   // Optimistic recommendation tick: the checkbox flips instantly, the save
   // runs silently in the background and is rolled back if it fails.
   const [recPending, setRecPending] = useState(null);
@@ -346,6 +385,18 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
     if (out) setEdits((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
     return out;
   }
+  // Rewrite / remove / add ONE proposal. The comment goes into the AI prompt
+  // on top of the standing prompt (see lib/scriptgen.js).
+  async function proposalAction(action, d) {
+    const comment = action === 'add' ? addComment : (comments[d.id] || '');
+    const out = await call('POST', { action, versionId: d ? d.id : undefined, comment }, (action === 'add' ? 'add' : action + '-' + d.id));
+    if (!out) return;
+    if (d) {
+      setEdits((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
+      setComments((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
+    }
+    if (action === 'add') { setAddComment(''); }
+  }
   async function release() {
     // Save any unsaved edits first so the client gets what is on screen.
     for (const d of drafts) {
@@ -354,14 +405,14 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
         if (!ok) return;
       }
     }
-    if (typeof window !== 'undefined' && !window.confirm('Scripts vrijgeven aan de klant? De klant krijgt hier meteen een e-mail over.')) return;
+    if (typeof window !== 'undefined' && !window.confirm('Scripts vrijgeven aan de klant (' + drafts.length + ' voorstel' + (drafts.length === 1 ? '' : 'len') + ')? De klant krijgt hier meteen een e-mail over.')) return;
     await call('POST', { action: 'release' }, 'release');
   }
 
   const dirty = Object.keys(edits).length > 0;
-  const scriptBox = { background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#1D1D1D' };
+  const scriptBox = SCRIPT_BOX;
   const arrowStyle = (off) => ({ flex: 'none', width: 30, height: 30, borderRadius: 8, border: '1px solid #D8D4C8', background: '#fff', fontSize: 18, lineHeight: 1, cursor: off ? 'default' : 'pointer', opacity: off ? 0.35 : 1 });
-  const taStyle = { width: '100%', minHeight: 90, fontSize: 13, lineHeight: 1.55, padding: '9px 11px', border: '1px solid #DAD6C8', borderRadius: 8, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical' };
+  const taStyle = { width: '100%', minHeight: 90, fontSize: 14, lineHeight: 1.65, padding: '10px 12px', border: '1px solid #DAD6C8', borderRadius: 8, fontFamily: 'inherit', boxSizing: 'border-box', resize: 'vertical', maxWidth: '72ch' };
 
   return (
     <div style={{ ...cardStyle, border: '1.5px solid ' + (released ? '#EEECE3' : '#E6C858'), background: released ? '#FFFFFF' : '#FBF9EC' }}>
@@ -373,7 +424,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
         </div>
       ) : (
         <div style={{ fontSize: 12.5, color: '#5C5850', lineHeight: 1.5, marginBottom: 10 }}>
-          De klant ziet nu een wachtpagina (&ldquo;een copywriter schrijft je script&rdquo;). Pas de teksten aan waar nodig en geef ze daarna vrij: de klant krijgt dan een e-mail en kiest een voorstel.
+          De klant ziet nu een wachtpagina. Pas de teksten aan waar nodig en geef ze vrij: de klant krijgt dan een e-mail en kiest een voorstel.
         </div>
       )}
 
@@ -415,7 +466,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
           <div style={{ fontSize: 12.5, color: '#5C5850', marginBottom: 6, lineHeight: 1.5 }}>
             Script van het agentschap (of zelf geschreven)? Plak het hier, dan krijgt de klant dat als enig voorstel.
           </div>
-          <textarea style={taStyle} value={ownScript} onChange={(e) => setOwnScript(e.target.value)} placeholder="Plak hier het script" />
+          <AutoTextarea minHeight={150} style={taStyle} value={ownScript} onChange={(e) => setOwnScript(e.target.value)} placeholder="Plak hier het script" />
           {Array.from({ length: varCount }).map((_, i) => (
             <div key={i}>
               <div style={{ fontSize: 11, color: '#8C8880', margin: '8px 0 4px' }}>
@@ -464,14 +515,14 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
                 )}
                 {Array.from({ length: varCount }).map((_, vi) => (variationsOf(d)[vi] ? (
                   <div key={vi} style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 3 }}>{varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'}</div>
-                    <div style={{ ...scriptBox, fontSize: 13 }}>{variationsOf(d)[vi]}</div>
+                    <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 3 }}>{varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'}{variationInfoLabelFull(varInfos[vi]) ? ' · ' + variationInfoLabelFull(varInfos[vi]) : ''}</div>
+                    <div style={{ ...scriptBox, fontSize: 14 }}>{variationsOf(d)[vi]}</div>
                   </div>
                 ) : null))}
               </>
             ) : (
               <>
-                <textarea style={taStyle} value={valueOf(d, 'main')} onChange={(e) => setField(d, 'main', e.target.value)} onBlur={() => saveDraft(d)} />
+                <AutoTextarea minHeight={150} style={taStyle} value={valueOf(d, 'main')} onChange={(e) => setField(d, 'main', e.target.value)} onBlur={() => saveDraft(d)} />
                 {drafts.length > 1 && (
                   <div style={{ marginTop: 6 }}>
                     <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#5C5850', cursor: 'pointer' }}>
@@ -495,21 +546,63 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
                     <div style={{ fontSize: 11, color: '#8C8880', margin: '6px 0 4px' }}>
                       {varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'} bij dit voorstel{variationInfoLabelFull(varInfos[vi]) ? ' · ' + variationInfoLabelFull(varInfos[vi]) : ''}
                     </div>
-                    <textarea style={{ ...taStyle, minHeight: 64 }} value={variationsOf(d)[vi] || ''} onChange={(e) => setVariation(d, vi, e.target.value)} onBlur={() => saveDraft(d)} />
+                    <AutoTextarea minHeight={90} style={taStyle} value={variationsOf(d)[vi] || ''} onChange={(e) => setVariation(d, vi, e.target.value)} onBlur={() => saveDraft(d)} />
                   </div>
                 ))}
+                <details style={{ marginTop: 12, borderTop: '1px solid #EAE3C4', paddingTop: 10 }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#383209' }}>Dit voorstel bijsturen of weghalen</summary>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{ fontSize: 11.5, color: '#5C5850', marginBottom: 4, lineHeight: 1.5 }}>
+                      Schrijf alleen dit voorstel opnieuw. Je opmerking wordt toegevoegd aan de vaste AI-instructie en de briefgegevens; de andere voorstellen blijven zoals ze zijn.
+                    </div>
+                    <AutoTextarea
+                      minHeight={60}
+                      style={taStyle}
+                      value={comments[d.id] || ''}
+                      maxLength={1000}
+                      placeholder="Opmerking, bijv. 'minder commercieel, meer humor' of 'begin met de actie'"
+                      onChange={(e) => setComments((cur) => ({ ...cur, [d.id]: e.target.value }))}
+                    />
+                    <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <button type="button" disabled={!!busy} onClick={() => proposalAction('rewrite', d)} style={{ border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                        {busy === 'rewrite-' + d.id ? 'Bezig met schrijven…' : 'Alleen dit voorstel opnieuw schrijven'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!!busy || drafts.length <= 1}
+                        title={drafts.length <= 1 ? 'Er moet minstens één voorstel overblijven' : ''}
+                        onClick={() => { if (window.confirm('Dit voorstel weghalen? De klant krijgt dan ' + (drafts.length - 1) + ' voorstel' + (drafts.length - 1 === 1 ? '' : 'len') + '.')) proposalAction('remove', d); }}
+                        style={{ border: 'none', background: 'transparent', color: '#C2513F', fontWeight: 600, fontSize: 12.5, textDecoration: 'underline', cursor: drafts.length <= 1 ? 'default' : 'pointer', padding: 0, opacity: drafts.length <= 1 ? 0.4 : 1 }}
+                      >
+                        {busy === 'remove-' + d.id ? 'Bezig…' : 'Voorstel weghalen'}
+                      </button>
+                    </div>
+                  </div>
+                </details>
               </>
             )}
           </div>
         );
       })()}
 
+      {!released && drafts.length > 0 && drafts.length < 3 && (
+        <details style={{ marginBottom: 14 }}>
+          <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#383209' }}>+ Extra voorstel laten schrijven ({drafts.length} van 3)</summary>
+          <div style={{ marginTop: 8 }}>
+            <AutoTextarea minHeight={60} style={taStyle} value={addComment} maxLength={1000} placeholder="Optionele opmerking voor het nieuwe voorstel, bijv. 'speelser, met een knipoog'" onChange={(e) => setAddComment(e.target.value)} />
+            <button type="button" disabled={!!busy} onClick={() => proposalAction('add')} style={{ marginTop: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+              {busy === 'add' ? 'Bezig met schrijven…' : 'Voorstel toevoegen'}
+            </button>
+          </div>
+        </details>
+      )}
+
       {error && <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, marginBottom: 8 }}>{error}</div>}
 
       {!released && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <button type="button" disabled={!!busy || drafts.length === 0} onClick={release} className="btn-primary" style={{ padding: '10px 18px', flex: 'none' }}>
-            {busy === 'release' ? 'Bezig…' : 'Vrijgeven aan klant'}
+            {busy === 'release' ? 'Bezig…' : 'Vrijgeven aan klant' + (drafts.length ? ' (' + drafts.length + ' voorstel' + (drafts.length === 1 ? '' : 'len') + ')' : '')}
           </button>
           <button
             type="button"
@@ -520,7 +613,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
             }}
             style={{ border: 'none', background: 'transparent', color: '#383209', fontWeight: 600, fontSize: 12.5, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
           >
-            {busy === 'regen' ? 'Bezig met schrijven…' : 'Opnieuw schrijven (3 nieuwe voorstellen)'}
+            {busy === 'regen' ? 'Bezig met schrijven…' : 'Alles opnieuw schrijven (3 nieuwe voorstellen)'}
           </button>
         </div>
       )}
@@ -559,20 +652,20 @@ function ScriptAuditPanel({ brief, cardStyle, onUpdated }) {
   const generated = brief.generatedScript || '';
   const mainTokens = diffWords(generated, mainNow);
   const pill = status === 'approved'
-    ? { t: 'Gecontroleerd en akkoord', bg: '#EAF5EE', fg: '#1D7A46' }
+    ? { t: 'Akkoord', tone: 'ok', icon: 'check' }
     : status === 'counter'
-      ? { t: 'Tegenvoorstel verstuurd, wacht op klant', bg: '#EEF4F8', fg: '#1F6F8C' }
-      : { t: 'Nog te controleren', bg: '#FFF4D6', fg: '#8C6D1F' };
+      ? { t: 'Wacht op klant', tone: 'neutral', icon: 'clock' }
+      : { t: 'Controleren', tone: 'attention', icon: 'alert' };
   const btn = { border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' };
 
-  return (
+  const body = (
     <div style={{ ...cardStyle, border: '1.5px solid ' + (status === 'approved' ? '#EEECE3' : '#E6C858') }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 700 }}>Script check</div>
-        <span style={{ fontSize: 11.5, fontWeight: 700, background: pill.bg, color: pill.fg, borderRadius: 999, padding: '3px 10px' }}>{pill.t}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>Scriptcontrole</div>
+        <Indicator tone={pill.tone} icon={pill.icon} label={pill.t} />
       </div>
-      <div style={{ fontSize: 12.5, color: '#5C5850', lineHeight: 1.5, marginBottom: 10 }}>
-        De klant heeft het script aangepast na onze voorstellen. De klant heeft in de bevestigingsmail gezien dat het script nog niet definitief is goedgekeurd, totdat jullie het hier controleren.
+      <div style={{ ...META_TEXT, marginBottom: 10 }}>
+        De klant paste het script aan na onze voorstellen en weet dat het pas definitief is na jouw controle.
       </div>
 
       {changes.main && (
@@ -636,6 +729,18 @@ function ScriptAuditPanel({ brief, cardStyle, onUpdated }) {
       {error && <div style={{ marginTop: 8, fontSize: 12.5, fontWeight: 600, color: '#C2513F' }}>{error}</div>}
     </div>
   );
+  // A finished check folds away: it is history, not something to act on.
+  if (status === 'approved') {
+    return (
+      <details style={{ padding: '0 4px' }}>
+        <summary style={{ cursor: 'pointer', fontSize: 12.5, color: '#6B675D', display: 'flex', alignItems: 'center', gap: 8, listStyle: 'revert' }}>
+          <Indicator tone="ok" icon="check" label="Scriptcontrole afgerond" /> <span>{brief.scriptAuditedAt ? formatShortDateTime(brief.scriptAuditedAt) : ''}</span>
+        </summary>
+        <div style={{ marginTop: 8 }}>{body}</div>
+      </details>
+    );
+  }
+  return body;
 }
 
 function ModalSectionTitle({ children }) {
@@ -712,6 +817,8 @@ const SORT_GETTERS = {
   daysOpen: (b) => (b.createdAt ? Math.floor((Date.now() - new Date(b.createdAt).getTime()) / 86400000) : -1),
   isUnseen: (b) => (isUnseenBrief(b) ? 1 : 0),
   scriptApproved: (b) => (b.scriptApproved ? 1 : 0),
+  scriptStage: (b) => scriptIndicator(b).rank,
+  productionStage: (b) => productionIndicator(b).rank,
   overIncludedCap: (b) => (reviewOverIncludedCap(b) ? 1 : 0),
 };
 
@@ -1139,25 +1246,20 @@ export default function DashboardClient({ briefs, readOnly = false }) {
       cell: (b, ctx) => (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {ctx.unseen && (
-            <span title="Nieuw: nog niet bekeken" style={{ width: 8, height: 8, borderRadius: '50%', background: '#E6C858', flex: 'none', boxShadow: '0 0 0 3px rgba(230,200,88,.35)' }} />
+            <span role="img" aria-label="Nieuw, nog niet bekeken" title="Nieuw: nog niet bekeken" style={{ width: 8, height: 8, borderRadius: '50%', background: '#E6C858', flex: 'none', boxShadow: '0 0 0 3px rgba(230,200,88,.35)' }} />
           )}
           <span>{b.companyName || 'Nog geen bedrijfsnaam'}</span>
-          {ctx.unseen && (
-            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>Nieuw</span>
-          )}
-          <ProductionBadge brief={b} small />
-          {scriptCheckState(b) === 'pending' && (
-            <span title="De klant heeft het script aangepast: nog controleren" style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8A2E1E', background: '#FBE9E4', borderRadius: 4, padding: '2px 6px' }}>Script check</span>
-          )}
-          {scriptCheckState(b) === 'nofit' && (
-            <span title="De klant zegt dat geen van de scriptvoorstellen past" style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#8A2E1E', background: '#FBE9E4', borderRadius: 4, padding: '2px 6px' }}>Voorstellen passen niet</span>
-          )}
-          {scriptCheckState(b) === 'counter' && (
-            <span title="Tegenvoorstel verstuurd, wacht op de klant" style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#1F6F8C', background: '#EEF4F8', borderRadius: 4, padding: '2px 6px' }}>Wacht op script-antwoord</span>
-          )}
         </div>
       ),
       cellStyle: (b, ctx) => ({ fontWeight: ctx.unseen ? 700 : 600, color: b.companyName ? '#1D1D1D' : '#9C9890' }),
+    },
+    {
+      key: 'scriptStage', core: true, label: 'Script',
+      cell: (b) => { const i = scriptIndicator(b); return <Indicator tone={i.tone} icon={i.icon} label={i.label} title={i.title} />; },
+    },
+    {
+      key: 'productionStage', core: true, label: 'Productie',
+      cell: (b) => { const i = productionIndicator(b); return <Indicator tone={i.tone} icon={i.icon} label={i.label} title={i.title} />; },
     },
     { key: 'hoofdspotLength', label: 'Spot', cell: (b) => <>{b.hoofdspotLength || '20'}″{variationsSummaryLabel(b)}</> },
     { key: 'assignedTo', label: 'Toegewezen', cell: (b) => b.assignedTo || 'Niet toegewezen', cellStyle: (b) => ({ color: b.assignedTo ? '#1D1D1D' : '#9C9890' }) },
@@ -1628,8 +1730,8 @@ export default function DashboardClient({ briefs, readOnly = false }) {
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#FFFFFF', borderRadius: 12, maxWidth: 800, width: '100%',
-              height: '86vh', maxHeight: 780, display: 'flex', flexDirection: 'column', overflow: 'hidden',
+              background: '#FFFFFF', borderRadius: 12, maxWidth: 1040, width: '100%',
+              height: '92vh', maxHeight: 960, display: 'flex', flexDirection: 'column', overflow: 'hidden',
             }}
           >
             <div style={{ padding: '22px 28px 0', flex: 'none' }}>
@@ -2140,21 +2242,6 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                   De klant heeft de brief nog niet verstuurd, dus er is nog geen script.
                 </div>
               )}
-              {(() => {
-                const infos = parseVariationInfo(selected);
-                const filled = infos.filter((v) => v.kind || v.detail || v.airing);
-                if (!selected.needsVariations || !filled.length) return null;
-                return (
-                  <div style={refCardStyle}>
-                    <ModalSectionTitle>Waar gaan de variaties over?</ModalSectionTitle>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      {infos.map((v, i) => (
-                        <Field key={i} label={infos.length > 1 ? `Variatie ${i + 1}` : 'Variatie'} empty={!variationInfoLabelFull(v)}>{variationInfoLabelFull(v) || 'Nog niet opgegeven'}</Field>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
               {!readOnly && selected.submittedAt && !selected.finalizedAt && (
                 <ScriptDraftsPanel
                   brief={selected}
@@ -2186,41 +2273,79 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 const variationCount = variationsCountOf(selected);
                 const variationScripts = parseVariationScripts(selected);
                 const variationInfos = parseVariationInfo(selected);
+                const finalState = selected.finalizedAt ? scriptCheckState(selected) : null;
+                const isFinal = !!selected.finalizedAt;
+                const title = isFinal
+                  ? (finalState ? 'Script (nog niet definitief)' : 'Definitief script om te produceren')
+                  : selected.scriptsReleasedAt && !selected.scriptApproved ? 'Script (huidige keuze van de klant)' : 'Script';
+                const metaBits = [
+                  (selected.hoofdspotLength || '20') + '″',
+                  variationCount > 0 ? variationCount + (variationCount === 1 ? ' variatie' : ' variaties') : '',
+                  isFinal && !finalState ? 'Akkoord van de klant op ' + formatShortDateTime(selected.finalizedAt) : '',
+                ].filter(Boolean);
                 return (
-                  <div style={refCardStyle}>
-                    <ModalSectionTitle>{selected.scriptsReleasedAt && !selected.scriptApproved && !selected.finalizedAt ? 'Script (huidige keuze van de klant)' : 'Script'}{variationCount > 0 ? ' · hoofdspot' : ''}</ModalSectionTitle>
-                    <div style={mainText ? { background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 12px', fontSize: 13.5, lineHeight: 1.6, whiteSpace: 'pre-wrap', color: '#1D1D1D' } : { fontSize: 13.5, color: '#9C9890' }}>
+                  <div style={{ ...refCardStyle, ...(isFinal && !finalState ? { border: '1.5px solid #E6C858' } : null) }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: '#1D1D1D' }}>{title}</div>
+                        <div style={{ ...META_TEXT, marginTop: 2 }}>{metaBits.join(' · ')}</div>
+                      </div>
+                      {mainText && <CopyButton text={mainText} />}
+                    </div>
+                    {isFinal && finalState && (
+                      <div style={{ marginBottom: 10 }}><Indicator tone="attention" icon="alert" label="Eerst controleren: de klant paste het script aan" /></div>
+                    )}
+                    <div style={mainText ? SCRIPT_BOX : { fontSize: 13.5, color: '#9C9890' }}>
                       {mainText || 'Nog geen script goedgekeurd.'}
                     </div>
                     {variationCount > 0 && (
-                      <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #EAE3C4' }}>
-                        {Array.from({ length: variationCount }).map((_, idx) => {
-                          const varText = variationScripts[idx] !== undefined ? variationScripts[idx] : mainText;
-                          const tokens = diffWords(mainText || '', varText || '');
-                          const changed = hasDiff(tokens);
-                          return (
-                            <div key={idx} style={{ marginTop: idx === 0 ? 0 : 14 }}>
-                              <div style={{ fontSize: 11, fontWeight: 600, color: '#5C5850', textTransform: 'uppercase', letterSpacing: '.03em' }}>
-                                {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}{variationInfoLabelFull(variationInfos[idx]) ? ' · ' + variationInfoLabelFull(variationInfos[idx]) : ''}{changed ? ': wat verschilt' : ''}
-                              </div>
-                              {changed ? (
-                                <div style={{ fontSize: 13.5, lineHeight: 1.6, marginTop: 6, whiteSpace: 'pre-wrap' }}>
-                                  <DiffPreview tokens={tokens} />
-                                </div>
-                              ) : (
-                                <div style={{ fontSize: 13, color: '#8C8880', marginTop: 6, fontStyle: 'italic' }}>
-                                  Nog identiek aan het hoofdscript.
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                      <div style={{ marginTop: 18 }}>
+                        <div style={{ ...META_TEXT, marginBottom: 8 }}>
+                          Variaties volgen het hoofdscript: een wijziging in gedeelde tekst zit al in elke variatie.
+                        </div>
+                        <div style={{ borderTop: '1px solid #EEECE3' }}>
+                          {Array.from({ length: variationCount }).map((_, idx) => {
+                            const varText = variationScripts[idx] !== undefined ? variationScripts[idx] : mainText;
+                            const tokens = diffWords(mainText || '', varText || '');
+                            const changed = hasDiff(tokens);
+                            const infoLabel = variationInfoLabelFull(variationInfos[idx]);
+                            return (
+                              <details key={idx} open={variationCount <= 2} style={{ borderBottom: '1px solid #EEECE3', padding: '10px 0' }}>
+                                <summary style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, listStyle: 'revert' }}>
+                                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>
+                                    {variationCount > 1 ? `Variatie ${idx + 1}` : 'Variatie'}
+                                    {infoLabel && <span style={{ fontWeight: 400, color: '#6B675D' }}> · {infoLabel}</span>}
+                                  </span>
+                                  {varText && <span onClick={(e) => e.stopPropagation()}><CopyButton text={varText} /></span>}
+                                </summary>
+                                <div style={{ ...SCRIPT_BOX, marginTop: 8, fontSize: 14 }}>{varText || ''}</div>
+                                {changed && (
+                                  <details style={{ marginTop: 6 }}>
+                                    <summary style={{ cursor: 'pointer', fontSize: 11.5, color: '#8C8880' }}>Wat verschilt met het hoofdscript</summary>
+                                    <div style={{ fontSize: 13.5, lineHeight: 1.65, marginTop: 6, whiteSpace: 'pre-wrap', maxWidth: '72ch' }}>
+                                      <DiffPreview tokens={tokens} />
+                                    </div>
+                                  </details>
+                                )}
+                              </details>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
+                    <div style={{ marginTop: 12, ...META_TEXT, fontSize: 11.5 }}>
+                      Wie wat wanneer wijzigde, staat in <button type="button" onClick={() => setModalTab('historie')} style={{ border: 'none', background: 'none', padding: 0, color: '#383209', textDecoration: 'underline', cursor: 'pointer', fontSize: 11.5 }}>Historie</button>.
+                    </div>
                   </div>
                 );
               })()}
 
+            </div>
+            )}
+
+            {modalTab === 'historie' && !readOnly && (
+            <div style={{ marginTop: 16 }}>
+              <HistoryPanel brief={selected} cardStyle={refCardStyle} />
             </div>
             )}
 

@@ -184,7 +184,7 @@ export default function ScriptVariationsPage({ params }) {
       hint={
         'Je gaf aan ' + (variationCount > 1 ? `${variationCount} variaties` : 'een variatie') +
         ' nodig te hebben. Onze copywriter schreef ' + (variationCount > 1 ? 'ze' : 'hem') +
-        ' op basis van wat je in je brief vertelde, gebaseerd op je goedgekeurde script. Pas de tekst gerust aan waar het anders moet; alles wordt automatisch bewaard zodra je typt.'
+        ' op basis van wat je in je brief vertelde, gebaseerd op je goedgekeurde script. Pas de tekst gerust aan waar het anders moet; alles wordt automatisch bewaard zodra je typt. Let op: een variatie volgt altijd je hoofdscript. Tekst die in alle versies hetzelfde is, pas je dus op de vorige pagina maar één keer aan; wij nemen dat mee in al je variaties. Hier pas je alleen aan wat in deze variatie anders moet zijn.'
       }
       backHref={`/brief/${id}/script`}
       backLabel="Terug naar je script"

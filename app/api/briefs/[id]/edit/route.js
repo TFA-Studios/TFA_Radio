@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
-import { getBrief, saveEdit, saveScriptAudit, addInternalNote } from '../../../../../lib/db';
+import { getBrief, saveEdit, saveScriptAudit, addInternalNote, logBriefEvent } from '../../../../../lib/db';
 import { syncVariationsPatch } from '../../../../../lib/scriptSync';
 import { scriptChangesOf } from '../../../../../components/flowData';
 
@@ -32,10 +32,16 @@ export async function PATCH(request, { params }) {
     }
   }
 
+  const finalMain = brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript : brief.generatedScript || '';
+  if (syncVariations) {
+    const changedByClient = brief.editedScript !== null && brief.editedScript !== undefined && brief.editedScript !== brief.generatedScript;
+    await logBriefEvent(params.id, { actor: 'klant', type: 'script_approved', text: changedByClient ? 'Klant keurde het hoofdscript goed, met eigen aanpassingen' : 'Klant keurde het hoofdscript goed zoals voorgesteld', detail: finalMain });
+  }
   // After the client has already confirmed everything, a later change to the
   // script puts it back in front of TFA for a check.
   if (brief.finalizedAt && brief.scriptAuditStatus !== 'pending' && scriptChangesOf(brief).any) {
     brief = (await saveScriptAudit(params.id, { scriptAuditStatus: 'pending', scriptAuditedAt: '' })) || brief;
+    await logBriefEvent(params.id, { actor: 'klant', type: 'script_changed_after_confirm', text: 'Klant paste het script aan na bevestiging; staat klaar voor controle', detail: finalMain });
   }
   return NextResponse.json(toPublicBrief(brief));
 }

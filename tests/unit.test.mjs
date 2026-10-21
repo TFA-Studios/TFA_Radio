@@ -89,3 +89,40 @@ test('stage: released scripts mean the client is choosing', () => {
   assert.equal(briefStageOf({ submittedAt: 'x', scriptsReleasedAt: 'y' }), 'choosing');
   assert.equal(briefStageOf({ submittedAt: 'x', scriptsReleasedAt: 'y', finalizedAt: 'z' }), 'final');
 });
+test('voice match: always alphabetical, with or without preferences', () => {
+  const pool = [
+    { id: '1', name: 'Zoë', gender: 'vrouw', ageRange: '18-34', tags: [] },
+    { id: '2', name: 'bram', gender: 'man', ageRange: '18-34', tags: [] },
+    { id: '3', name: 'Anouk', gender: 'vrouw', ageRange: '35-54', tags: [] },
+  ];
+  assert.deepEqual(matchVoices(pool, { gender: null, age: null, tags: [] }).voices.map((v) => v.name), ['Anouk', 'bram', 'Zoë']);
+  assert.deepEqual(matchVoices(pool, { gender: null, age: '18-34', tags: [] }).voices.map((v) => v.name), ['bram', 'Zoë']);
+});
+test('proposals: replace keeps position, remove keeps at least one, add stops at three', async () => {
+  const { applyProposalOp } = await import('../lib/scriptProposals.js');
+  const h = [{ id: 'a' }, { id: 'b' }];
+  assert.deepEqual(applyProposalOp(h, { type: 'replace', versionId: 'b', version: { id: 'n' } }).history.map((x) => x.id), ['a', 'n']);
+  assert.equal(applyProposalOp([{ id: 'a' }], { type: 'remove', versionId: 'a' }).error, 'last_one');
+  assert.deepEqual(applyProposalOp(h, { type: 'remove', versionId: 'a' }).history.map((x) => x.id), ['b']);
+  assert.equal(applyProposalOp([{ id: 1 }, { id: 2 }, { id: 3 }], { type: 'add', version: { id: 4 } }).error, 'too_many');
+});
+test('event log: appends, caps and sanitises', async () => {
+  const { addEvent, parseEvents, MAX_EVENTS } = await import('../lib/eventLog.js');
+  let list = [];
+  for (let i = 0; i < MAX_EVENTS + 5; i++) list = addEvent(list, { actor: 'bogus', type: 't', text: 'x' + i }, 'id' + i, '2026-10-21T10:00:00Z');
+  assert.equal(list.length, MAX_EVENTS);
+  assert.equal(list[list.length - 1].actor, 'systeem');
+  assert.deepEqual(parseEvents('not json'), []);
+});
+test('indicators: script and production stages are separate and consistent', async () => {
+  const { scriptIndicator, productionIndicator } = await import('../components/statusIndicators.js');
+  assert.equal(scriptIndicator({}).label, 'Brief open');
+  assert.equal(scriptIndicator({ submittedAt: 'x' }).label, 'Nakijken');
+  assert.equal(scriptIndicator({ submittedAt: 'x', scriptsReleasedAt: 'y' }).label, 'Klant kiest');
+  assert.equal(scriptIndicator({ submittedAt: 'x', scriptsReleasedAt: 'y', finalizedAt: 'z', scriptAuditStatus: 'approved' }).label, 'Akkoord');
+  assert.equal(scriptIndicator({ submittedAt: 'x', scriptsReleasedAt: 'y', finalizedAt: 'z', scriptAuditStatus: 'pending' }).tone, 'attention');
+  assert.equal(productionIndicator({}).label, 'Niet gestart');
+  assert.equal(productionIndicator({ productionStatus: 'script_choosing' }).label, 'Niet gestart');
+  assert.equal(productionIndicator({ productionStatus: 'in_revision' }).tone, 'attention');
+  assert.equal(productionIndicator({ productionStatus: 'approved', deliveredAt: 'd' }).label, 'Geleverd');
+});

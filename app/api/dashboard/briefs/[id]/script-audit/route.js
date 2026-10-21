@@ -1,6 +1,6 @@
 import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
-import { getBrief, saveScriptAudit } from '../../../../../../lib/db';
+import { getBrief, saveScriptAudit, logBriefEvent } from '../../../../../../lib/db';
 import { sendScriptCounterEmail, sendScriptApprovedEmail } from '../../../../../../lib/email';
 
 // Producer-only — gated by middleware.js. The producer's side of the script
@@ -24,6 +24,7 @@ export async function POST(request, { params }) {
     if (body.notify) {
       try { await sendScriptApprovedEmail(saved, appUrl); } catch (err) { console.error('[script-audit] email failed:', err && err.message); }
     }
+    await logBriefEvent(params.id, { actor: 'tfa', type: 'audit_approved', text: 'TFA keurde de aanpassingen van de klant goed' });
     return NextResponse.json(saved);
   }
 
@@ -32,6 +33,7 @@ export async function POST(request, { params }) {
     const counterText = typeof body.counterText === 'string' ? body.counterText.trim().slice(0, 4000) : '';
     if (!note && !counterText) return NextResponse.json({ error: 'empty', message: 'Schrijf een toelichting of een voorgestelde tekst.' }, { status: 400 });
     const saved = await saveScriptAudit(params.id, { scriptAuditStatus: 'counter', scriptAuditNote: note, scriptCounterText: counterText, scriptAuditedAt: now, scriptAuditReply: '' });
+    await logBriefEvent(params.id, { actor: 'tfa', type: 'audit_counter', text: 'TFA stuurde een tegenvoorstel', detail: [note, counterText].filter(Boolean).join('\n\n') });
     try { await sendScriptCounterEmail(saved, appUrl); } catch (err) { console.error('[script-audit] email failed:', err && err.message); }
     return NextResponse.json(saved);
   }

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
-import { getBrief, saveScriptAudit, addInternalNote } from '../../../../../lib/db';
+import { getBrief, saveScriptAudit, addInternalNote, logBriefEvent } from '../../../../../lib/db';
 import { notifyNoFit } from '../../../../../lib/slack';
 
 export const dynamic = 'force-dynamic';
@@ -17,6 +17,7 @@ export async function POST(request, { params }) {
   const now = new Date().toISOString();
   await saveScriptAudit(params.id, { scriptAuditStatus: 'nofit', scriptAuditReply: message, scriptAuditedAt: now });
   await addInternalNote(params.id, { author: 'Klant', text: 'Geen van de scriptvoorstellen past.' + (message ? ' Toelichting: ' + message : '') }).catch(() => {});
+  await logBriefEvent(params.id, { actor: 'klant', type: 'no_fit', text: 'Klant meldde dat geen voorstel past', detail: message });
   const brief = await getBrief(params.id);
   let dashboardUrl;
   try { dashboardUrl = new URL(request.url).origin + '/dashboard'; } catch (e) {}

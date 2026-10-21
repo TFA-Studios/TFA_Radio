@@ -1,5 +1,6 @@
 import { listBriefs } from '../../lib/db';
 import { getViewer, scopeBriefs } from '../../lib/access';
+import { toPublicBrief } from '../../lib/publicBrief';
 import DashboardClient from '../../components/DashboardClient';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../components/DashboardSidebar';
 
@@ -19,8 +20,11 @@ function isUnseenBrief(b) {
 export default async function DashboardPage() {
   const viewer = await getViewer();
   // Staff-archived briefs stay out of an agency's view; staff see them in the archive.
-  const briefs = scopeBriefs(viewer, await listBriefs()).filter((b) => viewer.role !== 'agency' || !b.archivedAt);
   const isAgency = viewer.role === 'agency';
+  // An agency login never receives TFA's internal notes or history log.
+  const briefs = scopeBriefs(viewer, await listBriefs())
+    .filter((b) => !isAgency || !b.archivedAt)
+    .map((b) => (isAgency ? toPublicBrief(b) : b));
   const unseenCount = briefs.filter((b) => !b.archivedAt && isUnseenBrief(b)).length;
 
   return (

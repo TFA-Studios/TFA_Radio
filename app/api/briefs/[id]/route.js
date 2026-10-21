@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { rateLimit, clientIp, tooManyRequests } from '../../../../lib/rateLimit';
 import { toPublicBrief } from '../../../../lib/publicBrief';
 import { waitUntil } from '@vercel/functions';
-import { getBrief, updateBrief, saveScriptDrafts, saveScriptAudit, listAgencies } from '../../../../lib/db';
+import { getBrief, updateBrief, saveScriptDrafts, saveScriptAudit, listAgencies, logBriefEvent } from '../../../../lib/db';
 import { scriptChangesOf } from '../../../../components/flowData';
 import { sendBriefReceivedEmail, sendConfirmationEmail } from '../../../../lib/email';
 import { notifyNewBrief, notifyClientConfirmed, notifyScriptCheck } from '../../../../lib/slack';
@@ -67,6 +67,7 @@ export async function PATCH(request, { params }) {
   // email and the Slack ping all run in the background (waitUntil keeps the
   // serverless function alive after the response is sent).
   if (body && body.submitted && !wasSubmitted && brief.submittedAt) {
+    await logBriefEvent(params.id, { actor: 'klant', type: 'submitted', text: 'Klant verstuurde de brief', detail: [brief.product && 'Product: ' + brief.product, brief.usp && 'USP: ' + brief.usp, brief.mainMessage && 'Hoofdboodschap: ' + brief.mainMessage, brief.cta && 'Call-to-action: ' + brief.cta].filter(Boolean).join('\n') });
     const submittedBrief = brief;
     waitUntil(
       (async () => {
@@ -94,6 +95,7 @@ export async function PATCH(request, { params }) {
             if (saved) {
               current = saved;
               draftCount = result.versions.length;
+              await logBriefEvent(params.id, { actor: 'systeem', type: 'drafts_written', text: 'De AI schreef ' + draftCount + ' scriptvoorstellen' });
             }
           } else if (providedScript) {
             // nothing to draft
@@ -125,6 +127,9 @@ export async function PATCH(request, { params }) {
     // nothing counts as approved yet: it goes to the script check first, and
     // the confirmation email below says so.
     const changed = scriptChangesOf(brief).any;
+    let tracks = [];
+    try { tracks = JSON.parse(brief.selectedTracks || '[]'); } catch (e) {}
+    await logBriefEvent(params.id, { actor: 'klant', type: 'finalized', text: 'Klant bevestigde script, stem en muziek' + (changed ? ' (script aangepast, wacht op controle)' : ''), detail: 'Stem: ' + (brief.selectedVoiceLabel || '-') + '\nMuziek: ' + (tracks.map((t) => t.title).join(', ') || '-') });
     if (changed) {
       brief = (await saveScriptAudit(params.id, { scriptAuditStatus: 'pending', scriptAuditedAt: '' })) || brief;
     }
