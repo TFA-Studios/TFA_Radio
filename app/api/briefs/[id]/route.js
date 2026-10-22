@@ -22,11 +22,11 @@ export const dynamic = 'force-dynamic';
 // After the client sends the brief, the script drafts are written in the
 // background (up to 3 AI calls in parallel) — give the function room beyond
 // Vercel's short default.
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // How long the background job waits for the script drafts before giving up
 // (the dashboard then shows "no drafts yet, write again").
-const DRAFT_TIMEOUT_MS = 48000;
+const DRAFT_TIMEOUT_MS = 270000;
 
 export async function GET(request, { params }) {
   const brief = await getBrief(params.id);

@@ -183,3 +183,12 @@ test('scriptJobState: idle, running, failed and stale running jobs', async () =>
   assert.equal(jobState(JSON.stringify({ status: 'running', startedAt: new Date(now - STALE_MS - 1000).toISOString() }), now).status, 'failed');
   assert.equal(jobState(JSON.stringify({ status: 'failed', message: 'x' }), now).message, 'x');
 });
+test('aiErrors: readable reasons without leaking provider output', async () => {
+  const { describeAiError, isFatalAiError } = await import('../lib/aiErrors.js');
+  assert.match(describeAiError('Claude', new Error('Anthropic API error 404: model x')), /model bestaat niet/);
+  assert.match(describeAiError('Claude', new Error('Anthropic API error 401: secret')), /API-sleutel/);
+  assert.ok(!/secret/.test(describeAiError('Claude', new Error('Anthropic API error 401: secret'))));
+  assert.match(describeAiError('Claude', new Error('Request timed out after 40000ms')), /time-out/);
+  assert.equal(isFatalAiError(new Error('Anthropic API error 429: x')), false);
+  assert.equal(isFatalAiError(new Error('Anthropic API error 404: x')), true);
+});

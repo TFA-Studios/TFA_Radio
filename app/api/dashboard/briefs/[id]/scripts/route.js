@@ -14,7 +14,7 @@ import { sendScriptsReadyEmail } from '../../../../../../lib/email';
 // edit any draft's text, and finally release them to the client, who until
 // then only sees a "your copywriter is writing" waiting page.
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 function historyOf(b) {
   try {
