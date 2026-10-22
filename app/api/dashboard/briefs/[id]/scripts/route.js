@@ -1,8 +1,10 @@
 import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
-import { getBrief, saveScriptDrafts, updateScriptDraft, releaseScripts, editScriptProposals, logBriefEvent } from '../../../../../../lib/db';
-import { draftScriptVersions, draftOneVersion } from '../../../../../../lib/scriptgen';
+import { waitUntil } from '@vercel/functions';
+import { getBrief, saveScriptDrafts, updateScriptDraft, releaseScripts, editScriptProposals, logBriefEvent, setScriptJob } from '../../../../../../lib/db';
+import { beginScriptJob, runScriptJob } from '../../../../../../lib/scriptJobs';
 import { describeProposal, describeProposals, describeScript } from '../../../../../../lib/eventLog';
+import { jobState } from '../../../../../../lib/scriptJobState';
 import { sendScriptsReadyEmail } from '../../../../../../lib/email';
 
 // Producer-only — gated by middleware.js (isProtectedRoute matches
@@ -28,6 +30,15 @@ function historyOf(b) {
 // POST { action: 'add', comment? }  — add one more proposal (max 3).
 // POST { action: 'remove', versionId } — drop one proposal (the client may get 1 or 2 instead of 3).
 // POST { action: 'release' }    — release the drafts to the client (emails them).
+// GET — the brief as the dashboard sees it (used to follow a running job).
+export async function GET(request, { params }) {
+  const denied = await requireStaffApi();
+  if (denied) return denied;
+  const brief = await getBrief(params.id);
+  if (!brief) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  return NextResponse.json(brief);
+}
+
 export async function POST(request, { params }) {
   const denied = await requireStaffApi();
   if (denied) return denied;
@@ -36,65 +47,43 @@ export async function POST(request, { params }) {
   const brief = await getBrief(params.id);
   if (!brief) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
-  if (action === 'regenerate') {
-    if (brief.scriptsReleasedAt) {
-      return NextResponse.json({ error: 'already_released', message: 'De scripts zijn al vrijgegeven aan de klant.' }, { status: 409 });
-    }
-    const result = await draftScriptVersions(brief, 3);
-    if (!result.versions.length) {
-      return NextResponse.json(
-        { error: 'generation_failed', message: result.error || 'Genereren is niet gelukt.', debugId: result.debugId || null },
-        { status: 503 }
-      );
-    }
-    const saved = await saveScriptDrafts(params.id, result.versions);
-    await logBriefEvent(params.id, { actor: 'tfa', type: 'drafts_regenerated', text: 'TFA liet alle voorstellen opnieuw schrijven (' + result.versions.length + ' nieuwe)', detail: 'NIEUW\n\n' + describeProposals(historyOf(saved)) + (historyOf(brief).length ? '\n\n=====\n\nVERVANGEN\n\n' + describeProposals(historyOf(brief)) : '') });
-    return NextResponse.json(saved);
+  // Writing happens in the background (lib/scriptJobs.js): these actions only
+  // start the job and return at once; the dashboard shows progress and the
+  // result by reading the brief, so nothing the producer clicks interrupts it.
+  if (action === 'clear_job') {
+    await setScriptJob(params.id, null);
+    return NextResponse.json((await getBrief(params.id)) || brief);
   }
 
-  if (action === 'rewrite' || action === 'add' || action === 'remove') {
+  if (action === 'regenerate' || action === 'rewrite' || action === 'add' || action === 'remove') {
     if (brief.scriptsReleasedAt) {
       return NextResponse.json({ error: 'already_released', message: 'De scripts zijn al vrijgegeven aan de klant.' }, { status: 409 });
     }
     const history = historyOf(brief);
     const comment = typeof body.comment === 'string' ? body.comment.trim().slice(0, 1000) : '';
-    const target = history.find((h) => h.id === body.versionId);
-    const slot = action === 'add' ? history.length : history.findIndex((h) => h.id === body.versionId);
-    if (action !== 'add' && !target) return NextResponse.json({ error: 'not_found' }, { status: 404 });
 
-    let op;
     if (action === 'remove') {
-      op = { type: 'remove', versionId: body.versionId };
-    } else {
-      if (action === 'add' && history.length >= 3) {
-        return NextResponse.json({ error: 'too_many', message: 'Er zijn al drie voorstellen. Verwijder er eerst een.' }, { status: 409 });
+      const target = history.find((h) => h.id === body.versionId);
+      if (!target) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+      const out = await editScriptProposals(params.id, { type: 'remove', versionId: body.versionId });
+      if (out.error) {
+        const messages = { last_one: 'Er moet minstens één voorstel overblijven.', not_found: 'Voorstel niet gevonden.', already_released: 'De scripts zijn al vrijgegeven aan de klant.' };
+        return NextResponse.json({ error: out.error, message: messages[out.error] || 'Dat is niet gelukt.' }, { status: out.error === 'not_found' ? 404 : 409 });
       }
-      const gen = await draftOneVersion(brief, { slot, comment, current: target ? target.main : '' });
-      if (!gen.version) {
-        return NextResponse.json({ error: 'generation_failed', message: gen.error, debugId: gen.debugId || null }, { status: 503 });
-      }
-      const v = gen.version;
-      const vars = Array.isArray(v.variations) ? v.variations : (v.variation ? [v.variation] : []);
-      op = action === 'add'
-        ? { type: 'add', version: { main: v.main, variations: vars, source: v.source, comment } }
-        : { type: 'replace', versionId: body.versionId, version: { main: v.main, variations: vars, source: v.source, comment } };
+      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_removed', text: 'TFA haalde voorstel ' + (history.indexOf(target) + 1) + ' weg', detail: describeProposal(target) });
+      return NextResponse.json((await getBrief(params.id)) || out.brief);
     }
-    const out = await editScriptProposals(params.id, op);
-    if (out.error) {
-      const messages = { last_one: 'Er moet minstens één voorstel overblijven.', too_many: 'Er zijn al drie voorstellen.', not_found: 'Voorstel niet gevonden.', already_released: 'De scripts zijn al vrijgegeven aan de klant.' };
-      return NextResponse.json({ error: out.error, message: messages[out.error] || 'Dat is niet gelukt.' }, { status: out.error === 'not_found' ? 404 : 409 });
+
+    if (action === 'rewrite' && !history.some((h) => h.id === body.versionId)) return NextResponse.json({ error: 'not_found', message: 'Voorstel niet gevonden.' }, { status: 404 });
+    if (action === 'add' && history.length >= 3) {
+      return NextResponse.json({ error: 'too_many', message: 'Er zijn al drie voorstellen. Verwijder er eerst een.' }, { status: 409 });
     }
-    const label = (n) => 'voorstel ' + (n + 1);
-    if (action === 'remove') {
-      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_removed', text: 'TFA haalde ' + label(slot) + ' weg', detail: describeProposal(target) });
-    } else if (action === 'add') {
-      const added = historyOf(out.brief).slice(-1)[0];
-      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_added', text: 'TFA liet een extra voorstel schrijven' + (comment ? ' (met opmerking)' : ''), detail: (comment ? 'Opmerking: ' + comment + '\n\n' : '') + (added ? describeProposal(added) : '') });
-    } else {
-      const now = historyOf(out.brief)[slot];
-      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_rewritten', text: 'TFA liet ' + label(slot) + ' opnieuw schrijven' + (comment ? ' (met opmerking)' : ''), detail: (comment ? 'Opmerking: ' + comment + '\n\n' : '') + 'NIEUW\n' + (now ? describeProposal(now) : '') + '\n\n=====\n\nVERVANGEN\n' + describeProposal(target) });
+    const job = { kind: action, versionId: action === 'rewrite' ? body.versionId : undefined, comment: action === 'regenerate' ? '' : comment };
+    if (!(await beginScriptJob(brief, job))) {
+      return NextResponse.json({ error: 'busy', message: 'Er wordt al een voorstel geschreven. Even geduld.' }, { status: 409 });
     }
-    return NextResponse.json((await getBrief(params.id)) || out.brief);
+    waitUntil(runScriptJob(params.id, job));
+    return NextResponse.json((await getBrief(params.id)) || brief, { status: 202 });
   }
 
   if (action === 'provide') {
@@ -113,6 +102,9 @@ export async function POST(request, { params }) {
   }
 
   if (action === 'release') {
+    if (jobState(brief.scriptJob).status === 'running') {
+      return NextResponse.json({ error: 'busy', message: 'Er wordt nog een voorstel geschreven. Geef vrij zodra het klaar is.' }, { status: 409 });
+    }
     if (brief.scriptsReleasedAt) {
       return NextResponse.json({ error: 'already_released', message: 'De scripts zijn al vrijgegeven aan de klant.' }, { status: 409 });
     }

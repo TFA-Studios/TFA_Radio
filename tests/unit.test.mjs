@@ -174,3 +174,12 @@ test('voice match: age is kept before gender when relaxing', () => {
   assert.deepEqual(r.voices.map((v) => v.id), ['a']);
   assert.deepEqual(r.relaxed, ['geslacht']);
 });
+test('scriptJobState: idle, running, failed and stale running jobs', async () => {
+  const { jobState, STALE_MS } = await import('../lib/scriptJobState.js');
+  const now = Date.parse('2026-10-22T12:00:00.000Z');
+  assert.equal(jobState('', now).status, 'idle');
+  assert.equal(jobState('garbage', now).status, 'idle');
+  assert.equal(jobState(JSON.stringify({ status: 'running', startedAt: new Date(now - 5000).toISOString() }), now).status, 'running');
+  assert.equal(jobState(JSON.stringify({ status: 'running', startedAt: new Date(now - STALE_MS - 1000).toISOString() }), now).status, 'failed');
+  assert.equal(jobState(JSON.stringify({ status: 'failed', message: 'x' }), now).message, 'x');
+});

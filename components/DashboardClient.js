@@ -13,6 +13,7 @@ import { scriptIndicator, productionIndicator } from './statusIndicators';
 import { profileOfBrief, answersOfBrief } from '../lib/formProfile';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
 import { SCRIPT_SOURCE_META } from '../lib/reports';
+import { jobState } from '../lib/scriptJobState';
 
 const RANGES = [
   { key: '7d', label: 'Laatste week' },
@@ -316,6 +317,18 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   const [comments, setComments] = useState({});
   const [addComment, setAddComment] = useState('');
   const [replaceOpen, setReplaceOpen] = useState(null);
+  // The writer runs on the server in the background: follow it by reading the
+  // brief. Leaving this screen or clicking elsewhere never interrupts it.
+  const job = jobState(brief.scriptJob);
+  const running = job.status === 'running';
+  useEffect(() => {
+    let cancelled = false;
+    const sync = () => fetch(`/api/dashboard/briefs/${brief.id}/scripts`).then((r) => (r.ok ? r.json() : null)).then((data) => { if (data && !cancelled) onUpdated(data); }).catch(() => {});
+    sync();
+    if (!running) return () => { cancelled = true; };
+    const timer = setInterval(sync, 3000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [brief.id, running]); // eslint-disable-line react-hooks/exhaustive-deps
   // Optimistic recommendation tick: the checkbox flips instantly, the save
   // runs silently in the background and is rolled back if it fails.
   const [recPending, setRecPending] = useState(null);
@@ -496,7 +509,19 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
           </button>
         </div>
       )}
-      {drafts.length === 0 && (
+      {running && (
+        <div style={{ marginBottom: 12, background: '#FFFFFF', border: '1px solid #E6C858', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, color: '#383209', lineHeight: 1.5 }}>
+          <b>{job.kind === 'regenerate' || job.kind === 'initial' ? 'De scriptvoorstellen worden geschreven' : 'Er wordt een voorstel geschreven'}</b>
+          {' '}op de achtergrond; dit kan tot een minuut duren. Je kunt gewoon verder werken of een andere brief openen: het verschijnt hier vanzelf.
+        </div>
+      )}
+      {job.status === 'failed' && (
+        <div style={{ marginBottom: 12, background: '#FBF3F1', border: '1px solid #E3B8AF', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, color: '#8A2E1E', lineHeight: 1.5 }}>
+          {job.message || 'Genereren is niet gelukt.'}{' '}
+          <button type="button" onClick={() => call('POST', { action: 'clear_job' }, 'clear')} style={{ border: 'none', background: 'transparent', color: '#8A2E1E', fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', padding: 0, fontSize: 12.5 }}>Sluiten</button>
+        </div>
+      )}
+      {drafts.length === 0 && !running && job.status !== 'failed' && (
         <div style={{ fontSize: 12.5, color: '#C2513F', marginBottom: 10 }}>
           De concepten worden nog geschreven (dat duurt even, ververs straks). Zijn ze er na een minuut nog niet, klik dan op &ldquo;Opnieuw schrijven&rdquo; of plak hierboven zelf een script.
         </div>
@@ -562,7 +587,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
                 ))}
                 <div style={{ marginTop: 12, borderTop: '1px solid #EAE3C4', paddingTop: 10 }}>
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <button type="button" disabled={!!busy} onClick={() => setReplaceOpen(replaceOpen === d.id ? null : d.id)} style={{ border: '1px solid #D8D4C8', background: replaceOpen === d.id ? '#F4F1E4' : '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                    <button type="button" disabled={!!busy || running} onClick={() => setReplaceOpen(replaceOpen === d.id ? null : d.id)} style={{ border: '1px solid #D8D4C8', background: replaceOpen === d.id ? '#F4F1E4' : '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
                       Vervang dit voorstel door een nieuw
                     </button>
                     <button
@@ -589,8 +614,8 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
                         onChange={(e) => setComments((cur) => ({ ...cur, [d.id]: e.target.value }))}
                       />
                       <div>
-                      <button type="button" disabled={!!busy} onClick={async () => { await proposalAction('rewrite', d); setReplaceOpen(null); }} className="btn-primary" style={{ marginTop: 8, padding: '9px 16px', flex: 'none' }}>
-                        {busy === 'rewrite-' + d.id ? 'Bezig met schrijven…' : 'Nieuw voorstel schrijven'}
+                      <button type="button" disabled={!!busy || running} onClick={async () => { await proposalAction('rewrite', d); setReplaceOpen(null); }} className="btn-primary" style={{ marginTop: 8, padding: '9px 16px', flex: 'none' }}>
+                        {busy === 'rewrite-' + d.id ? 'Bezig met starten…' : 'Nieuw voorstel schrijven'}
                       </button>
                       </div>
                     </div>
@@ -608,8 +633,8 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
             Er {drafts.length === 1 ? 'is' : 'zijn'} maar {drafts.length} voorstel{drafts.length === 1 ? '' : 'len'}. De klant kiest het liefst uit drie.
           </div>
           <AutoTextarea minHeight={44} style={{ ...taStyle, marginTop: 8 }} value={addComment} maxLength={1000} placeholder="Optionele opmerking voor het nieuwe voorstel, bijv. 'speelser, met een knipoog'" onChange={(e) => setAddComment(e.target.value)} />
-          <button type="button" disabled={!!busy} onClick={() => proposalAction('add')} style={{ marginTop: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-            {busy === 'add' ? 'Bezig met schrijven…' : 'Voorstel toevoegen (' + (drafts.length + 1) + ' van 3)'}
+          <button type="button" disabled={!!busy || running} onClick={() => proposalAction('add')} style={{ marginTop: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            {busy === 'add' ? 'Bezig met starten…' : 'Voorstel toevoegen (' + (drafts.length + 1) + ' van 3)'}
           </button>
         </div>
       )}
@@ -618,19 +643,19 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
 
       {!released && (
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-          <button type="button" disabled={!!busy || drafts.length === 0} onClick={release} className="btn-primary" style={{ padding: '10px 18px', flex: 'none' }}>
+          <button type="button" disabled={!!busy || running || drafts.length === 0} onClick={release} className="btn-primary" style={{ padding: '10px 18px', flex: 'none' }}>
             {busy === 'release' ? 'Bezig…' : 'Vrijgeven aan klant' + (drafts.length ? ' (' + drafts.length + ' voorstel' + (drafts.length === 1 ? '' : 'len') + ')' : '')}
           </button>
           <button
             type="button"
-            disabled={!!busy}
+            disabled={!!busy || running}
             onClick={() => {
               if (dirty && typeof window !== 'undefined' && !window.confirm('Je aanpassingen gaan verloren. Toch opnieuw schrijven?')) return;
               call('POST', { action: 'regenerate' }, 'regen');
             }}
             style={{ border: 'none', background: 'transparent', color: '#383209', fontWeight: 600, fontSize: 12.5, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
           >
-            {busy === 'regen' ? 'Bezig met schrijven…' : 'Alles opnieuw schrijven (3 nieuwe voorstellen)'}
+            {busy === 'regen' ? 'Bezig met starten…' : 'Alles opnieuw schrijven (3 nieuwe voorstellen)'}
           </button>
         </div>
       )}

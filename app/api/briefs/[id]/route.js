@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { rateLimit, clientIp, tooManyRequests } from '../../../../lib/rateLimit';
 import { toPublicBrief } from '../../../../lib/publicBrief';
 import { waitUntil } from '@vercel/functions';
-import { getBrief, updateBrief, saveScriptDrafts, saveScriptAudit, listAgencies, logBriefEvent } from '../../../../lib/db';
+import { getBrief, updateBrief, saveScriptDrafts, saveScriptAudit, listAgencies, logBriefEvent, setScriptJob } from '../../../../lib/db';
 import { scriptChangesOf, parseVariationScripts } from '../../../../components/flowData';
 import { sendBriefReceivedEmail, sendConfirmationEmail } from '../../../../lib/email';
 import { notifyNewBrief, notifyClientConfirmed, notifyScriptCheck } from '../../../../lib/slack';
@@ -26,22 +26,12 @@ export const maxDuration = 60;
 
 // How long the background job waits for the script drafts before giving up
 // (the dashboard then shows "no drafts yet, write again").
-const DRAFT_TIMEOUT_MS = 45000;
+const DRAFT_TIMEOUT_MS = 48000;
 
 export async function GET(request, { params }) {
   const brief = await getBrief(params.id);
   if (!brief) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   return NextResponse.json(toPublicBrief(brief));
-}
-
-function withTimeout(promise, ms) {
-  return new Promise((resolve) => {
-    const timer = setTimeout(() => resolve(null), ms);
-    promise.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      () => { clearTimeout(timer); resolve(null); }
-    );
-  });
 }
 
 export async function PATCH(request, { params }) {
@@ -99,7 +89,8 @@ export async function PATCH(request, { params }) {
           console.error('[api/briefs/:id] sendBriefReceivedEmail failed:', err && err.message);
         });
         try {
-          const result = providedScript ? { versions: [] } : await withTimeout(draftScriptVersions(submittedBrief, 3), DRAFT_TIMEOUT_MS);
+          if (!providedScript) await setScriptJob(params.id, { status: 'running', kind: 'initial', startedAt: new Date().toISOString() });
+          const result = providedScript ? { versions: [] } : await draftScriptVersions(submittedBrief, 3, { budgetMs: DRAFT_TIMEOUT_MS });
           if (result && result.versions && result.versions.length) {
             const saved = await saveScriptDrafts(params.id, result.versions);
             if (saved) {
@@ -116,6 +107,13 @@ export async function PATCH(request, { params }) {
           }
         } catch (err) {
           console.error('[api/briefs/:id] script drafting threw:', err && err.message);
+        }
+        try {
+          // Drafting is over (success or not): the dashboard stops showing "writing".
+          if (draftCount > 0 || providedScript) await setScriptJob(params.id, null);
+          else await setScriptJob(params.id, { status: 'failed', kind: 'initial', startedAt: new Date().toISOString(), message: 'De scripts konden niet automatisch geschreven worden. Klik op "Alles opnieuw schrijven".' });
+        } catch (err) {
+          console.error('[api/briefs/:id] clearing script job failed:', err && err.message);
         }
         await receipt;
         // Team-facing ping, sent once the drafts are ready (or with a
