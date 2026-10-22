@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../components/StepShell';
 import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
+import LengthMeter from '../../../../components/LengthMeter';
+import { lengthLevel, blocksEdit } from '../../../../lib/lengthLevel';
 import { TONE_LABELS, estimateSeconds, wordCountOf, variationsCountOf, briefStageOf } from '../../../../components/flowData';
 
 const DEFAULT_DISCLAIMER = 'Nog geen verplichte tekst ontvangen, deze verschijnt hier zodra ingevuld in de brief.';
@@ -166,6 +168,10 @@ export default function ScriptPage({ params }) {
   }
 
   function onScriptChange(e) {
+    // Too long: removing or swapping words is fine, adding more is not.
+    const nextText = e.target.value;
+    const nextWords = wordCountOf(nextText.trim());
+    if (blocksEdit(wordCountOf((scriptText || '').trim()), nextWords, estimateSeconds(nextWords), target)) return;
     setScriptSavedFlash(false);
     setScriptText(e.target.value);
     scheduleScriptSave(e.target.value);
@@ -267,11 +273,7 @@ export default function ScriptPage({ params }) {
   const trimmed = (scriptText || '').trim();
   const words = wordCountOf(trimmed);
   const seconds = estimateSeconds(words);
-  let statusLabel = 'Past goed binnen ' + target + ' seconden.';
-  let barColor = '#1D1D1D';
-  if (seconds > target * 1.2) { statusLabel = 'Te lang, graag inkorten.'; barColor = '#C2513F'; }
-  else if (seconds > target * 1.05) { statusLabel = 'Net iets te lang, bekort het wat.'; barColor = '#383209'; }
-  const barPct = Math.min((seconds / target) * 100, 140) + '%';
+  const tooLong = lengthLevel(seconds, target) === 'long';
   const unchanged = trimmed === generatedText.trim();
 
   // The big button only ever means "approve and go on" (it also keeps any
@@ -445,14 +447,7 @@ export default function ScriptPage({ params }) {
           </button>
         </div>
         <div style={{ marginTop: 12 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5C5850' }}>
-            <span>Geschatte lengte</span>
-            <span style={{ fontWeight: 500, color: barColor }}>{seconds.toFixed(1)}s van {target}″</span>
-          </div>
-          <div style={{ marginTop: 6, height: 8, borderRadius: 4, background: '#EAE7DE', overflow: 'hidden' }}>
-            <div style={{ height: '100%', borderRadius: 4, width: barPct, background: barColor }} />
-          </div>
-          <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 500, color: barColor }}>{statusLabel}</div>
+          <LengthMeter seconds={seconds} target={target} />
         </div>
       </div>
 
@@ -467,7 +462,7 @@ export default function ScriptPage({ params }) {
             ↺ Terugzetten naar het voorstel
           </button>
         )}
-        <button type="button" className="btn-primary" disabled={!hasGenerated} onClick={approveAndContinue}>{approveLabel}</button>
+        <button type="button" className="btn-primary" disabled={!hasGenerated || tooLong} title={tooLong ? 'Het script is te lang: haal eerst woorden weg' : undefined} onClick={approveAndContinue}>{approveLabel}</button>
       </div>
 
       <p style={{ marginTop: 20, fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>

@@ -74,7 +74,7 @@ test('voice match: relaxes and reports only criteria the client actually set', (
   const pool = [{ id: 'a', gender: 'man', ageRange: '55+', tags: ['warm'] }];
   const r = matchVoices(pool, { gender: 'man', age: '18-34', tags: [] });
   assert.equal(r.voices.length, 1);
-  assert.deepEqual(r.relaxed, ['leeftijd']);
+  assert.deepEqual(r.relaxed, ['geslacht', 'leeftijd']);
 });
 test('variation label shows only what the client wrote', () => {
   assert.equal(variationInfoLabel({ kind: 'periode', detail: 'Black Friday', airing: 'nov' }), 'Black Friday · uitzending: nov');
@@ -125,4 +125,52 @@ test('indicators: script and production stages are separate and consistent', asy
   assert.equal(productionIndicator({ productionStatus: 'script_choosing' }).label, 'Niet gestart');
   assert.equal(productionIndicator({ productionStatus: 'in_revision' }).tone, 'attention');
   assert.equal(productionIndicator({ productionStatus: 'approved', deliveredAt: 'd' }).label, 'Geleverd');
+});
+test('lengthLevel: ok / check / long thresholds and edit blocking', async () => {
+  const { lengthLevel, blocksEdit } = await import('../lib/lengthLevel.js');
+  assert.equal(lengthLevel(20, 20), 'ok');
+  assert.equal(lengthLevel(23, 20), 'check');
+  assert.equal(lengthLevel(26, 20), 'long');
+  assert.equal(blocksEdit(60, 62, 26, 20), true);
+  assert.equal(blocksEdit(60, 58, 26, 20), false);
+  assert.equal(blocksEdit(40, 42, 18, 20), false);
+});
+test('splitVoices: recommended first, rest ordered by age closeness then gender', async () => {
+  const { splitVoices } = await import('../lib/voiceMatch.js');
+  const pool = [
+    { id: '1', name: 'A', gender: 'man', ageRange: '55+' },
+    { id: '2', name: 'B', gender: 'vrouw', ageRange: '55+' },
+    { id: '3', name: 'C', gender: 'vrouw', ageRange: '35-54' },
+    { id: '4', name: 'D', gender: 'man', ageRange: '35-54' },
+    { id: '5', name: 'E', gender: 'man', ageRange: '18-34' },
+  ];
+  const r = splitVoices(pool, { gender: 'man', age: '55+', tags: [] });
+  assert.deepEqual(r.recommended.map((v) => v.id), ['1']);
+  assert.deepEqual(r.others.map((v) => v.id), ['2', '4', '3', '5']);
+});
+test('eventLog: full proposal text and coalescing of rapid edits', async () => {
+  const { addEvent, describeProposal } = await import('../lib/eventLog.js');
+  assert.match(describeProposal({ main: 'Hoi', variations: ['A', 'B'] }), /Variatie 2:\nB/);
+  let list = addEvent([], { actor: 'klant', type: 'client_edit', text: 'x', detail: 'one', coalesce: true }, 'a', '2026-10-22T10:00:00.000Z');
+  list = addEvent(list, { actor: 'klant', type: 'client_edit', text: 'x', detail: 'two', coalesce: true }, 'b', '2026-10-22T10:05:00.000Z');
+  assert.equal(list.length, 1);
+  assert.equal(list[0].detail, 'two');
+  list = addEvent(list, { actor: 'klant', type: 'client_edit', text: 'x', detail: 'three', coalesce: true }, 'c', '2026-10-22T11:00:00.000Z');
+  assert.equal(list.length, 2);
+});
+test('playlistOrder: moving and cleaning names', async () => {
+  const { movedOrder, cleanPlaylistName } = await import('../lib/playlistOrder.js');
+  assert.deepEqual(movedOrder(['a', 'b', 'c'], 'b', -1), ['b', 'a', 'c']);
+  assert.deepEqual(movedOrder(['a', 'b', 'c'], 'c', 1), ['a', 'b', 'c']);
+  assert.deepEqual(movedOrder(['a', 'b', 'c'], 'x', 1), ['a', 'b', 'c']);
+  assert.equal(cleanPlaylistName('  Kerst   &  Winter '), 'Kerst & Winter');
+});
+test('voice match: age is kept before gender when relaxing', () => {
+  const pool = [
+    { id: 'a', name: 'A', gender: 'vrouw', ageRange: '55+', tags: [] },
+    { id: 'b', name: 'B', gender: 'man', ageRange: '35-54', tags: [] },
+  ];
+  const r = matchVoices(pool, { gender: 'man', age: '55+', tags: [] });
+  assert.deepEqual(r.voices.map((v) => v.id), ['a']);
+  assert.deepEqual(r.relaxed, ['geslacht']);
 });

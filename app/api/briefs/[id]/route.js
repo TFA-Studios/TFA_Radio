@@ -3,9 +3,19 @@ import { rateLimit, clientIp, tooManyRequests } from '../../../../lib/rateLimit'
 import { toPublicBrief } from '../../../../lib/publicBrief';
 import { waitUntil } from '@vercel/functions';
 import { getBrief, updateBrief, saveScriptDrafts, saveScriptAudit, listAgencies, logBriefEvent } from '../../../../lib/db';
-import { scriptChangesOf } from '../../../../components/flowData';
+import { scriptChangesOf, parseVariationScripts } from '../../../../components/flowData';
 import { sendBriefReceivedEmail, sendConfirmationEmail } from '../../../../lib/email';
 import { notifyNewBrief, notifyClientConfirmed, notifyScriptCheck } from '../../../../lib/slack';
+import { describeProposals, describeScript } from '../../../../lib/eventLog';
+
+function parseHistory(raw) {
+  try {
+    const p = raw ? JSON.parse(raw) : [];
+    return Array.isArray(p) ? p : [];
+  } catch (e) {
+    return [];
+  }
+}
 import { draftScriptVersions } from '../../../../lib/scriptgen';
 
 export const dynamic = 'force-dynamic';
@@ -95,7 +105,7 @@ export async function PATCH(request, { params }) {
             if (saved) {
               current = saved;
               draftCount = result.versions.length;
-              await logBriefEvent(params.id, { actor: 'systeem', type: 'drafts_written', text: 'De AI schreef ' + draftCount + ' scriptvoorstellen' });
+              await logBriefEvent(params.id, { actor: 'systeem', type: 'drafts_written', text: 'De AI schreef ' + draftCount + ' scriptvoorstellen', detail: describeProposals(parseHistory(saved.scriptHistory)) });
             }
           } else if (providedScript) {
             // nothing to draft
@@ -129,7 +139,7 @@ export async function PATCH(request, { params }) {
     const changed = scriptChangesOf(brief).any;
     let tracks = [];
     try { tracks = JSON.parse(brief.selectedTracks || '[]'); } catch (e) {}
-    await logBriefEvent(params.id, { actor: 'klant', type: 'finalized', text: 'Klant bevestigde script, stem en muziek' + (changed ? ' (script aangepast, wacht op controle)' : ''), detail: 'Stem: ' + (brief.selectedVoiceLabel || '-') + '\nMuziek: ' + (tracks.map((t) => t.title).join(', ') || '-') });
+    await logBriefEvent(params.id, { actor: 'klant', type: 'finalized', text: 'Klant bevestigde script, stem en muziek' + (changed ? ' (script aangepast, wacht op controle)' : ''), detail: 'Stem: ' + (brief.selectedVoiceLabel || '-') + '\nMuziek: ' + (tracks.map((t) => t.title).join(', ') || '-') + '\n\n' + describeScript(brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript : brief.generatedScript || '', parseVariationScripts(brief)) });
     if (changed) {
       brief = (await saveScriptAudit(params.id, { scriptAuditStatus: 'pending', scriptAuditedAt: '' })) || brief;
     }

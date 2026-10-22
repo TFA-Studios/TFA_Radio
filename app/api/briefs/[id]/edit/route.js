@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
 import { getBrief, saveEdit, saveScriptAudit, addInternalNote, logBriefEvent } from '../../../../../lib/db';
 import { syncVariationsPatch } from '../../../../../lib/scriptSync';
-import { scriptChangesOf } from '../../../../../components/flowData';
+import { scriptChangesOf, parseVariationScripts } from '../../../../../components/flowData';
+import { describeScript } from '../../../../../lib/eventLog';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,6 +24,11 @@ export async function PATCH(request, { params }) {
   delete fields.variationsBase;
   let brief = await saveEdit(params.id, fields);
   if (!brief) return NextResponse.json({ error: 'not_found' }, { status: 404 });
+  const touched = (k) => fields[k] !== undefined && (existing[k] ?? null) !== (brief[k] ?? null);
+  if (touched('editedScript') || touched('variationScripts')) {
+    const nowMain = brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript : brief.generatedScript || '';
+    await logBriefEvent(params.id, { actor: 'klant', type: 'client_edit', text: 'Klant paste het script aan', detail: describeScript(nowMain, parseVariationScripts(brief)), coalesce: true });
+  }
 
   if (syncVariations) {
     const patch = syncVariationsPatch(brief);
@@ -35,13 +41,13 @@ export async function PATCH(request, { params }) {
   const finalMain = brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript : brief.generatedScript || '';
   if (syncVariations) {
     const changedByClient = brief.editedScript !== null && brief.editedScript !== undefined && brief.editedScript !== brief.generatedScript;
-    await logBriefEvent(params.id, { actor: 'klant', type: 'script_approved', text: changedByClient ? 'Klant keurde het hoofdscript goed, met eigen aanpassingen' : 'Klant keurde het hoofdscript goed zoals voorgesteld', detail: finalMain });
+    await logBriefEvent(params.id, { actor: 'klant', type: 'script_approved', text: changedByClient ? 'Klant keurde het hoofdscript goed, met eigen aanpassingen' : 'Klant keurde het hoofdscript goed zoals voorgesteld', detail: describeScript(finalMain, parseVariationScripts(brief)) });
   }
   // After the client has already confirmed everything, a later change to the
   // script puts it back in front of TFA for a check.
   if (brief.finalizedAt && brief.scriptAuditStatus !== 'pending' && scriptChangesOf(brief).any) {
     brief = (await saveScriptAudit(params.id, { scriptAuditStatus: 'pending', scriptAuditedAt: '' })) || brief;
-    await logBriefEvent(params.id, { actor: 'klant', type: 'script_changed_after_confirm', text: 'Klant paste het script aan na bevestiging; staat klaar voor controle', detail: finalMain });
+    await logBriefEvent(params.id, { actor: 'klant', type: 'script_changed_after_confirm', text: 'Klant paste het script aan na bevestiging; staat klaar voor controle', detail: describeScript(finalMain, parseVariationScripts(brief)) });
   }
   return NextResponse.json(toPublicBrief(brief));
 }

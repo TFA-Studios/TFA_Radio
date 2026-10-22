@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
+import { describeScript } from '../../../../../lib/eventLog';
+import { draftVariationsOf } from '../../../../../lib/scriptSync';
 import { getBrief, selectScriptVersion, logBriefEvent } from '../../../../../lib/db';
 
 // Public (like the rest of /api/briefs/*) — the client-flow script step
@@ -24,6 +26,6 @@ export async function POST(request, { params }) {
   if (!updated) return NextResponse.json({ error: 'not_found' }, { status: 404 });
   let n = 0;
   try { n = (JSON.parse(existing.scriptHistory || '[]').findIndex((h) => h.id === versionId)) + 1; } catch (e) {}
-  await logBriefEvent(params.id, { actor: 'klant', type: 'script_chosen', text: 'Klant koos ' + (n ? 'voorstel ' + n : 'een voorstel'), detail: updated.generatedScript || '' });
+  await logBriefEvent(params.id, { actor: 'klant', type: 'script_chosen', text: 'Klant koos ' + (n ? 'voorstel ' + n : 'een voorstel'), detail: describeScript(updated.generatedScript || '', draftVariationsOf(updated)) });
   return NextResponse.json(toPublicBrief(updated));
 }

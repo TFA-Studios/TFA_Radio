@@ -8,7 +8,7 @@ import Preloader from '../../../../components/Preloader';
 import useMinDelay from '../../../../components/useMinDelay';
 import { useBrief } from '../../../../components/useBrief';
 import { AGE_LABELS } from '../../../../components/flowData';
-import { matchVoices } from '../../../../lib/voiceMatch';
+import { splitVoices } from '../../../../lib/voiceMatch';
 
 // Step 5 — mirrors public/voice.html (questions phase, then a curated
 // shortlist of voices to pick from). Voices come from the producer's real
@@ -170,8 +170,7 @@ export default function VoicePage({ params }) {
     const wantAge = form.voiceAgeRange || null;
     const wantTags = form.voiceStyleTags;
 
-    const { voices, relaxed } = matchVoices(voicePool, { gender: wantGender, age: wantAge, tags: wantTags });
-    return { voices, relaxed };
+    return splitVoices(voicePool, { gender: wantGender, age: wantAge, tags: wantTags });
   }
 
   function selectVoice(voice) {
@@ -291,10 +290,8 @@ export default function VoicePage({ params }) {
             // character preference" tends to make them reject a perfectly
             // good voice on principle, even when it's genuinely the closest
             // fit. The relaxation still happens silently underneath.
-            const { voices: shortlist } = curatedVoices();
-            return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {shortlist.map((voice) => {
+            const { recommended, others } = curatedVoices();
+              const renderVoice = (voice) => {
                 const isSelected = form.selectedVoiceId === voice.id;
                 const isPlaying = playingId === voice.id;
                 return (
@@ -332,7 +329,25 @@ export default function VoicePage({ params }) {
                     )}
                   </div>
                 );
-              })}
+              };
+            const sectionLabel = { fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: '#8C8880', margin: '0 0 10px' };
+            return (
+            <div>
+              <div style={sectionLabel}>{recommended.length > 1 ? 'Aanbevolen voor jou' : 'Onze aanbeveling voor jou'}</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {recommended.map(renderVoice)}
+              </div>
+              {others.length > 0 && (
+                <details open={recommended.length <= 3} style={{ marginTop: 40, paddingTop: 22, borderTop: '1px solid #DEDCD7' }}>
+                  <summary style={{ cursor: 'pointer', fontSize: 13.5, fontWeight: 600, color: '#1D1D1D', marginBottom: 14 }}>
+                    Meer stemmen om uit te kiezen ({others.length})
+                  </summary>
+                  <p style={{ fontSize: 12.5, color: '#5C5850', margin: '0 0 12px' }}>De stemmen die er het dichtst bij komen staan bovenaan.</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {others.map(renderVoice)}
+                  </div>
+                </details>
+              )}
             </div>
             );
           })()}

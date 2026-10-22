@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { upload } from '@vercel/blob/client';
+import PlaylistManager from './PlaylistManager';
 import {
   removeTrackAction, updateTrackAction, removeTracksBulkAction,
   removeVoiceAction, updateVoiceAction, removeVoicesBulkAction,
@@ -970,7 +971,10 @@ function StorageUsageBadge({ storage }) {
   );
 }
 
-export default function LibraryClient({ tracks, voices, categories, defaultTags }) {
+export default function LibraryClient({ tracks, voices, playlists, defaultTags }) {
+  const categories = playlists.map((p) => p.name);
+  const trackCounts = {};
+  tracks.forEach((t) => { trackCounts[t.category] = (trackCounts[t.category] || 0) + 1; });
   const [tab, setTab] = useState('music');
   // Shared across both Muziek/Stemmen tabs: "Bibliotheek" (browse/manage
   // what's already there) is its own separate screen from "Toevoegen" (the
@@ -1167,6 +1171,8 @@ export default function LibraryClient({ tracks, voices, categories, defaultTags 
         view === 'add' ? (
           <AddZone kind="music" categories={categories} onConfirm={confirmTracksBulk} />
         ) : (
+          <>
+          <PlaylistManager playlists={playlists} trackCounts={trackCounts} />
           <BrowsePanel
             kind="music"
             items={tracks}
@@ -1181,6 +1187,7 @@ export default function LibraryClient({ tracks, voices, categories, defaultTags 
             onBulkSetHidden={bulkSetTracksHidden}
             onBulkRename={bulkRenameTracks}
           />
+          </>
         )
       ) : (
         view === 'add' ? (

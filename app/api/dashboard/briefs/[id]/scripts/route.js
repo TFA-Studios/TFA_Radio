@@ -2,6 +2,7 @@ import { requireStaffApi } from '../../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { getBrief, saveScriptDrafts, updateScriptDraft, releaseScripts, editScriptProposals, logBriefEvent } from '../../../../../../lib/db';
 import { draftScriptVersions, draftOneVersion } from '../../../../../../lib/scriptgen';
+import { describeProposal, describeProposals, describeScript } from '../../../../../../lib/eventLog';
 import { sendScriptsReadyEmail } from '../../../../../../lib/email';
 
 // Producer-only — gated by middleware.js (isProtectedRoute matches
@@ -47,7 +48,7 @@ export async function POST(request, { params }) {
       );
     }
     const saved = await saveScriptDrafts(params.id, result.versions);
-    await logBriefEvent(params.id, { actor: 'tfa', type: 'drafts_regenerated', text: 'TFA liet alle voorstellen opnieuw schrijven (' + result.versions.length + ' nieuwe)' });
+    await logBriefEvent(params.id, { actor: 'tfa', type: 'drafts_regenerated', text: 'TFA liet alle voorstellen opnieuw schrijven (' + result.versions.length + ' nieuwe)', detail: 'NIEUW\n\n' + describeProposals(historyOf(saved)) + (historyOf(brief).length ? '\n\n=====\n\nVERVANGEN\n\n' + describeProposals(historyOf(brief)) : '') });
     return NextResponse.json(saved);
   }
 
@@ -85,13 +86,13 @@ export async function POST(request, { params }) {
     }
     const label = (n) => 'voorstel ' + (n + 1);
     if (action === 'remove') {
-      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_removed', text: 'TFA haalde ' + label(slot) + ' weg', detail: target.main });
+      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_removed', text: 'TFA haalde ' + label(slot) + ' weg', detail: describeProposal(target) });
     } else if (action === 'add') {
       const added = historyOf(out.brief).slice(-1)[0];
-      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_added', text: 'TFA liet een extra voorstel schrijven' + (comment ? ' (met opmerking)' : ''), detail: (comment ? 'Opmerking: ' + comment + '\n\n' : '') + (added ? added.main : '') });
+      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_added', text: 'TFA liet een extra voorstel schrijven' + (comment ? ' (met opmerking)' : ''), detail: (comment ? 'Opmerking: ' + comment + '\n\n' : '') + (added ? describeProposal(added) : '') });
     } else {
       const now = historyOf(out.brief)[slot];
-      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_rewritten', text: 'TFA liet ' + label(slot) + ' opnieuw schrijven' + (comment ? ' (met opmerking)' : ''), detail: (comment ? 'Opmerking: ' + comment + '\n\n' : '') + 'Nieuw:\n' + (now ? now.main : '') + '\n\nVervangen tekst:\n' + target.main });
+      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_rewritten', text: 'TFA liet ' + label(slot) + ' opnieuw schrijven' + (comment ? ' (met opmerking)' : ''), detail: (comment ? 'Opmerking: ' + comment + '\n\n' : '') + 'NIEUW\n' + (now ? describeProposal(now) : '') + '\n\n=====\n\nVERVANGEN\n' + describeProposal(target) });
     }
     return NextResponse.json((await getBrief(params.id)) || out.brief);
   }
@@ -107,7 +108,7 @@ export async function POST(request, { params }) {
     const variations = Array.isArray(body.variations) ? body.variations.map((v) => String(v || '').trim()) : (variation ? [variation] : []);
     if (!main) return NextResponse.json({ error: 'empty', message: 'Plak eerst het script.' }, { status: 400 });
     const saved = await saveScriptDrafts(params.id, [{ main, variation: variations[0] || variation, variations, source: 'agency' }]);
-    await logBriefEvent(params.id, { actor: 'tfa', type: 'script_provided', text: 'Script van het agentschap ingevoerd', detail: main });
+    await logBriefEvent(params.id, { actor: 'tfa', type: 'script_provided', text: 'Script van het agentschap ingevoerd', detail: describeScript(main, variations) });
     return NextResponse.json(saved);
   }
 
@@ -119,7 +120,7 @@ export async function POST(request, { params }) {
     if (!released) {
       return NextResponse.json({ error: 'nothing_to_release', message: 'Er is nog geen script om vrij te geven.' }, { status: 400 });
     }
-    await logBriefEvent(params.id, { actor: 'tfa', type: 'released', text: 'Scripts vrijgegeven aan de klant (' + historyOf(released).length + ' voorstel' + (historyOf(released).length === 1 ? '' : 'len') + ')', detail: historyOf(released).map((h, i) => 'Voorstel ' + (i + 1) + ':\n' + h.main).join('\n\n') });
+    await logBriefEvent(params.id, { actor: 'tfa', type: 'released', text: 'Scripts vrijgegeven aan de klant (' + historyOf(released).length + ' voorstel' + (historyOf(released).length === 1 ? '' : 'len') + ')', detail: describeProposals(historyOf(released)) });
     let appUrl;
     try {
       appUrl = new URL(request.url).origin;
@@ -158,7 +159,7 @@ export async function PATCH(request, { params }) {
   if (!updated) return NextResponse.json({ error: 'not_found_or_released' }, { status: 404 });
   const textChanged = before && ((typeof data.main === 'string' && data.main !== before.main) || (Array.isArray(data.variations) && JSON.stringify(data.variations) !== JSON.stringify(Array.isArray(before.variations) ? before.variations : (before.variation ? [before.variation] : []))));
   if (textChanged) {
-    await logBriefEvent(params.id, { actor: 'tfa', type: 'draft_edited', text: 'TFA paste een voorstel aan', detail: typeof data.main === 'string' ? data.main : '' });
+    await logBriefEvent(params.id, { actor: 'tfa', type: 'draft_edited', text: 'TFA paste een voorstel aan', detail: describeProposal(updated && historyOf(updated).find((h) => h.id === versionId) || before), coalesce: true });
   }
   return NextResponse.json(updated);
 }

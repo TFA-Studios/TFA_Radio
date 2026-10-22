@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { toPublicBrief } from '../../../../../lib/publicBrief';
 import { getBrief, saveEdit, saveScriptAudit, addInternalNote, logBriefEvent } from '../../../../../lib/db';
 import { syncVariationsPatch } from '../../../../../lib/scriptSync';
+import { describeScript } from '../../../../../lib/eventLog';
+import { parseVariationScripts } from '../../../../../components/flowData';
 import { notifyAuditReply } from '../../../../../lib/slack';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +30,7 @@ export async function POST(request, { params }) {
     }
     current = (await saveScriptAudit(params.id, { scriptAuditStatus: 'approved', scriptAuditedAt: now, scriptAuditReply: '' })) || current;
     await addInternalNote(params.id, { author: 'Klant', text: 'Klant nam ons tegenvoorstel voor het script over.' }).catch(() => {});
-    await logBriefEvent(params.id, { actor: 'klant', type: 'counter_accepted', text: 'Klant nam ons tegenvoorstel over', detail: current.editedScript || '' });
+    await logBriefEvent(params.id, { actor: 'klant', type: 'counter_accepted', text: 'Klant nam ons tegenvoorstel over', detail: describeScript(current.editedScript || '', parseVariationScripts(current)) });
   } else if (body.action === 'reply') {
     message = typeof body.message === 'string' ? body.message.trim().slice(0, 800) : '';
     if (!message) return NextResponse.json({ error: 'empty' }, { status: 400 });

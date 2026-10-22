@@ -5,6 +5,7 @@ import { assertStaff } from '../../../lib/access';
 import { revalidatePath } from 'next/cache';
 import {
   createTrack, deleteTrack, updateTrack, deleteTracksBulk, updateTracksBulk, renameTracksBulk,
+  createPlaylist, updatePlaylist, movePlaylist, deletePlaylist,
   createVoice, deleteVoice, updateVoice, deleteVoicesBulk, updateVoicesBulk,
 } from '../../../lib/library';
 
@@ -203,4 +204,35 @@ export async function setVoicesHiddenBulkAction(formData) {
   const hidden = formData.get('hidden') === 'true';
   await updateVoicesBulk(ids, { hidden });
   revalidatePath('/dashboard/library');
+}
+
+// ---- Playlists: add, rename, hide/show, reorder, delete (empty only) ----
+export async function addPlaylistAction(name, description) {
+  await assertStaff();
+  const out = await createPlaylist({ name, description });
+  revalidatePath('/dashboard/library');
+  return out.error ? { error: out.error } : { ok: true };
+}
+
+export async function updatePlaylistAction(id, patch) {
+  await assertStaff();
+  const out = await updatePlaylist(id, {
+    name: patch && patch.name, description: patch && patch.description, hidden: patch && patch.hidden,
+  });
+  revalidatePath('/dashboard/library');
+  return out.error ? { error: out.error } : { ok: true };
+}
+
+export async function movePlaylistAction(id, dir) {
+  await assertStaff();
+  await movePlaylist(id, dir);
+  revalidatePath('/dashboard/library');
+  return { ok: true };
+}
+
+export async function removePlaylistAction(id) {
+  await assertStaff();
+  const out = await deletePlaylist(id);
+  revalidatePath('/dashboard/library');
+  return out.error ? { error: out.error } : { ok: true };
 }

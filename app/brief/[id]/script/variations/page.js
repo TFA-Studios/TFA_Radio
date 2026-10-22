@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import StepShell from '../../../../../components/StepShell';
 import Preloader from '../../../../../components/Preloader';
 import useMinDelay from '../../../../../components/useMinDelay';
+import LengthMeter from '../../../../../components/LengthMeter';
+import { lengthLevel, blocksEdit } from '../../../../../lib/lengthLevel';
 import { estimateSeconds, wordCountOf, variationsCountOf, parseVariationScripts, parseVariationInfo, variationInfoLabel } from '../../../../../components/flowData';
 import { diffWords, DiffPreview } from '../../../../../components/textDiff';
 
@@ -118,6 +120,10 @@ export default function ScriptVariationsPage({ params }) {
   }
 
   function onVarChange(idx, value) {
+    // Too long: removing or swapping words is fine, adding more is not.
+    const oldText = variations[idx] !== undefined ? variations[idx] : scriptText;
+    const nw = wordCountOf((value || '').trim());
+    if (blocksEdit(wordCountOf((oldText || '').trim()), nw, estimateSeconds(nw), target)) return;
     setSavedFlash((f) => (f[idx] ? { ...f, [idx]: false } : f));
     setVariations((current) => {
       const next = current.slice();
@@ -171,6 +177,10 @@ export default function ScriptVariationsPage({ params }) {
   const target = parseInt(spotLength, 10) || 20;
   const variationCount = variationsCountOf(brief);
   const scriptText = brief.editedScript !== null && brief.editedScript !== undefined ? brief.editedScript : (brief.generatedScript || '');
+  const anyTooLong = Array.from({ length: variationCount }).some((_, i) => {
+    const text = variations[i] !== undefined ? variations[i] : scriptText;
+    return lengthLevel(estimateSeconds(wordCountOf((text || '').trim())), target) === 'long';
+  });
 
   return (
     <StepShell
@@ -232,11 +242,6 @@ export default function ScriptVariationsPage({ params }) {
         const varTrimmed = (varText || '').trim();
         const varWords = wordCountOf(varTrimmed);
         const varSeconds = estimateSeconds(varWords);
-        let varStatusLabel = 'Past goed binnen ' + target + ' seconden.';
-        let varBarColor = '#1D1D1D';
-        if (varSeconds > target * 1.2) { varStatusLabel = 'Te lang, graag inkorten.'; varBarColor = '#C2513F'; }
-        else if (varSeconds > target * 1.05) { varStatusLabel = 'Net iets te lang, bekort het wat.'; varBarColor = '#383209'; }
-        const varBarPct = Math.min((varSeconds / target) * 100, 140) + '%';
         const varUnchanged = varTrimmed === scriptText.trim();
         const tokens = diffWords(scriptText, varText);
 
@@ -265,14 +270,7 @@ export default function ScriptVariationsPage({ params }) {
               )}
             </div>
             <div style={{ marginTop: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: '#5C5850' }}>
-                <span>Geschatte lengte</span>
-                <span style={{ fontWeight: 500, color: varBarColor }}>{varSeconds.toFixed(1)}s van {target}″</span>
-              </div>
-              <div style={{ marginTop: 6, height: 8, borderRadius: 4, background: '#EAE7DE', overflow: 'hidden' }}>
-                <div style={{ height: '100%', borderRadius: 4, width: varBarPct, background: varBarColor }} />
-              </div>
-              <div style={{ marginTop: 6, fontSize: 12.5, fontWeight: 500, color: varBarColor }}>{varStatusLabel}</div>
+              <LengthMeter seconds={varSeconds} target={target} />
             </div>
             {!varUnchanged && (
               <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
@@ -291,7 +289,7 @@ export default function ScriptVariationsPage({ params }) {
       })()}
 
       <div style={{ marginTop: 20, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
-        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={continueToVoice}>
+        <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} onClick={continueToVoice} disabled={anyTooLong} title={anyTooLong ? 'Een variatie is nog te lang. Kort die eerst in.' : undefined}>
           {returnToOverview ? 'Terug naar overzicht' : 'Doorgaan naar de stem'}
         </button>
       </div>

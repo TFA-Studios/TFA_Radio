@@ -247,12 +247,17 @@ function CopyButton({ text }) {
 
 // The full history of a brief, newest first: who did what and when, with
 // the script texts behind a toggle so the list itself stays calm.
+// Side padding that keeps the brief workspace content at most ~1100px wide, centred.
+const PAGE_GUTTER = 'max(28px, calc((100% - 1100px) / 2))';
+const navBtnStyle = (off) => ({ border: '1px solid #D2CFC8', background: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12.5, fontWeight: 600, cursor: off ? 'default' : 'pointer', opacity: off ? 0.4 : 1 });
+
 function HistoryPanel({ brief, cardStyle }) {
   let events = [];
   try {
     const parsed = brief.eventLog ? JSON.parse(brief.eventLog) : [];
     if (Array.isArray(parsed)) events = parsed.slice().reverse();
   } catch (e) {}
+  const [openAll, setOpenAll] = useState(false);
   const ACTOR = { klant: { label: 'Klant', color: '#6B4FA0' }, tfa: { label: 'TFA', color: '#8C6D1F' }, systeem: { label: 'Systeem', color: '#8C8880' } };
   return (
     <div style={cardStyle}>
@@ -260,6 +265,11 @@ function HistoryPanel({ brief, cardStyle }) {
       <div style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5, marginBottom: 12 }}>
         Wat er met deze brief is gebeurd: wat de klant koos en aanpaste, en wat wij deden. Alleen zichtbaar voor TFA.
       </div>
+      {events.some((e) => e.detail) && (
+        <button type="button" onClick={() => setOpenAll((o) => !o)} style={{ marginBottom: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+          {openAll ? 'Alle teksten inklappen' : 'Alle teksten uitklappen'}
+        </button>
+      )}
       {events.length === 0 && <div style={{ fontSize: 13, color: '#8C8880' }}>Nog niets vastgelegd. Alles vanaf nu komt hier te staan.</div>}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {events.map((e) => {
@@ -273,8 +283,8 @@ function HistoryPanel({ brief, cardStyle }) {
                   {e.text}
                 </div>
                 {e.detail && (
-                  <details style={{ marginTop: 4 }}>
-                    <summary style={{ cursor: 'pointer', fontSize: 11.5, color: '#8C8880' }}>Toon tekst</summary>
+                  <details style={{ marginTop: 4 }} open={openAll}>
+                    <summary style={{ cursor: 'pointer', fontSize: 11.5, color: '#8C8880' }}>Toon volledige tekst</summary>
                     <div style={{ marginTop: 6, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '8px 10px', fontSize: 12.5, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{e.detail}</div>
                   </details>
                 )}
@@ -305,11 +315,12 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   // Per-proposal "opmerking voor opnieuw schrijven" and the one for a new extra proposal.
   const [comments, setComments] = useState({});
   const [addComment, setAddComment] = useState('');
+  const [replaceOpen, setReplaceOpen] = useState(null);
   // Optimistic recommendation tick: the checkbox flips instantly, the save
   // runs silently in the background and is rolled back if it fails.
   const [recPending, setRecPending] = useState(null);
 
-  useEffect(() => { setEdits({}); setError(''); setActive(0); setRecPending(null); }, [brief.id, brief.scriptGeneratedAt]);
+  useEffect(() => { setEdits({}); setError(''); setActive(0); setRecPending(null); setReplaceOpen(null); }, [brief.id, brief.scriptGeneratedAt]);
 
   function isRec(d) {
     if (!recPending) return !!d.recommended;
@@ -549,36 +560,42 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
                     <AutoTextarea minHeight={90} style={taStyle} value={variationsOf(d)[vi] || ''} onChange={(e) => setVariation(d, vi, e.target.value)} onBlur={() => saveDraft(d)} />
                   </div>
                 ))}
-                <details style={{ marginTop: 12, borderTop: '1px solid #EAE3C4', paddingTop: 10 }}>
-                  <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#383209' }}>Dit voorstel bijsturen of weghalen</summary>
-                  <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 11.5, color: '#5C5850', marginBottom: 4, lineHeight: 1.5 }}>
-                      Schrijf alleen dit voorstel opnieuw. Je opmerking wordt toegevoegd aan de vaste AI-instructie en de briefgegevens; de andere voorstellen blijven zoals ze zijn.
-                    </div>
-                    <AutoTextarea
-                      minHeight={60}
-                      style={taStyle}
-                      value={comments[d.id] || ''}
-                      maxLength={1000}
-                      placeholder="Opmerking, bijv. 'minder commercieel, meer humor' of 'begin met de actie'"
-                      onChange={(e) => setComments((cur) => ({ ...cur, [d.id]: e.target.value }))}
-                    />
-                    <div style={{ marginTop: 8, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                      <button type="button" disabled={!!busy} onClick={() => proposalAction('rewrite', d)} style={{ border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-                        {busy === 'rewrite-' + d.id ? 'Bezig met schrijven…' : 'Alleen dit voorstel opnieuw schrijven'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!!busy || drafts.length <= 1}
-                        title={drafts.length <= 1 ? 'Er moet minstens één voorstel overblijven' : ''}
-                        onClick={() => { if (window.confirm('Dit voorstel weghalen? De klant krijgt dan ' + (drafts.length - 1) + ' voorstel' + (drafts.length - 1 === 1 ? '' : 'len') + '.')) proposalAction('remove', d); }}
-                        style={{ border: 'none', background: 'transparent', color: '#C2513F', fontWeight: 600, fontSize: 12.5, textDecoration: 'underline', cursor: drafts.length <= 1 ? 'default' : 'pointer', padding: 0, opacity: drafts.length <= 1 ? 0.4 : 1 }}
-                      >
-                        {busy === 'remove-' + d.id ? 'Bezig…' : 'Voorstel weghalen'}
-                      </button>
-                    </div>
+                <div style={{ marginTop: 12, borderTop: '1px solid #EAE3C4', paddingTop: 10 }}>
+                  <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <button type="button" disabled={!!busy} onClick={() => setReplaceOpen(replaceOpen === d.id ? null : d.id)} style={{ border: '1px solid #D8D4C8', background: replaceOpen === d.id ? '#F4F1E4' : '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+                      Vervang dit voorstel door een nieuw
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!busy || drafts.length <= 1}
+                      title={drafts.length <= 1 ? 'Er moet minstens één voorstel overblijven' : ''}
+                      onClick={() => { if (window.confirm('Dit voorstel weghalen? De klant krijgt dan ' + (drafts.length - 1) + ' voorstel' + (drafts.length - 1 === 1 ? '' : 'len') + '.')) proposalAction('remove', d); }}
+                      style={{ border: 'none', background: 'transparent', color: '#C2513F', fontWeight: 600, fontSize: 12.5, textDecoration: 'underline', cursor: drafts.length <= 1 ? 'default' : 'pointer', padding: 0, opacity: drafts.length <= 1 ? 0.4 : 1 }}
+                    >
+                      {busy === 'remove-' + d.id ? 'Bezig…' : 'Voorstel weghalen'}
+                    </button>
                   </div>
-                </details>
+                  {replaceOpen === d.id && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: 11.5, color: '#5C5850', marginBottom: 4, lineHeight: 1.5 }}>
+                        Er komt een nieuw script (inclusief variaties) voor dit voorstel; de andere blijven staan. Een opmerking is optioneel en wordt aan de AI-instructie toegevoegd.
+                      </div>
+                      <AutoTextarea
+                        minHeight={60}
+                        style={taStyle}
+                        value={comments[d.id] || ''}
+                        maxLength={1000}
+                        placeholder="Opmerking, bijv. 'minder commercieel, meer humor' of 'begin met de actie'"
+                        onChange={(e) => setComments((cur) => ({ ...cur, [d.id]: e.target.value }))}
+                      />
+                      <div>
+                      <button type="button" disabled={!!busy} onClick={async () => { await proposalAction('rewrite', d); setReplaceOpen(null); }} className="btn-primary" style={{ marginTop: 8, padding: '9px 16px', flex: 'none' }}>
+                        {busy === 'rewrite-' + d.id ? 'Bezig met schrijven…' : 'Nieuw voorstel schrijven'}
+                      </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -586,15 +603,15 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
       })()}
 
       {!released && drafts.length > 0 && drafts.length < 3 && (
-        <details style={{ marginBottom: 14 }}>
-          <summary style={{ cursor: 'pointer', fontSize: 12.5, fontWeight: 600, color: '#383209' }}>+ Extra voorstel laten schrijven ({drafts.length} van 3)</summary>
-          <div style={{ marginTop: 8 }}>
-            <AutoTextarea minHeight={60} style={taStyle} value={addComment} maxLength={1000} placeholder="Optionele opmerking voor het nieuwe voorstel, bijv. 'speelser, met een knipoog'" onChange={(e) => setAddComment(e.target.value)} />
-            <button type="button" disabled={!!busy} onClick={() => proposalAction('add')} style={{ marginTop: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
-              {busy === 'add' ? 'Bezig met schrijven…' : 'Voorstel toevoegen'}
-            </button>
+        <div style={{ marginBottom: 14, background: '#FFFFFF', border: '1px solid #E6C858', borderRadius: 10, padding: '10px 12px' }}>
+          <div style={{ fontSize: 12.5, color: '#383209', lineHeight: 1.5 }}>
+            Er {drafts.length === 1 ? 'is' : 'zijn'} maar {drafts.length} voorstel{drafts.length === 1 ? '' : 'len'}. De klant kiest het liefst uit drie.
           </div>
-        </details>
+          <AutoTextarea minHeight={44} style={{ ...taStyle, marginTop: 8 }} value={addComment} maxLength={1000} placeholder="Optionele opmerking voor het nieuwe voorstel, bijv. 'speelser, met een knipoog'" onChange={(e) => setAddComment(e.target.value)} />
+          <button type="button" disabled={!!busy} onClick={() => proposalAction('add')} style={{ marginTop: 8, border: '1px solid #D8D4C8', background: '#fff', borderRadius: 8, padding: '8px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            {busy === 'add' ? 'Bezig met schrijven…' : 'Voorstel toevoegen (' + (drafts.length + 1) + ' van 3)'}
+          </button>
+        </div>
       )}
 
       {error && <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, marginBottom: 8 }}>{error}</div>}
@@ -965,6 +982,13 @@ export default function DashboardClient({ briefs, readOnly = false }) {
   // restructure below) — scrolled back to the top on every tab switch so a
   // producer never lands mid-scroll on a tab they just clicked into.
   const modalBodyRef = useRef(null);
+  useEffect(() => {
+    const onPop = () => setSelected(null);
+    const onKey = (e) => { if (e.key === 'Escape') closeBrief(); };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('keydown', onKey); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear any unsent note/review-link draft, and jump back to the first tab,
   // whenever a different brief's modal opens (or the modal closes) —
@@ -1120,8 +1144,19 @@ export default function DashboardClient({ briefs, readOnly = false }) {
   // this, a failed write looked identical to a successful one until the
   // page was refreshed and re-read the (unwritten) database state — which
   // reads exactly like "the badge goes away, then comes back on refresh."
+  function closeBrief() {
+    if (typeof window !== 'undefined' && window.history.state && window.history.state.tfaBrief) window.history.back();
+    else setSelected(null);
+  }
+
   function handleOpenBrief(b) {
     setSelected(b);
+    // One history entry for the whole workspace, so the browser's back
+    // button returns to the dashboard instead of leaving the page.
+    if (typeof window !== 'undefined' && !(window.history.state && window.history.state.tfaBrief)) {
+      window.history.pushState({ tfaBrief: true }, '');
+    }
+    if (modalBodyRef.current) modalBodyRef.current.scrollTop = 0;
     // Agency logins are read-only: they never mark briefs as seen.
     if (readOnly) setModalTab('overzicht');
     if (readOnly || !isUnseenBrief(b)) return;
@@ -1390,6 +1425,12 @@ export default function DashboardClient({ briefs, readOnly = false }) {
     });
     return list;
   }, [searched, sortField, sortDir]);
+
+  // Previous / next client in the list as currently filtered and sorted.
+  const briefNav = (() => {
+    const index = selected ? sorted.findIndex((b) => b.id === selected.id) : -1;
+    return { index, total: sorted.length, prev: index > 0 ? sorted[index - 1] : null, next: index >= 0 && index < sorted.length - 1 ? sorted[index + 1] : null };
+  })();
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
@@ -1714,8 +1755,9 @@ export default function DashboardClient({ briefs, readOnly = false }) {
 
       {selected && (
         <div
-          onClick={() => setSelected(null)}
-          style={{ position: 'fixed', inset: 0, background: 'rgba(29,29,29,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, zIndex: 50 }}
+          role="dialog"
+          aria-label={'Brief van ' + (selected.companyName || 'klant')}
+          style={{ position: 'fixed', inset: 0, background: '#F6F4EC', display: 'flex', zIndex: 50 }}
         >
           {/* Fixed-height dialog, split into a fixed header/tabs block and a
               scrollable body — this used to just be maxHeight+overflow on
@@ -1728,13 +1770,21 @@ export default function DashboardClient({ briefs, readOnly = false }) {
               tab switch (see setModalTab below) so you're never left
               scrolled halfway down a tab you just arrived at. */}
           <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: '#FFFFFF', borderRadius: 12, maxWidth: 1040, width: '100%',
-              height: '92vh', maxHeight: 960, display: 'flex', flexDirection: 'column', overflow: 'hidden',
-            }}
+            style={{ background: '#FFFFFF', width: '100%', height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
           >
-            <div style={{ padding: '22px 28px 0', flex: 'none' }}>
+            <div style={{ padding: '14px ' + PAGE_GUTTER + ' 0', flex: 'none' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 14 }}>
+                <button type="button" onClick={closeBrief} style={{ border: '1px solid #D2CFC8', background: '#FFFFFF', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer', color: '#1D1D1D' }}>
+                  ← Terug naar dashboard
+                </button>
+                {briefNav.total > 1 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: '#5C5850' }}>
+                    <button type="button" disabled={!briefNav.prev} onClick={() => briefNav.prev && handleOpenBrief(briefNav.prev)} title={briefNav.prev ? briefNav.prev.companyName || 'Vorige' : ''} style={navBtnStyle(!briefNav.prev)}>‹ Vorige</button>
+                    <span>{briefNav.index + 1} van {briefNav.total}</span>
+                    <button type="button" disabled={!briefNav.next} onClick={() => briefNav.next && handleOpenBrief(briefNav.next)} title={briefNav.next ? briefNav.next.companyName || 'Volgende' : ''} style={navBtnStyle(!briefNav.next)}>Volgende ›</button>
+                  </div>
+                )}
+              </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                 <div style={{ minWidth: 0 }}>
                   <h2 style={{ fontSize: 22, fontWeight: 500, letterSpacing: '-.01em', margin: 0, lineHeight: 1.25 }}>{selected.companyName || 'Nog geen bedrijfsnaam'}</h2>
@@ -1751,15 +1801,6 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                       {selected.archivedAt ? 'Terugzetten' : 'Archiveren'}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setSelected(null)}
-                    aria-label="Sluiten"
-                    title="Sluiten"
-                    style={{ border: '1px solid #D2CFC8', background: '#FFFFFF', borderRadius: 999, width: 32, height: 32, fontSize: 15, lineHeight: 1, cursor: 'pointer', color: '#1D1D1D' }}
-                  >
-                    ✕
-                  </button>
                 </div>
               </div>
 
@@ -1806,7 +1847,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
               </div>
             </div>
 
-            <div ref={modalBodyRef} style={{ flex: 1, overflowY: 'auto', padding: '0 28px 26px', background: '#F6F4EC' }}>
+            <div ref={modalBodyRef} style={{ flex: 1, overflowY: 'auto', padding: '0 ' + PAGE_GUTTER + ' 26px', background: '#F6F4EC' }}>
 
             {modalTab === 'productie' && (
             <div
