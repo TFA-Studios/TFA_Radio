@@ -14,7 +14,7 @@ import BrandMark from './BrandMark';
 // (e.g. the client-flow mobile rail) while keeping the icon visible, the
 // same way the old bare-"TFA" label did.
 export default function SpotFlowLogo({ size = 32, variant = 'dark', gap, className, textClassName }) {
-  const tfaColor = variant === 'dark' ? '#E6C858' : '#8C6D1F';
+  const tfaColor = variant === 'dark' ? '#E6C858' : '#6E5410';
   const nameColor = variant === 'dark' ? '#FFFFFF' : '#1D1D1D';
   const fontSize = Math.round(size * 0.75);
 

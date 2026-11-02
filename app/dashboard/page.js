@@ -3,19 +3,10 @@ import { getViewer, scopeBriefs } from '../../lib/access';
 import { toPublicBrief } from '../../lib/publicBrief';
 import DashboardClient from '../../components/DashboardClient';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../components/DashboardSidebar';
+import { isUnseenBrief } from '../../lib/briefState.js';
 
 // Real, changing data (submitted briefs) — never statically cache this page.
 export const dynamic = 'force-dynamic';
-
-// Mirrors isUnseenBrief() in DashboardClient.js — a brief counts as
-// "new/unchecked" once submitted but not yet opened by a producer since.
-// Duplicated rather than imported since DashboardClient is a client
-// component; kept in sync manually (same one-line rule either way).
-function isUnseenBrief(b) {
-  if (!b || !b.submittedAt) return false;
-  if (!b.seenAt) return true;
-  return new Date(b.seenAt).getTime() < new Date(b.submittedAt).getTime();
-}
 
 export default async function DashboardPage() {
   const viewer = await getViewer();

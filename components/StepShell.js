@@ -248,7 +248,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
           script step (step 4) — everywhere else it fired on every single
           navigation between steps, which read as too flashy/repetitive. */}
       {showWipe && <span className="tfa-shell-wipe" aria-hidden="true" />}
-      <div
+      <aside
         ref={sidebarRef}
         onClickCapture={handleRailClick}
         style={{
@@ -299,10 +299,10 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
               borderRadius: '0 6px 6px 0', textDecoration: 'none', cursor: isDone && !locked ? 'pointer' : 'default',
               ...(isCurrent ? { borderLeft: '2px solid #E6C858', background: 'rgba(230,200,88,.10)' } : null),
             };
-            const numColor = isCurrent || isDone ? '#E6C858' : '#77746A';
+            const numColor = isCurrent || isDone ? '#E6C858' : '#A9A59B';
             const labelStyle = isCurrent
               ? { fontSize: 16.5, color: '#FFFFFF', fontWeight: 600 }
-              : { fontSize: 14.5, color: isDone ? '#D8D5CB' : '#8C8880' };
+              : { fontSize: 14.5, color: isDone ? '#D8D5CB' : '#A9A59B' };
             // On the mobile rail (see CSS below), the wave icon and text
             // label disappear and only this number is left — dressed up as
             // a small circle (filled gold for the current step, gold
@@ -385,9 +385,9 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
           </div>
           {brief && briefId && <ResumeCard briefId={briefId} defaultEmail={brief.contactEmail} />}
         </div>
-      </div>
+      </aside>
 
-      <div
+      <main
         style={{
           flex: 1, minWidth: 0, background: '#FFFFFF', padding: '56px 60px',
           position: 'relative',
@@ -407,13 +407,13 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
           <Link href="/" onClick={(e) => askLeave(e, '/')} className="tfa-home-link-mobile">⌂ Homepage</Link>
           {onBack ? (
             <div style={{ marginBottom: 18 }}>
-              <a href="#" onClick={(e) => { e.preventDefault(); onBack(); }} style={{ fontSize: 12, color: '#8C8880', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <a href="#" onClick={(e) => { e.preventDefault(); onBack(); }} style={{ fontSize: 12, color: '#6B675D', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 ← {backText || 'Terug'}
               </a>
             </div>
           ) : backHref ? (
             <div style={{ marginBottom: 18 }}>
-              <Link href={backHref} style={{ fontSize: 12, color: '#8C8880', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Link href={backHref} style={{ fontSize: 12, color: '#6B675D', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                 ← {backLabel || 'Terug'}
               </Link>
             </div>
@@ -422,14 +422,14 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
             <div style={{ fontSize: 13, letterSpacing: '.09em', textTransform: 'uppercase', color: '#383209', fontWeight: 500 }}>{kicker}</div>
           ) : null}
           {title ? (
-            <h2 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 36, margin: '8px 0 6px', color: '#1D1D1D' }}>
+            <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 36, margin: '8px 0 6px', color: '#1D1D1D' }}>
               {title}
-            </h2>
+            </h1>
           ) : null}
           {hint ? <p style={{ fontSize: 13.5, lineHeight: 1.55, color: '#5C5850', margin: '0 0 26px' }}>{hint}</p> : null}
           {children}
         </div>
-      </div>
+      </main>
 
       {showLeaveConfirm && (
         <div
@@ -449,7 +449,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
               type="button"
               onClick={() => setShowLeaveConfirm(false)}
               aria-label="Sluiten"
-              style={{ position: 'absolute', top: 14, right: 14, border: 'none', background: 'transparent', color: '#8C8880', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: 4 }}
+              style={{ position: 'absolute', top: 14, right: 14, border: 'none', background: 'transparent', color: '#6B675D', fontSize: 20, lineHeight: 1, cursor: 'pointer', padding: 4 }}
             >
               ×
             </button>

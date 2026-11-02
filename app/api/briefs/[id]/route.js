@@ -8,15 +8,8 @@ import { sendBriefReceivedEmail, sendConfirmationEmail } from '../../../../lib/e
 import { notifyNewBrief, notifyClientConfirmed, notifyScriptCheck } from '../../../../lib/slack';
 import { describeProposals, describeScript } from '../../../../lib/eventLog';
 
-function parseHistory(raw) {
-  try {
-    const p = raw ? JSON.parse(raw) : [];
-    return Array.isArray(p) ? p : [];
-  } catch (e) {
-    return [];
-  }
-}
 import { draftScriptVersions } from '../../../../lib/scriptgen';
+import { parseJsonArray } from '../../../../lib/jsonArray.js';
 
 export const dynamic = 'force-dynamic';
 // After the client sends the brief, the script drafts are written in the
@@ -96,7 +89,7 @@ export async function PATCH(request, { params }) {
             if (saved) {
               current = saved;
               draftCount = result.versions.length;
-              await logBriefEvent(params.id, { actor: 'systeem', type: 'drafts_written', text: 'De AI schreef ' + draftCount + ' scriptvoorstellen', detail: describeProposals(parseHistory(saved.scriptHistory)) });
+              await logBriefEvent(params.id, { actor: 'systeem', type: 'drafts_written', text: 'De AI schreef ' + draftCount + ' scriptvoorstellen', detail: describeProposals(parseJsonArray(saved.scriptHistory)) });
             }
           } else if (providedScript) {
             // nothing to draft
@@ -110,7 +103,8 @@ export async function PATCH(request, { params }) {
         }
         try {
           // Drafting is over (success or not): the dashboard stops showing "writing".
-          if (draftCount > 0 || providedScript) await setScriptJob(params.id, null);
+          if (providedScript || draftCount >= 3) await setScriptJob(params.id, null);
+          else if (draftCount > 0) await setScriptJob(params.id, { status: 'failed', kind: 'initial', startedAt: new Date().toISOString(), message: 'Er zijn maar ' + draftCount + ' van 3 voorstellen gelukt. Voeg de ontbrekende toe met "Voorstel toevoegen".' });
           else await setScriptJob(params.id, { status: 'failed', kind: 'initial', startedAt: new Date().toISOString(), message: 'De scripts konden niet automatisch geschreven worden. Klik op "Alles opnieuw schrijven".' });
         } catch (err) {
           console.error('[api/briefs/:id] clearing script job failed:', err && err.message);

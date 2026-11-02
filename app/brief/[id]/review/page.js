@@ -203,7 +203,7 @@ export default function ReviewPage({ params }) {
             {isApproved ? '✓' : '🎧'}
           </span>
         </div>
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isApproved ? '#3A6B32' : '#8C6D1F' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: isApproved ? '#3A6B32' : '#6E5410' }}>
           {rounds.length > 1 ? formatRoundLabel(round) : 'Jouw productie'}
         </div>
         <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 28, margin: '10px 0 8px', color: '#1D1D1D' }}>
@@ -225,7 +225,7 @@ export default function ReviewPage({ params }) {
         >
           Bekijk op Frame.io
         </a>
-        <div style={{ marginTop: 12, fontSize: 12, color: isApproved ? '#5C8C52' : '#8C6D1F' }}>
+        <div style={{ marginTop: 12, fontSize: 12, color: isApproved ? '#5C8C52' : '#6E5410' }}>
           Gedeeld op {formatDateTime(round.createdAt)}
           {rounds.length > 1 ? ' (zelfde link als voorheen, open de ' + formatRoundLabel(round).replace(/^Map/, 'map') + ' binnenin)' : ''}
         </div>
@@ -281,7 +281,7 @@ export default function ReviewPage({ params }) {
             padding: '28px 24px', textAlign: 'center', marginBottom: 18,
           }}
         >
-          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 12 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: '#6E5410', marginBottom: 12 }}>
             Helemaal tevreden?
           </div>
           <button
@@ -316,14 +316,14 @@ export default function ReviewPage({ params }) {
           the card's own internal "Geschiedenis" heading (below) already
           covers it, so this would otherwise just duplicate that label. */}
       {!isApproved && (
-        <div style={{ marginBottom: 8, fontSize: 12.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C8880' }}>
+        <div style={{ marginBottom: 8, fontSize: 12.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6B675D' }}>
           Nog iets aanpassen?
         </div>
       )}
       <div style={{ background: '#FFFFFF', border: '1px solid #EEECE3', borderRadius: 14, padding: '20px 22px' }}>
         {!isApproved && (
           <>
-            <div style={{ fontSize: 12, color: '#9C9890', marginBottom: 8 }}>
+            <div style={{ fontSize: 12, color: '#6B675D', marginBottom: 8 }}>
               Wil je liever eerst nog iets laten aanpassen? Typ het hieronder: TFA ziet dit direct en het blijft hier zichtbaar staan. Dit is een aparte stap van goedkeuren hierboven.
             </div>
             <textarea
@@ -372,12 +372,12 @@ export default function ReviewPage({ params }) {
             Productie & review tab for the producer's own reference. */}
         {!isApproved && pastRounds.length > 0 && (
           <div style={{ marginTop: isApproved ? 0 : 18, paddingTop: isApproved ? 0 : 16, borderTop: isApproved ? 'none' : '1px solid #EEECE3' }}>
-            <div style={{ fontSize: 11.5, fontWeight: 600, color: '#8C8880', textTransform: 'uppercase', marginBottom: 10 }}>Eerdere versies</div>
+            <div style={{ fontSize: 11.5, fontWeight: 600, color: '#6B675D', textTransform: 'uppercase', marginBottom: 10 }}>Eerdere versies</div>
             {pastRounds.map((r) => (
               <div key={r.id} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#1D1D1D' }}>
                   {formatRoundLabel(r)}
-                  <span style={{ fontWeight: 400, color: '#9C9890', marginLeft: 6 }}>gedeeld {formatDateTime(r.createdAt)}</span>
+                  <span style={{ fontWeight: 400, color: '#6B675D', marginLeft: 6 }}>gedeeld {formatDateTime(r.createdAt)}</span>
                 </div>
                 {r.approvedAt && (
                   <div style={{ fontSize: 12, color: '#3A6B32', marginTop: 2 }}>Goedgekeurd op {formatDateTime(r.approvedAt)}</div>
@@ -386,13 +386,13 @@ export default function ReviewPage({ params }) {
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {r.feedback.map((f) => (
                       <div key={f.id} style={{ fontSize: 13, color: '#5C5850', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
-                        <span style={{ color: '#9C9890', fontSize: 11.5 }}>{formatDateTime(f.createdAt)}: </span>
+                        <span style={{ color: '#6B675D', fontSize: 11.5 }}>{formatDateTime(f.createdAt)}: </span>
                         {f.text}
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div style={{ fontSize: 12, color: '#9C9890', fontStyle: 'italic', marginTop: 2 }}>Geen feedback op deze map.</div>
+                  <div style={{ fontSize: 12, color: '#6B675D', fontStyle: 'italic', marginTop: 2 }}>Geen feedback op deze map.</div>
                 )}
               </div>
             ))}
@@ -401,7 +401,7 @@ export default function ReviewPage({ params }) {
       </div>
 
       {justSent === 'feedback' && (
-        <div style={{ marginTop: 14, fontSize: 12.5, color: '#8C6D1F' }}>Je feedback is verstuurd naar TFA.</div>
+        <div style={{ marginTop: 14, fontSize: 12.5, color: '#6E5410' }}>Je feedback is verstuurd naar TFA.</div>
       )}
       {error && <div style={{ marginTop: 14, fontSize: 12.5, color: '#C2513F' }}>{error}</div>}
 
@@ -482,7 +482,7 @@ function InProductionCard({ brief, assignedTo, view }) {
             />
           ))}
         </div>
-        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6E5410' }}>
           {view ? view.kicker : 'TFA is aan het werk'}
         </div>
         <h1 style={{ fontFamily: "'Playfair Display', Georgia, serif", fontWeight: 600, fontSize: 28, margin: '10px 0 10px', color: '#1D1D1D' }}>
@@ -499,7 +499,7 @@ function InProductionCard({ brief, assignedTo, view }) {
         <div
           key={tipIdx}
           className="tfa-tip-fade"
-          style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed #E6C858', fontSize: 12.5, color: '#8C6D1F', lineHeight: 1.5, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}
+          style={{ marginTop: 16, paddingTop: 14, borderTop: '1px dashed #E6C858', fontSize: 12.5, color: '#6E5410', lineHeight: 1.5, maxWidth: 460, marginLeft: 'auto', marginRight: 'auto' }}
         >
           ✦ {STUDIO_TIPS[tipIdx]}
         </div>
@@ -529,7 +529,7 @@ function InProductionCard({ brief, assignedTo, view }) {
                 )}
               </div>
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 600, color: active || s.state === 'done' ? '#1D1D1D' : '#9C9890' }}>{s.label}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 600, color: active || s.state === 'done' ? '#1D1D1D' : '#6B675D' }}>{s.label}</div>
                 <div style={{ fontSize: 12.5, color: active || s.state === 'done' ? '#5C5850' : '#B4B0A5', marginTop: 2, lineHeight: 1.5 }}>{s.detail}</div>
               </div>
             </div>
@@ -605,7 +605,7 @@ function Shell({ companyName, firstName, children, agencyName, brief }) {
             is visible wherever the client actually checks status, per the
             explicit request that this be clear "everywhere", not buried in
             terms shown only pre-submit. */}
-        <div style={{ marginTop: 22, fontSize: 11.5, lineHeight: 1.6, color: '#8C8880', textAlign: 'center' }}>
+        <div style={{ marginTop: 22, fontSize: 11.5, lineHeight: 1.6, color: '#6B675D', textAlign: 'center' }}>
           {revisionDisclaimerText({ agencyName })}
         </div>
       </div>

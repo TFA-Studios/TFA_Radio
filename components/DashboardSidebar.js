@@ -42,7 +42,7 @@ export default function DashboardSidebar({ active, unseenCount = 0, role = 'staf
       <Link href="/" style={{ textDecoration: 'none' }}>
         <SpotFlowLogo size={24} variant="dark" className="tfa-dash-sidebar-brand" />
       </Link>
-      <nav className="tfa-dash-nav" style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <nav aria-label="Dashboard" className="tfa-dash-nav" style={{ marginTop: 32, display: 'flex', flexDirection: 'column', gap: 4 }}>
         {navItems.map((item) => {
           const isActive = item.key === active;
           const showBadge = item.key === 'dashboard' && unseenCount > 0;
@@ -104,7 +104,10 @@ export const DASHBOARD_SHELL_STYLES = `
       flex: none !important; width: 100%; min-height: auto !important; padding: 14px 16px !important;
     }
     .tfa-dash-sidebar-brand { display: none; }
-    .tfa-dash-nav { flex-direction: row !important; flex-wrap: wrap; margin-top: 0 !important; gap: 6px !important; }
+    /* One scrollable row instead of a three-line wrapped block. */
+    .tfa-dash-nav { flex-direction: row !important; flex-wrap: nowrap; overflow-x: auto; margin-top: 0 !important; gap: 6px !important; scrollbar-width: none; }
+    .tfa-dash-nav::-webkit-scrollbar { display: none; }
+    .tfa-dash-navlink { padding: 8px 12px !important; white-space: nowrap; flex: none; }
     /* Same inline-vs-stylesheet issue as above: the footer div sets
        display:'flex' inline, which silently beat this rule without
        !important — the "Uitloggen / Login niet geconfigureerd" row was

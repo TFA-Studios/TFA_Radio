@@ -46,7 +46,7 @@ export default function HomePage() {
               Start je commercial
               <span className="tfa-cta-arrow" aria-hidden="true">→</span>
             </Link>
-            <div style={{ marginTop: 16, fontSize: 13, color: '#8C8880' }}>
+            <div style={{ marginTop: 16, fontSize: 13, color: '#6B675D' }}>
               Geen account nodig: je krijgt direct je eigen brieflink.
             </div>
           </main>
@@ -246,7 +246,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div style={{ marginTop: 32, paddingTop: 18, borderTop: '1px solid #33301F', fontSize: 11.5, color: '#8C8880', textAlign: 'center' }}>
+          <div style={{ marginTop: 32, paddingTop: 18, borderTop: '1px solid #33301F', fontSize: 11.5, color: '#A9A59B', textAlign: 'center' }}>
             © {new Date().getFullYear()} Team TFA · Karim Abdelmessih
           </div>
         </div>
@@ -276,7 +276,7 @@ export default function HomePage() {
         }
         .tfa-footer-icon:hover { color: #E6C858; border-color: #E6C858; background: rgba(230,200,88,.12); }
         .tfa-footer-heading {
-          font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #8C8880;
+          font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: #A9A59B;
         }
         @media (max-width: 700px) {
           .tfa-footer-grid { grid-template-columns: 1fr 1fr !important; gap: 24px !important; }

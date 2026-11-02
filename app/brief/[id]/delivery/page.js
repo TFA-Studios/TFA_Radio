@@ -145,7 +145,7 @@ export default function DeliveryPage({ params }) {
         )}
         <div>
           <label className="field-label">Lengte van de hoofdspot</label>
-          <select value={form.hoofdspotLength} onChange={(e) => update({ hoofdspotLength: e.target.value })}>
+          <select aria-label="Lengte van de hoofdspot" value={form.hoofdspotLength} onChange={(e) => update({ hoofdspotLength: e.target.value })}>
             <option value="20">20 seconden</option>
             <option value="25">25 seconden</option>
           </select>
@@ -180,6 +180,7 @@ export default function DeliveryPage({ params }) {
             <label className="field-label" style={{ marginBottom: 6 }}>Hoeveel variaties heb je nodig?</label>
             <input
               type="number"
+              aria-label="Aantal variaties"
               min={1}
               max={MAX_VARIATIONS_COUNT}
               step={1}
@@ -210,6 +211,7 @@ export default function DeliveryPage({ params }) {
         <div className="hint" style={{ marginBottom: 7 }}>Staat de live-datum nog niet vast? Geen probleem. Geef een schatting of alleen een maand; TFA stemt de definitieve datum later met je af.</div>
         <input
           type="date"
+          aria-label="Eerste uitzenddatum"
           min={todayISO}
           value={form.dateUnknown ? '' : form.airDate}
           disabled={form.dateUnknown}
@@ -228,7 +230,7 @@ export default function DeliveryPage({ params }) {
           <div className="box" style={{ marginTop: 10 }}>
             <div className="hint" style={{ marginBottom: 8 }}>Geen probleem, geef ons dan in elk geval een maand, zodat we het project goed kunnen inplannen. Ook een maand volgend jaar kan.</div>
             <label className="field-label">Welke maand ongeveer?</label>
-            <select value={airMonthValue} onChange={(e) => update({ airMonth: e.target.value })}>
+            <select aria-label="Welke maand ongeveer?" value={airMonthValue} onChange={(e) => update({ airMonth: e.target.value })}>
               <option value="">Kies een maand</option>
               {monthOptions.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
@@ -241,7 +243,7 @@ export default function DeliveryPage({ params }) {
 
       <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         {!canContinue && (
-          <div style={{ fontSize: 12, color: '#8C8880' }}>
+          <div style={{ fontSize: 12, color: '#6B675D' }}>
             {!impressionsValid
               ? 'Vul hierboven een aantal impressies in dat we kunnen lezen (bijv. 250.000 of 500k), of laat het leeg.'
               : 'Vul hierboven een geldig aantal variaties in om verder te gaan.'}

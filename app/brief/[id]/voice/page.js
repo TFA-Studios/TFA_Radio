@@ -258,7 +258,7 @@ export default function VoicePage({ params }) {
             <div className="hint" style={{ marginBottom: 8 }}>Kies er een of meer.</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
               {allTags.length === 0 && !poolLoading && (
-                <span style={{ fontSize: 12.5, color: '#8C8880' }}>Nog geen tags beschikbaar.</span>
+                <span style={{ fontSize: 12.5, color: '#6B675D' }}>Nog geen tags beschikbaar.</span>
               )}
               {allTags.map((v) => (
                 <button key={v} type="button" className={'tone-chip' + (form.voiceStyleTags.includes(v) ? ' active' : '')} onClick={() => toggleTag(v)}>{v}</button>
@@ -266,7 +266,7 @@ export default function VoicePage({ params }) {
             </div>
           </div>
           <div style={{ marginTop: 18 }}>
-            <label className="field-label">Nog iets dat we moeten weten? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+            <label className="field-label">Nog iets dat we moeten weten? <span style={{ color: '#6B675D', fontWeight: 400 }}>(optioneel)</span></label>
             <textarea style={{ minHeight: 64 }} value={form.voiceNote} placeholder="Bijv. 'geen kinderstem'" onChange={(e) => update({ voiceNote: e.target.value })} />
           </div>
           <div style={{ marginTop: 26, maxWidth: 340 }}>
@@ -279,7 +279,7 @@ export default function VoicePage({ params }) {
             Op basis van je antwoorden stelt TFA deze stemmen voor. Beluister elk voorbeeld en kies de stem die het beste past.
           </p>
           {poolLoading ? (
-            <div style={{ fontSize: 12.5, color: '#8C8880' }}>Stemmen laden…</div>
+            <div style={{ fontSize: 12.5, color: '#6B675D' }}>Stemmen laden…</div>
           ) : voicePool.length === 0 ? (
             <div style={{ background: '#FBF3F1', border: '1px solid #C2513F', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#C2513F' }}>
               TFA heeft nog geen stemmen in de bibliotheek gezet. Neem contact op met je producer.
@@ -330,7 +330,7 @@ export default function VoicePage({ params }) {
                   </div>
                 );
               };
-            const sectionLabel = { fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: '#8C8880', margin: '0 0 10px' };
+            const sectionLabel = { fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: '#6B675D', margin: '0 0 10px' };
             return (
             <div>
               <div style={sectionLabel}>{recommended.length > 1 ? 'Aanbevolen voor jou' : 'Onze aanbeveling voor jou'}</div>
@@ -352,7 +352,7 @@ export default function VoicePage({ params }) {
             );
           })()}
           <div style={{ marginTop: 18 }}>
-            <a href="#" onClick={(e) => { e.preventDefault(); stopAudio(); setPlayingId(null); setPhase('questions'); }} style={{ fontSize: 12, color: '#8C8880', textDecoration: 'underline' }}>← Terug naar de vragen</a>
+            <a href="#" onClick={(e) => { e.preventDefault(); stopAudio(); setPlayingId(null); setPhase('questions'); }} style={{ fontSize: 12, color: '#6B675D', textDecoration: 'underline' }}>← Terug naar de vragen</a>
           </div>
           <div style={{ marginTop: 22, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', justifyContent: 'flex-end' }}>
             <button type="button" className="btn-primary" style={{ minWidth: 320, flex: 'none', whiteSpace: 'nowrap', padding: '14px 26px' }} disabled={!form.selectedVoiceId} onClick={next}>
@@ -361,7 +361,7 @@ export default function VoicePage({ params }) {
           </div>
         </>
       )}
-      <p style={{ marginTop: 26, fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>Twijfel je tussen twee stemmen? Je kunt je keuze altijd nog aanpassen voordat je alles verstuurt.</p>
+      <p style={{ marginTop: 26, fontSize: 11.5, color: '#6B675D', lineHeight: 1.5 }}>Twijfel je tussen twee stemmen? Je kunt je keuze altijd nog aanpassen voordat je alles verstuurt.</p>
     </StepShell>
   );
 }

@@ -48,7 +48,7 @@ export default function PlaylistManager({ playlists, trackCounts }) {
   return (
     <details style={{ background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
       <summary style={{ cursor: 'pointer', fontSize: 13.5, fontWeight: 600 }}>
-        Playlists beheren <span style={{ fontWeight: 500, color: '#8C8880' }}>({playlists.length}{hiddenCount ? ', ' + hiddenCount + ' verborgen' : ''})</span>
+        Playlists beheren <span style={{ fontWeight: 500, color: '#6B675D' }}>({playlists.length}{hiddenCount ? ', ' + hiddenCount + ' verborgen' : ''})</span>
       </summary>
       <div style={{ fontSize: 12, color: '#5C5850', lineHeight: 1.5, margin: '8px 0 12px' }}>
         De volgorde hieronder is de volgorde waarin klanten de playlists zien. Een verborgen playlist (bijvoorbeeld Kerst buiten het seizoen) verdwijnt voor klanten, maar blijft hier staan.
@@ -73,9 +73,9 @@ export default function PlaylistManager({ playlists, trackCounts }) {
               <div style={{ flex: 1, minWidth: 200 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 600 }}>
                   {p.name}
-                  {p.hidden && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#8C6D1F', background: '#F3E6C9', borderRadius: 999, padding: '2px 8px' }}>Verborgen voor klanten</span>}
+                  {p.hidden && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: '#6E5410', background: '#F3E6C9', borderRadius: 999, padding: '2px 8px' }}>Verborgen voor klanten</span>}
                 </div>
-                <div style={{ fontSize: 12, color: '#8C8880' }}>{(trackCounts[p.name] || 0)} track{(trackCounts[p.name] || 0) === 1 ? '' : 's'}{p.description ? ' · ' + p.description : ''}</div>
+                <div style={{ fontSize: 12, color: '#6B675D' }}>{(trackCounts[p.name] || 0)} track{(trackCounts[p.name] || 0) === 1 ? '' : 's'}{p.description ? ' · ' + p.description : ''}</div>
               </div>
             )}
             {editing !== p.id && (

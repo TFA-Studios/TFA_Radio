@@ -6,10 +6,7 @@ import { notifyDelivered } from '../../../../../lib/slack';
 // Public (like the rest of /api/briefs/*) — the client's private review
 // page uses this to approve the current review round. On approval, the
 // final Frame.io link is automatically posted to Slack (see notifyDelivered
-// in lib/slack.js) — this used to also be a separate ADMIN_NOTIFY_EMAIL
-// email (still defined as sendReviewApprovedNotification in lib/email.js,
-// unused, if ever wanted back), but Karim wants everything internal routed
-// through Slack rather than email.
+// in lib/slack.js); internal pings go through Slack only, not email.
 export const dynamic = 'force-dynamic';
 
 export async function POST(request, { params }) {

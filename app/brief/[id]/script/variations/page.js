@@ -230,7 +230,7 @@ export default function ScriptVariationsPage({ params }) {
         if (!label) return null;
         return (
           <div style={{ marginBottom: 14, background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 10, padding: '10px 14px' }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>Waar deze variatie over gaat</div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6E5410' }}>Waar deze variatie over gaat</div>
             <div style={{ fontSize: 13.5, color: '#1D1D1D', marginTop: 3, lineHeight: 1.5 }}>{label}</div>
           </div>
         );
@@ -254,7 +254,7 @@ export default function ScriptVariationsPage({ params }) {
               onBlur={() => { varFocusedMap.current[idx] = false; }}
               onChange={(e) => onVarChange(idx, e.target.value)}
             />
-            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: savedFlash[idx] ? '#1D7A46' : '#9C9890' }}>
+            <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: savedFlash[idx] ? '#1D7A46' : '#6B675D' }}>
               {savedFlash[idx] ? <>✓ Opgeslagen</> : <>Wordt automatisch opgeslagen terwijl je typt</>}
             </div>
             <div style={{ marginTop: 14 }}>

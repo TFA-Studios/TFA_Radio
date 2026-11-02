@@ -84,7 +84,7 @@ export function DiffText({ tokens }) {
 // being shown inline at full size. With several variations on one page
 // this keeps each one to roughly its own length rather than ~1.5-2x it.
 export function DiffPreview({ tokens }) {
-  const removedText = tokens.filter((t) => t.type === 'removed').map((t) => t.text).join('').trim();
+  const removedText = tokens.filter((t) => t.type === 'removed').map((t) => t.text.trim()).filter(Boolean).join(' … ');
   return (
     <>
       <div>
@@ -101,7 +101,7 @@ export function DiffPreview({ tokens }) {
           )}
       </div>
       {removedText && (
-        <div style={{ marginTop: 6, fontSize: 11.5, color: '#9C9890', fontStyle: 'italic' }}>
+        <div style={{ marginTop: 6, fontSize: 11.5, color: '#6B675D', fontStyle: 'italic' }}>
           Verwijderd t.o.v. het hoofdscript: &ldquo;{removedText}&rdquo;
         </div>
       )}

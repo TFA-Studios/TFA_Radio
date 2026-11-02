@@ -238,7 +238,7 @@ export default function MusicPage({ params }) {
       </div>
 
       {poolLoading ? (
-        <div style={{ fontSize: 12.5, color: '#8C8880' }}>Muziek laden…</div>
+        <div style={{ fontSize: 12.5, color: '#6B675D' }}>Muziek laden…</div>
       ) : playlists.length === 0 ? (
         <div style={{ background: '#FBF3F1', border: '1px solid #C2513F', borderRadius: 10, padding: '12px 14px', fontSize: 12.5, color: '#C2513F' }}>
           TFA heeft nog geen muziek in de bibliotheek gezet. Neem contact op met je producer.
@@ -259,14 +259,14 @@ export default function MusicPage({ params }) {
                     {pl.description && (
                       <div style={{ fontSize: 12, color: '#5C5850', marginTop: 3, lineHeight: 1.4, maxWidth: 460 }}>{pl.description}</div>
                     )}
-                    <div style={{ fontSize: 11.5, color: '#8C8880', marginTop: 3, lineHeight: 1.4 }}>{pl.tracks.length} track{pl.tracks.length === 1 ? '' : 's'}</div>
+                    <div style={{ fontSize: 11.5, color: '#6B675D', marginTop: 3, lineHeight: 1.4 }}>{pl.tracks.length} track{pl.tracks.length === 1 ? '' : 's'}</div>
                   </div>
                   <span style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▾</span>
                 </div>
                 {isOpen && (
                   <div style={{ borderTop: '1px solid #DEDCD7', padding: '4px 12px 10px' }}>
                     {pl.tracks.length === 0 && (
-                      <div style={{ padding: '10px 8px', fontSize: 12, color: '#8C8880', fontStyle: 'italic' }}>
+                      <div style={{ padding: '10px 8px', fontSize: 12, color: '#6B675D', fontStyle: 'italic' }}>
                         Nog geen tracks in deze categorie.
                       </div>
                     )}
@@ -296,7 +296,7 @@ export default function MusicPage({ params }) {
                               panel below. */}
                           <div style={{ flex: isPlaying && track.audioUrl ? '0 1 34%' : '1 1 auto', minWidth: 0 }}>
                             <div style={{ fontSize: 12.5, fontWeight: selected ? 600 : 500, color: '#1D1D1D', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</div>
-                            <div style={{ fontSize: 11, color: '#8C8880', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist}{track.artist && track.duration ? ' · ' : ''}{track.duration}</div>
+                            <div style={{ fontSize: 11, color: '#6B675D', marginTop: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.artist}{track.artist && track.duration ? ' · ' : ''}{track.duration}</div>
                           </div>
                           {isPlaying && track.audioUrl && (
                             <AudioScrubber currentTime={currentTime} duration={duration} onSeek={seekPreview} />
@@ -366,7 +366,7 @@ export default function MusicPage({ params }) {
           {returnToOverview ? 'Terug naar overzicht' : 'Bevestigen: verder naar het overzicht'}
         </button>
       </div>
-      <p style={{ marginTop: 20, fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>Twijfel je tussen twee tracks? Je kunt je keuze altijd nog aanpassen voordat je alles verstuurt.</p>
+      <p style={{ marginTop: 20, fontSize: 11.5, color: '#6B675D', lineHeight: 1.5 }}>Twijfel je tussen twee tracks? Je kunt je keuze altijd nog aanpassen voordat je alles verstuurt.</p>
 
       <style jsx>{`
         .tfa-track-row:hover {

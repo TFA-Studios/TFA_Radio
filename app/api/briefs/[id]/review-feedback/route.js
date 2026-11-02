@@ -27,10 +27,7 @@ export async function POST(request, { params }) {
     dashboardUrl = undefined;
   }
 
-  // Slack-only now — this used to also email TEAM_NOTIFY_EMAILS
-  // (sendReviewFeedbackNotification, still defined in lib/email.js if ever
-  // wanted back), but Karim wants Slack to be the one place for internal
-  // "something happened" pings, same as the new-brief and delivered events.
+  // Slack is the one place for internal "something happened" pings.
   try {
     await notifyFeedback(brief, dashboardUrl);
   } catch (err) {

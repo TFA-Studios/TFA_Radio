@@ -8,15 +8,11 @@ import useMinDelay from '../../../../components/useMinDelay';
 import LengthMeter from '../../../../components/LengthMeter';
 import { lengthLevel, blocksEdit } from '../../../../lib/lengthLevel';
 import { TONE_LABELS, estimateSeconds, wordCountOf, variationsCountOf, briefStageOf } from '../../../../components/flowData';
+import { parseJsonArray } from '../../../../lib/jsonArray.js';
 
 const DEFAULT_DISCLAIMER = 'Nog geen verplichte tekst ontvangen, deze verschijnt hier zodra ingevuld in de brief.';
 function parseHistory(brief) {
-  try {
-    const parsed = brief && brief.scriptHistory ? JSON.parse(brief.scriptHistory) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return parseJsonArray(brief && brief.scriptHistory ? brief.scriptHistory : '');
 }
 
 // Step 4 — mirrors public/script.html: generation, live "estimated
@@ -299,14 +295,14 @@ export default function ScriptPage({ params }) {
       backLabel="Terug naar de status"
     >
       {tones.length > 0 && (
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#8C6D1F', background: 'rgba(230,200,88,.18)', borderRadius: 20, padding: '5px 12px', margin: '0 0 4px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 600, color: '#6E5410', background: 'rgba(230,200,88,.18)', borderRadius: 20, padding: '5px 12px', margin: '0 0 4px' }}>
           Toon uit je brief: {tones.map((t) => TONE_LABELS[t]).join(' & ')}
         </div>
       )}
 
       {hasGenerated && history.length > 0 && (
         <div style={{ margin: '18px 0 4px' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6E5410' }}>
             {history.length > 1 ? 'Onze scriptvoorstellen voor jou' : 'Ons scriptvoorstel voor jou'}
           </div>
           <p style={{ fontSize: 12.5, color: '#5C5850', margin: '6px 0 12px', lineHeight: 1.5 }}>
@@ -327,11 +323,11 @@ export default function ScriptPage({ params }) {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: isActive ? '#8C6D1F' : '#8C8880' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase', color: isActive ? '#6E5410' : '#6B675D' }}>
                         Voorstel {i + 1}{isActive && history.length > 1 ? ' · gekozen ✓' : ''}
                       </div>
                       {h.recommended && history.length > 1 && (
-                        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em', color: '#8C6D1F', border: '1px solid #E6D9A3', borderRadius: 999, padding: '2px 8px', background: '#FFFDF3' }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.04em', color: '#6E5410', border: '1px solid #E6D9A3', borderRadius: 999, padding: '2px 8px', background: '#FFFDF3' }}>
                           Onze aanbeveling
                         </span>
                       )}
@@ -356,7 +352,7 @@ export default function ScriptPage({ params }) {
                   </div>
                   {h.recommended && h.reason && history.length > 1 && (
                     <div style={{ marginTop: 9, fontSize: 12.5, lineHeight: 1.5, color: '#5C5850' }}>
-                      <span style={{ fontWeight: 600, color: '#8C6D1F' }}>Waarom wij hiervoor kiezen: </span>{h.reason}
+                      <span style={{ fontWeight: 600, color: '#6E5410' }}>Waarom wij hiervoor kiezen: </span>{h.reason}
                     </div>
                   )}
                 </div>
@@ -375,7 +371,7 @@ export default function ScriptPage({ params }) {
             <button
               type="button"
               onClick={() => setNoFitOpen(true)}
-              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11.5, color: '#9C9890', textDecoration: 'underline', cursor: 'pointer' }}
+              style={{ background: 'none', border: 'none', padding: 0, fontSize: 11.5, color: '#6B675D', textDecoration: 'underline', cursor: 'pointer' }}
             >
               Past geen van deze voorstellen bij je?
             </button>
@@ -400,7 +396,7 @@ export default function ScriptPage({ params }) {
         </div>
       )}
       {!hasGenerated && (
-        <div style={{ margin: '16px 0 4px', fontSize: 12.5, color: '#8C8880' }}>
+        <div style={{ margin: '16px 0 4px', fontSize: 12.5, color: '#6B675D' }}>
           De scriptvoorstellen zijn nog niet beschikbaar.
         </div>
       )}
@@ -410,12 +406,12 @@ export default function ScriptPage({ params }) {
           <div style={{ fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: '#383209', fontWeight: 500 }}>
             Verplichte tekst uit je brief: TFA neemt dit altijd op
           </div>
-          <div style={{ fontSize: 12.5, color: hasRealDisclaimer ? '#1D1D1D' : '#9C9890', marginTop: 4, lineHeight: 1.5 }}>&ldquo;{disclaimerText}&rdquo;</div>
+          <div style={{ fontSize: 12.5, color: hasRealDisclaimer ? '#1D1D1D' : '#6B675D', marginTop: 4, lineHeight: 1.5 }}>&ldquo;{disclaimerText}&rdquo;</div>
         </div>
       </div>
 
       <div style={{ marginTop: 30, paddingTop: 22, borderTop: '2px solid #EAE7DE' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C8880' }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6B675D' }}>
           Script aanpassen
         </div>
         <h3 style={{ fontSize: 14, fontWeight: 600, margin: '6px 0 4px' }}>Wil je iets aanpassen?</h3>
@@ -426,6 +422,7 @@ export default function ScriptPage({ params }) {
           {hasVariation && ' Je variaties bouwen voort op dit hoofdscript: een aanpassing aan tekst die in alle versies hetzelfde is, nemen wij automatisch mee in je ' + (variationCount > 1 ? 'variaties' : 'variatie') + '. Je hoeft dat dus niet per variatie opnieuw te doen.'}
         </p>
         <textarea
+          aria-label="Scripttekst"
           style={{ minHeight: 140, fontSize: 15.5, lineHeight: 1.65, fontWeight: 500, background: '#FFFDF3', borderLeft: '3px solid #E6C858' }}
           value={scriptText}
           onFocus={() => { scriptFocused.current = true; }}
@@ -433,7 +430,7 @@ export default function ScriptPage({ params }) {
           onChange={onScriptChange}
         />
         <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 12, color: scriptSavedFlash || !dirty ? '#1D7A46' : '#9C9890' }}>
+          <div style={{ fontSize: 12, color: scriptSavedFlash || !dirty ? '#1D7A46' : '#6B675D' }}>
             {scriptSavedFlash ? '✓ Je aanpassing is opgeslagen' : dirty ? 'Wordt automatisch opgeslagen terwijl je typt' : '✓ Alles is opgeslagen'}
           </div>
           <button
@@ -465,7 +462,7 @@ export default function ScriptPage({ params }) {
         <button type="button" className="btn-primary" disabled={!hasGenerated || tooLong} title={tooLong ? 'Het script is te lang: haal eerst woorden weg' : undefined} onClick={approveAndContinue}>{approveLabel}</button>
       </div>
 
-      <p style={{ marginTop: 20, fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>
+      <p style={{ marginTop: 20, fontSize: 11.5, color: '#6B675D', lineHeight: 1.5 }}>
         Je krijgt na deze stap nog één moment om het script bij te stellen, voordat de opname start.
       </p>
 

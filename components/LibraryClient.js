@@ -94,13 +94,13 @@ function TagPicker({ allTags, selected, onChange, onAddTag }) {
           fontSize: 13, background: '#FFFFFF', cursor: 'pointer', minHeight: 38, display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center',
         }}
       >
-        {selected.length === 0 && <span style={{ color: '#9C9890' }}>Kies tags…</span>}
+        {selected.length === 0 && <span style={{ color: '#55514A' }}>Kies tags…</span>}
         {selected.map((tag) => (
           <span key={tag} style={{ fontSize: 11.5, fontWeight: 600, padding: '2px 8px', borderRadius: 999, background: '#FBF0C8', color: '#383209' }}>
             {tag}
           </span>
         ))}
-        <span style={{ marginLeft: 'auto', color: '#8C8880', fontSize: 11 }}>{open ? '▴' : '▾'}</span>
+        <span style={{ marginLeft: 'auto', color: '#55514A', fontSize: 11 }}>{open ? '▴' : '▾'}</span>
       </button>
 
       {open && (
@@ -111,7 +111,7 @@ function TagPicker({ allTags, selected, onChange, onAddTag }) {
               {tag}
             </label>
           ))}
-          {allTags.length === 0 && <div style={{ fontSize: 12, color: '#8C8880', padding: '4px 6px' }}>Nog geen tags beschikbaar.</div>}
+          {allTags.length === 0 && <div style={{ fontSize: 12, color: '#55514A', padding: '4px 6px' }}>Nog geen tags beschikbaar.</div>}
           <div style={{ marginTop: 6, paddingTop: 8, borderTop: '1px solid #EEECE3', display: 'flex', gap: 6 }}>
             <input
               type="text"
@@ -125,7 +125,7 @@ function TagPicker({ allTags, selected, onChange, onAddTag }) {
               Toevoegen
             </button>
           </div>
-          <button type="button" onClick={() => setOpen(false)} style={{ marginTop: 6, width: '100%', border: 'none', background: 'transparent', color: '#8C8880', fontSize: 11.5, cursor: 'pointer', padding: '4px 0' }}>
+          <button type="button" onClick={() => setOpen(false)} style={{ marginTop: 6, width: '100%', border: 'none', background: 'transparent', color: '#55514A', fontSize: 11.5, cursor: 'pointer', padding: '4px 0' }}>
             Sluiten
           </button>
         </div>
@@ -214,7 +214,7 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
         <div style={{ fontSize: 14, fontWeight: 600, color: '#1D1D1D' }}>
           Sleep {kind === 'music' ? 'muziekbestanden' : 'stem-audio'} hierheen
         </div>
-        <div style={{ fontSize: 12.5, color: '#8C8880', marginTop: 4 }}>
+        <div style={{ fontSize: 12.5, color: '#55514A', marginTop: 4 }}>
           of klik om te bladeren: kies één bestand of meerdere tegelijk, allebei werkt hier
         </div>
         <input
@@ -239,7 +239,7 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
                 <option value="">Kies categorie…</option>
                 {categories.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
-              <button type="button" onClick={applyBatchCategory} disabled={!batchCategory} style={{ border: 'none', borderRadius: 6, background: batchCategory ? '#1D1D1D' : '#EAE7DE', color: batchCategory ? '#FFFFFF' : '#8C8880', fontSize: 12, padding: '6px 12px', cursor: batchCategory ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
+              <button type="button" onClick={applyBatchCategory} disabled={!batchCategory} style={{ border: 'none', borderRadius: 6, background: batchCategory ? '#1D1D1D' : '#EAE7DE', color: batchCategory ? '#FFFFFF' : '#55514A', fontSize: 12, padding: '6px 12px', cursor: batchCategory ? 'pointer' : 'not-allowed', whiteSpace: 'nowrap' }}>
                 Toepassen op alle
               </button>
             </div>
@@ -254,13 +254,13 @@ function AddZone({ kind, categories, defaultGender, defaultAgeRange, onConfirm, 
                 className="tfa-staged-remove"
                 style={{
                   position: 'absolute', top: 8, right: 8, width: 24, height: 24, borderRadius: '50%', border: 'none',
-                  background: 'transparent', color: '#8C8880', cursor: 'pointer', fontSize: 15, lineHeight: 1,
+                  background: 'transparent', color: '#55514A', cursor: 'pointer', fontSize: 15, lineHeight: 1,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}
               >
                 ×
               </button>
-              <div style={{ fontSize: 11.5, color: '#8C8880', marginBottom: 8 }}>{it.file.name}</div>
+              <div style={{ fontSize: 11.5, color: '#55514A', marginBottom: 8 }}>{it.file.name}</div>
               {kind === 'music' ? (
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8 }} className="tfa-lib-grid">
                   <input type="text" value={it.title} onChange={(e) => updateStaged(it.localId, { title: e.target.value })} placeholder="Titel" />
@@ -408,7 +408,7 @@ function AudioPlayer({ src, autoPlay }) {
       <button type="button" onClick={() => skip(5)} title="5 seconden vooruit" style={{ border: 'none', background: 'transparent', color: '#5C5850', cursor: 'pointer', fontSize: 15, flex: 'none', padding: '4px 2px' }}>
         ⏭
       </button>
-      <span style={{ fontSize: 11.5, color: '#8C8880', flex: 'none', width: 36, textAlign: 'right' }}>{formatTime(current)}</span>
+      <span style={{ fontSize: 11.5, color: '#55514A', flex: 'none', width: 36, textAlign: 'right' }}>{formatTime(current)}</span>
       <input
         type="range"
         min={0}
@@ -418,7 +418,7 @@ function AudioPlayer({ src, autoPlay }) {
         onChange={seek}
         style={{ flex: 1, accentColor: '#E6C858', cursor: 'pointer' }}
       />
-      <span style={{ fontSize: 11.5, color: '#8C8880', flex: 'none', width: 36 }}>{formatTime(duration)}</span>
+      <span style={{ fontSize: 11.5, color: '#55514A', flex: 'none', width: 36 }}>{formatTime(duration)}</span>
     </div>
   );
 }
@@ -471,7 +471,7 @@ function TrackRow({ track, categories, selected, onToggleSelect, activePreviewId
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
           <input name="audioFile" type="file" accept="audio/*" style={{ flex: 1, fontSize: 12.5 }} />
-          <span style={{ fontSize: 11, color: '#8C8880', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 11, color: '#55514A', whiteSpace: 'nowrap' }}>
             {track.audioUrl ? 'Laat leeg om huidige audio te behouden' : 'Nog geen audio geüpload'}
           </span>
         </div>
@@ -513,7 +513,7 @@ function TrackRow({ track, categories, selected, onToggleSelect, activePreviewId
               </span>
             )}
           </div>
-          <div style={{ fontSize: 12, color: '#8C8880' }}>
+          <div style={{ fontSize: 12, color: '#55514A' }}>
             {track.artist} · {track.category}{track.fileId ? ` · ID: ${track.fileId}` : ''}
           </div>
           {track.originalFilename && (
@@ -611,7 +611,7 @@ function VoiceRow({ voice, allTags, onAddTag, selected, onToggleSelect, activePr
         <input type="hidden" name="tags" value={editTags.join(',')} readOnly />
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10 }}>
           <input name="audioFile" type="file" accept="audio/*" style={{ flex: 1, fontSize: 12.5 }} />
-          <span style={{ fontSize: 11, color: '#8C8880', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 11, color: '#55514A', whiteSpace: 'nowrap' }}>
             {voice.audioUrl ? 'Laat leeg om huidige audio te behouden' : 'Nog geen audio geüpload'}
           </span>
         </div>
@@ -653,7 +653,7 @@ function VoiceRow({ voice, allTags, onAddTag, selected, onToggleSelect, activePr
               </span>
             )}
           </div>
-          <div style={{ fontSize: 12, color: '#8C8880' }}>
+          <div style={{ fontSize: 12, color: '#55514A' }}>
             {voice.gender} · {voice.ageRange} · {(voice.tags || []).join(', ')}{voice.fileId ? ` · ID: ${voice.fileId}` : ''}
           </div>
           {voice.originalFilename && (
@@ -718,7 +718,7 @@ function BulkEditBar({ kind, categories, selectedCount, onSetCategory, onSetHidd
               <option value="">Nieuwe categorie…</option>
               {categories.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
-            <button type="button" disabled={!category || busy} onClick={() => { onSetCategory(category); setCategory(''); }} style={{ border: 'none', borderRadius: 6, background: category ? '#1D1D1D' : '#EAE7DE', color: category ? '#FFFFFF' : '#8C8880', fontSize: 12, padding: '7px 12px', cursor: category && !busy ? 'pointer' : 'not-allowed' }}>
+            <button type="button" disabled={!category || busy} onClick={() => { onSetCategory(category); setCategory(''); }} style={{ border: 'none', borderRadius: 6, background: category ? '#1D1D1D' : '#EAE7DE', color: category ? '#FFFFFF' : '#55514A', fontSize: 12, padding: '7px 12px', cursor: category && !busy ? 'pointer' : 'not-allowed' }}>
               Categorie toepassen
             </button>
             <span style={{ width: 1, height: 20, background: '#EAE3C4' }} />
@@ -735,7 +735,7 @@ function BulkEditBar({ kind, categories, selectedCount, onSetCategory, onSetHidd
             <span style={{ width: 1, height: 20, background: '#EAE3C4' }} />
             <input type="text" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Zoek in titel…" style={{ width: 130, border: '1px solid #C9C5B9', borderRadius: 6, padding: '7px 8px', fontSize: 12.5 }} />
             <input type="text" value={replace} onChange={(e) => setReplace(e.target.value)} placeholder="Vervang door…" style={{ width: 130, border: '1px solid #C9C5B9', borderRadius: 6, padding: '7px 8px', fontSize: 12.5 }} />
-            <button type="button" disabled={!find || busy} onClick={() => { onRename(find, replace); setFind(''); setReplace(''); }} style={{ border: 'none', borderRadius: 6, background: find ? '#1D1D1D' : '#EAE7DE', color: find ? '#FFFFFF' : '#8C8880', fontSize: 12, padding: '7px 12px', cursor: find && !busy ? 'pointer' : 'not-allowed' }}>
+            <button type="button" disabled={!find || busy} onClick={() => { onRename(find, replace); setFind(''); setReplace(''); }} style={{ border: 'none', borderRadius: 6, background: find ? '#1D1D1D' : '#EAE7DE', color: find ? '#FFFFFF' : '#55514A', fontSize: 12, padding: '7px 12px', cursor: find && !busy ? 'pointer' : 'not-allowed' }}>
               Titels aanpassen
             </button>
           </>
@@ -845,14 +845,14 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
           <input type="checkbox" checked={allVisibleSelected} disabled={!filtered.length} onChange={toggleSelectAll} style={{ width: 15, height: 15, accentColor: '#E6C858', cursor: 'pointer' }} />
           Selecteer alles
         </label>
-        <span style={{ fontSize: 12.5, color: '#8C8880' }}>{selectedIds.size} geselecteerd</span>
+        <span style={{ fontSize: 12.5, color: '#55514A' }}>{selectedIds.size} geselecteerd</span>
         <button
           type="button"
           disabled={selectedIds.size === 0 || bulkBusy}
           onClick={onBulkDelete}
           style={{
             marginLeft: 'auto', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 12.5, fontWeight: 600,
-            background: selectedIds.size === 0 ? '#EAE7DE' : '#C2513F', color: selectedIds.size === 0 ? '#8C8880' : '#FFFFFF',
+            background: selectedIds.size === 0 ? '#EAE7DE' : '#C2513F', color: selectedIds.size === 0 ? '#55514A' : '#FFFFFF',
             cursor: selectedIds.size === 0 || bulkBusy ? 'not-allowed' : 'pointer', opacity: bulkBusy ? 0.7 : 1,
           }}
         >
@@ -879,14 +879,14 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
               <button
                 type="button"
                 onClick={() => setOpenCategories(new Set(groups.map(([category]) => category)))}
-                style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, color: '#8C6D1F', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, color: '#6E5410', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
               >
                 Alles uitvouwen
               </button>
               <button
                 type="button"
                 onClick={() => setOpenCategories(new Set())}
-                style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, color: '#8C8880', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
+                style={{ border: 'none', background: 'none', padding: 0, fontSize: 11.5, color: '#55514A', fontWeight: 600, cursor: 'pointer', textDecoration: 'underline' }}
               >
                 Alles invouwen
               </button>
@@ -904,9 +904,9 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 14px', cursor: 'pointer' }}
                   >
                     <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#5C5850' }}>
-                      {category} <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: '#8C8880' }}>({list.length})</span>
+                      {category} <span style={{ fontWeight: 500, textTransform: 'none', letterSpacing: 0, color: '#55514A' }}>({list.length})</span>
                     </div>
-                    <span style={{ fontSize: 12, color: '#8C8880', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▾</span>
+                    <span style={{ fontSize: 12, color: '#55514A', transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform .15s ease' }}>▾</span>
                   </div>
                   {isOpen && (
                     <div style={{ borderTop: '1px solid #EEECE3', padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -918,20 +918,20 @@ function BrowsePanel({ kind, items, categories, allTags, onAddTag, selectedIds, 
             })}
           </div>
           {groups.length === 0 && items.length > 0 && (
-            <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
+            <div style={{ fontSize: 13, color: '#55514A' }}>Niets gevonden voor "{query}".</div>
           )}
           {items.length === 0 && (
-            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen tracks, ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
+            <div style={{ fontSize: 13, color: '#55514A' }}>Nog geen tracks, ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
           )}
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {filtered.map(renderRow)}
           {filtered.length === 0 && items.length > 0 && (
-            <div style={{ fontSize: 13, color: '#8C8880' }}>Niets gevonden voor "{query}".</div>
+            <div style={{ fontSize: 13, color: '#55514A' }}>Niets gevonden voor "{query}".</div>
           )}
           {items.length === 0 && (
-            <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen stemmen, ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
+            <div style={{ fontSize: 13, color: '#55514A' }}>Nog geen stemmen, ga naar &quot;Toevoegen&quot; om er een paar toe te voegen.</div>
           )}
         </div>
       )}
@@ -964,7 +964,7 @@ function StorageUsageBadge({ storage }) {
       <div style={{ flex: '1 1 140px', minWidth: 100, height: 8, borderRadius: 999, background: '#EAE7DE', overflow: 'hidden' }}>
         <div style={{ width: `${pct}%`, height: '100%', background: warn ? '#C2513F' : '#E6C858', transition: 'width .2s ease' }} />
       </div>
-      <div style={{ fontSize: 11.5, color: '#8C8880', whiteSpace: 'nowrap' }}>
+      <div style={{ fontSize: 11.5, color: '#55514A', whiteSpace: 'nowrap' }}>
         {storage.fileCount} bestand{storage.fileCount === 1 ? '' : 'en'} · {pct}%
       </div>
     </div>

@@ -78,7 +78,7 @@ function StartInner() {
             boxShadow: '0 20px 50px rgba(0,0,0,.08)', display: 'flex', flexDirection: 'column', gap: 14, textAlign: 'center',
           }}
         >
-          <div style={{ fontSize: 13, letterSpacing: '.09em', textTransform: 'uppercase', color: '#8C6D1F', fontWeight: 600 }}>
+          <div style={{ fontSize: 13, letterSpacing: '.09em', textTransform: 'uppercase', color: '#6E5410', fontWeight: 600 }}>
             TFA Studios
           </div>
           <h1 style={{ fontSize: 20, fontWeight: 600, margin: '2px 0 4px', color: '#1D1D1D' }}>Toegangscode</h1>
@@ -104,9 +104,9 @@ function StartInner() {
           >
             {submitting ? 'Bezig…' : 'Doorgaan'}
           </button>
-          <div style={{ fontSize: 12, color: '#8C8880' }}>
+          <div style={{ fontSize: 12, color: '#6B675D' }}>
             Nog geen code? Neem contact op via{' '}
-            <a href="mailto:planning@tfa.studio" style={{ color: '#8C6D1F' }}>planning@tfa.studio</a>.
+            <a href="mailto:planning@tfa.studio" style={{ color: '#6E5410' }}>planning@tfa.studio</a>.
           </div>
         </form>
       </div>

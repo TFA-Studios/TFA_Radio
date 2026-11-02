@@ -187,7 +187,7 @@ export default function OverviewPage({ params }) {
           if (st === 'counter') {
             return (
               <div style={{ marginBottom: 22, background: '#FFFFFF', border: '1.5px solid #E6C858', borderRadius: 14, padding: '20px 22px' }}>
-                <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 6 }}>Een voorstel van TFA voor je script</div>
+                <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6E5410', marginBottom: 6 }}>Een voorstel van TFA voor je script</div>
                 {brief.scriptAuditNote && <p style={{ fontSize: 14, lineHeight: 1.6, color: '#1D1D1D', margin: '0 0 10px', whiteSpace: 'pre-wrap' }}>{brief.scriptAuditNote}</p>}
                 {brief.scriptCounterText && (
                   <div style={{ fontSize: 15.5, fontWeight: 500, lineHeight: 1.65, background: '#FFF8D9', borderLeft: '3px solid #E6C858', borderRadius: 8, padding: '12px 14px', margin: '0 0 14px', whiteSpace: 'pre-wrap' }}>{brief.scriptCounterText}</div>
@@ -215,7 +215,7 @@ export default function OverviewPage({ params }) {
             return (
               <div style={{ marginBottom: 22, background: '#FFFFFF', border: '1px solid #E3DFD2', borderRadius: 14, padding: '16px 20px', fontSize: 13.5, lineHeight: 1.6, color: '#5C5850' }}>
                 <b style={{ color: '#1D1D1D' }}>Je script wordt nog gecontroleerd.</b> Je hebt aanpassingen gemaakt in de tekst. Ons team leest die eerst na, zodat alles past bij de stijl en de lengte van de commercial. Je hoort van ons zodra het akkoord is. Als we iets willen afstemmen, nemen we contact met je op.
-                {brief.scriptAuditReply && <div style={{ marginTop: 8, fontSize: 12.5, color: '#8C8880' }}>Je reactie is doorgegeven: &ldquo;{brief.scriptAuditReply}&rdquo;</div>}
+                {brief.scriptAuditReply && <div style={{ marginTop: 8, fontSize: 12.5, color: '#6B675D' }}>Je reactie is doorgegeven: &ldquo;{brief.scriptAuditReply}&rdquo;</div>}
               </div>
             );
           }
@@ -229,7 +229,7 @@ export default function OverviewPage({ params }) {
           return null;
         })()}
 
-        <div style={{ marginBottom: 8, fontSize: 12.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C8880' }}>
+        <div style={{ marginBottom: 8, fontSize: 12.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6B675D' }}>
           Wat gebeurt er nu?
         </div>
         <div style={{ display: 'flex', gap: 14, marginBottom: 8 }} className="tfa-nextsteps-row">
@@ -237,14 +237,14 @@ export default function OverviewPage({ params }) {
             <div key={s.n} style={{ flex: 1, background: '#FFFFFF', border: '1px solid #EEECE3', borderRadius: 12, padding: '18px 18px' }}>
               <div
                 style={{
-                  width: 26, height: 26, borderRadius: '50%', border: '1.5px solid #E6C858', color: '#8C6D1F',
+                  width: 26, height: 26, borderRadius: '50%', border: '1.5px solid #E6C858', color: '#6E5410',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, marginBottom: 10,
                 }}
               >
                 {s.n}
               </div>
               <div style={{ fontSize: 13.5, fontWeight: 600, color: '#1D1D1D', marginBottom: 4 }}>{s.label}</div>
-              <div style={{ fontSize: 12, lineHeight: 1.5, color: '#8C8880' }}>{s.detail}</div>
+              <div style={{ fontSize: 12, lineHeight: 1.5, color: '#6B675D' }}>{s.detail}</div>
             </div>
           ))}
         </div>
@@ -257,7 +257,7 @@ export default function OverviewPage({ params }) {
           }}
         >
           <div>
-            <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 4 }}>
+            <div style={{ fontSize: 11.5, fontWeight: 600, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6E5410', marginBottom: 4 }}>
               Status: {statusLabel}
             </div>
             <div style={{ fontSize: 14, color: '#5C5850' }}>{statusHint}</div>
@@ -353,8 +353,8 @@ export default function OverviewPage({ params }) {
             <a href={`/brief/${id}/contact?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
           <div style={{ fontSize: 13, marginTop: 9 }}>{companyName}</div>
-          <div style={{ fontSize: 13, marginTop: 2, color: brief.contactPerson ? '#1D1D1D' : '#9C9890' }}>{brief.contactPerson || 'Nog geen contactpersoon opgegeven'}</div>
-          <div style={{ fontSize: 13, marginTop: 2, color: brief.contactEmail ? '#1D1D1D' : '#9C9890' }}>{brief.contactEmail || 'Nog geen e-mailadres opgegeven'}</div>
+          <div style={{ fontSize: 13, marginTop: 2, color: brief.contactPerson ? '#1D1D1D' : '#6B675D' }}>{brief.contactPerson || 'Nog geen contactpersoon opgegeven'}</div>
+          <div style={{ fontSize: 13, marginTop: 2, color: brief.contactEmail ? '#1D1D1D' : '#6B675D' }}>{brief.contactEmail || 'Nog geen e-mailadres opgegeven'}</div>
           {additionalContacts.map((c, i) => (
             <div key={i} style={{ fontSize: 12.5, marginTop: 6, paddingTop: 6, borderTop: '1px solid #EEECE3', color: '#5C5850' }}>
               {(c.name || 'Extra contactpersoon')}{c.email ? ' (' + c.email + ')' : ''}
@@ -378,7 +378,7 @@ export default function OverviewPage({ params }) {
             <div style={featureHeaderStyle}>Script · hoofdspot {spotLength}″</div>
             <a href={`/brief/${id}/script?from=overview`} style={{ fontSize: 11, fontWeight: 600, textDecoration: 'underline' }}>Wijzig</a>
           </div>
-          <div style={{ fontSize: 16, fontWeight: mainText ? 500 : 400, lineHeight: 1.65, marginTop: 16, color: mainText ? '#1D1D1D' : '#9C9890', background: mainText ? '#FFF8D9' : 'transparent', borderLeft: mainText ? '3px solid #E6C858' : 'none', borderRadius: 8, padding: mainText ? '12px 14px' : 0 }}>
+          <div style={{ fontSize: 16, fontWeight: mainText ? 500 : 400, lineHeight: 1.65, marginTop: 16, color: mainText ? '#1D1D1D' : '#6B675D', background: mainText ? '#FFF8D9' : 'transparent', borderLeft: mainText ? '3px solid #E6C858' : 'none', borderRadius: 8, padding: mainText ? '12px 14px' : 0 }}>
             {mainText || 'Nog geen script goedgekeurd.'}
           </div>
           {variationCount > 0 && (
@@ -397,7 +397,7 @@ export default function OverviewPage({ params }) {
                         <DiffPreview tokens={tokens} />
                       </div>
                     ) : (
-                      <div style={{ fontSize: 13, color: '#8C8880', marginTop: 6, fontStyle: 'italic' }}>
+                      <div style={{ fontSize: 13, color: '#6B675D', marginTop: 6, fontStyle: 'italic' }}>
                         Nog identiek aan het hoofdscript.
                       </div>
                     )}
@@ -419,13 +419,13 @@ export default function OverviewPage({ params }) {
               {voiceTags.length > 0 && <div style={{ fontSize: 12.5, color: '#5C5850', marginTop: 3 }}>{voiceTags.join(', ')}</div>}
             </>
           ) : (
-            <div style={{ fontSize: 13, marginTop: 9, color: '#9C9890' }}>Nog geen stem gekozen.</div>
+            <div style={{ fontSize: 13, marginTop: 9, color: '#6B675D' }}>Nog geen stem gekozen.</div>
           )}
           {voiceLabel && (
             matchedVoice && matchedVoice.audioUrl ? (
               <audio controls src={matchedVoice.audioUrl} style={{ width: '100%', height: 34, marginTop: 10 }} />
             ) : (
-              <div style={{ fontSize: 11.5, color: '#9C9890', marginTop: 8, fontStyle: 'italic' }}>Geen audio beschikbaar voor deze stem.</div>
+              <div style={{ fontSize: 11.5, color: '#6B675D', marginTop: 8, fontStyle: 'italic' }}>Geen audio beschikbaar voor deze stem.</div>
             )
           )}
         </div>
@@ -448,16 +448,16 @@ export default function OverviewPage({ params }) {
                       {matchedTrack && matchedTrack.audioUrl ? (
                         <audio controls src={matchedTrack.audioUrl} style={{ width: '100%', height: 32, marginTop: 6 }} />
                       ) : (
-                        <div style={{ fontSize: 11, color: '#8C8880', marginTop: 4, fontStyle: 'italic' }}>Geen audio beschikbaar voor deze track.</div>
+                        <div style={{ fontSize: 11, color: '#6B675D', marginTop: 4, fontStyle: 'italic' }}>Geen audio beschikbaar voor deze track.</div>
                       )}
                     </div>
                   </div>
                 );
               })}
-              {selectedTracks.length > 1 && <div style={{ fontSize: 11, color: '#8C8880', marginTop: 8 }}>TFA combineert er één van deze met de gekozen stem tot de definitieve mix.</div>}
+              {selectedTracks.length > 1 && <div style={{ fontSize: 11, color: '#6B675D', marginTop: 8 }}>TFA combineert er één van deze met de gekozen stem tot de definitieve mix.</div>}
             </>
           ) : (
-            <div style={{ fontSize: 13, color: '#9C9890' }}>Nog geen track gekozen.</div>
+            <div style={{ fontSize: 13, color: '#6B675D' }}>Nog geen track gekozen.</div>
           )}
         </div>
       </div>
@@ -493,7 +493,7 @@ export default function OverviewPage({ params }) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
             <span style={{ fontSize: 13.5, fontWeight: 700 }}>Nodig om te versturen</span>
-            <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#8C6D1F', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>Verplicht</span>
+            <span style={{ fontSize: 11, fontWeight: 600, textTransform: 'uppercase', color: '#6E5410', background: 'rgba(230,200,88,.28)', borderRadius: 4, padding: '2px 6px' }}>Verplicht</span>
           </div>
           <div style={{ marginTop: 4, fontSize: 13, lineHeight: 1.55, color: '#5C5850' }}>
             Hierbij geef ik TFA formeel akkoord om het script, de stem en de muziek in productie te nemen. Daarnaast ga ik

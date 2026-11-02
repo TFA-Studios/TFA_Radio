@@ -36,7 +36,7 @@ export default function PartnerBadge({ brief, variant = 'dark', size = 26, label
   const src = partnerLogoOf(brief, variant);
   if (!src) return null;
   const name = (brief && brief.agencyName) || 'partner';
-  const color = variant === 'light' ? '#8C8880' : '#8C897E';
+  const color = variant === 'light' ? '#6B675D' : '#8C897E';
   const h = partnerHeightFor(size);
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, ...style }}>

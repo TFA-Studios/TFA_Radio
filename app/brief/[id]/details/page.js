@@ -8,6 +8,7 @@ import useMinDelay from '../../../../components/useMinDelay';
 import { profileOfBrief, answersOfBrief } from '../../../../lib/formProfile';
 import { useBrief } from '../../../../components/useBrief';
 import { TONE_LABELS, VARIATION_KINDS, parseVariationInfo, parseGenderSplit, describeGenderSplit } from '../../../../components/flowData';
+import { parseJsonArray } from '../../../../lib/jsonArray.js';
 
 const MAX_TONES = 3;
 const TONE_ORDER = Object.keys(TONE_LABELS);
@@ -52,7 +53,7 @@ function CharCount({ field, value }) {
   const len = (value || '').length;
   const near = len >= max * 0.9;
   return (
-    <div style={{ marginTop: 4, textAlign: 'right', fontSize: 11, color: near ? '#B06156' : '#9C9890' }}>
+    <div style={{ marginTop: 4, textAlign: 'right', fontSize: 11, color: near ? '#B06156' : '#6B675D' }}>
       {len} / {max}
     </div>
   );
@@ -89,11 +90,7 @@ export default function DetailsPage({ params }) {
   // long comment in contact/page.js's identical effect for why.
   useEffect(() => {
     if (brief) {
-      let tones = [];
-      try {
-        const parsed = brief.toneOfVoice ? JSON.parse(brief.toneOfVoice) : [];
-        tones = Array.isArray(parsed) ? parsed : [];
-      } catch (e) {}
+      const tones = parseJsonArray(brief.toneOfVoice);
       setForm({
         disclaimerText: brief.disclaimerText || '',
         product: brief.product || '',
@@ -191,7 +188,7 @@ export default function DetailsPage({ params }) {
         {/* Deliberately low-key: a commercial aimed at everyone is aimed at no
             one, so "both" is available but not promoted. */}
         {form.audience !== 'both' ? (
-          <div style={{ marginTop: 10, fontSize: 12, color: '#8C8880' }}>
+          <div style={{ marginTop: 10, fontSize: 12, color: '#6B675D' }}>
             Heb je echt beide doelgroepen nodig?{' '}
             <button type="button" onClick={() => update('audience', 'both')} style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', color: '#5C5850', textDecoration: 'underline', cursor: 'pointer' }}>
               Kies dan beide
@@ -217,7 +214,7 @@ export default function DetailsPage({ params }) {
               </div>
             )}
             <div style={{ marginTop: 8 }}>
-              <button type="button" onClick={() => update('audience', 'b2b')} style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: '#8C8880', textDecoration: 'underline', cursor: 'pointer' }}>
+              <button type="button" onClick={() => update('audience', 'b2b')} style={{ background: 'none', border: 'none', padding: 0, fontSize: 12, color: '#6B675D', textDecoration: 'underline', cursor: 'pointer' }}>
                 Toch liever één doelgroep kiezen
               </button>
             </div>
@@ -238,18 +235,18 @@ export default function DetailsPage({ params }) {
           </div>
         )}
         <div style={{ marginTop: 18 }}>
-          <label className="field-label">Verdeling man / vrouw <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+          <label className="field-label">Verdeling man / vrouw <span style={{ color: '#6B675D', fontWeight: 400 }}>(optioneel)</span></label>
           <input type="text" maxLength={FIELD_LIMITS.genderSplit} value={form.genderSplit} placeholder="Bijv. man / vrouw - 30 / 70" onChange={(e) => update('genderSplit', e.target.value)} />
           {!form.genderSplit.trim() ? (
             <div className="hint" style={{ marginTop: 5 }}>Weet je hoe je doelgroep verdeeld is? Schrijf het gewoon op, bijvoorbeeld &ldquo;man / vrouw - 30 / 70&rdquo;: dat betekent 30% mannen en 70% vrouwen.</div>
           ) : genderRead && genderRead.off ? (
-            <div style={{ fontSize: 11.5, color: '#8C6D1F', marginTop: 5 }}>De percentages tellen niet op tot 100. Klopt dat zo? Je kunt het gewoon laten staan.</div>
+            <div style={{ fontSize: 11.5, color: '#6E5410', marginTop: 5 }}>De percentages tellen niet op tot 100. Klopt dat zo? Je kunt het gewoon laten staan.</div>
           ) : genderRead ? (
             <div style={{ fontSize: 12, color: '#1D7A46', marginTop: 5 }}>
               We lezen dit als: <b>{describeGenderSplit(form.genderSplit)}</b>.{genderRead.assumed ? ' (Zonder man/vrouw erbij gaan we uit van man eerst, dan vrouw.)' : ''}
             </div>
           ) : (
-            <div style={{ fontSize: 11.5, color: '#8C8880', marginTop: 5 }}>We nemen dit over zoals je het schrijft.</div>
+            <div style={{ fontSize: 11.5, color: '#6B675D', marginTop: 5 }}>We nemen dit over zoals je het schrijft.</div>
           )}
         </div>
       </div>
@@ -286,7 +283,7 @@ export default function DetailsPage({ params }) {
 
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
         <label className="field-label">
-          Hoe moet de commercial klinken? <span style={{ color: '#8C8880', fontWeight: 400 }}>(kies max. 3)</span>
+          Hoe moet de commercial klinken? <span style={{ color: '#6B675D', fontWeight: 400 }}>(kies max. 3)</span>
         </label>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7, marginTop: 8 }}>
           {TONE_ORDER.map((v) => {
@@ -315,7 +312,7 @@ export default function DetailsPage({ params }) {
         {!hide.includes('slogan') && (
           <>
         <div>
-          <label className="field-label">Heeft je bedrijf al een slogan? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+          <label className="field-label">Heeft je bedrijf al een slogan? <span style={{ color: '#6B675D', fontWeight: 400 }}>(optioneel)</span></label>
           <input type="text" maxLength={FIELD_LIMITS.slogan} value={form.slogan} placeholder="Bijv. 'Altijd in de buurt'" onChange={(e) => update('slogan', e.target.value)} />
           <CharCount field="slogan" value={form.slogan} />
         </div>
@@ -326,7 +323,7 @@ export default function DetailsPage({ params }) {
 
       {!hide.includes('disclaimer') && (
       <div style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
-        <label className="field-label">Moet er verplichte wettelijke tekst in? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel, laat leeg als dit niet van toepassing is)</span></label>
+        <label className="field-label">Moet er verplichte wettelijke tekst in? <span style={{ color: '#6B675D', fontWeight: 400 }}>(optioneel, laat leeg als dit niet van toepassing is)</span></label>
         <textarea
           style={{ minHeight: 56 }}
           maxLength={FIELD_LIMITS.disclaimerText}
@@ -352,7 +349,7 @@ export default function DetailsPage({ params }) {
         {varInfo.map((v, i) => (
           <div key={i} style={{ background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 12, padding: '14px 16px', marginBottom: 12 }}>
             {varInfo.length > 1 && (
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#8C6D1F', marginBottom: 8 }}>Variatie {i + 1}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: '#6E5410', marginBottom: 8 }}>Variatie {i + 1}</div>
             )}
             <label className="field-label">Wat is er anders?</label>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
@@ -369,7 +366,7 @@ export default function DetailsPage({ params }) {
               onChange={(e) => updateVar(i, { detail: e.target.value })}
             />
             <div style={{ marginTop: 12 }}>
-              <label className="field-label">Wanneer wordt deze variatie uitgezonden? <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+              <label className="field-label">Wanneer wordt deze variatie uitgezonden? <span style={{ color: '#6B675D', fontWeight: 400 }}>(optioneel)</span></label>
               <input type="text" maxLength={120} value={v.airing} placeholder="Bijv. week 48, rond Black Friday" onChange={(e) => updateVar(i, { airing: e.target.value })} />
             </div>
           </div>
@@ -382,7 +379,7 @@ export default function DetailsPage({ params }) {
         const setVal = (v) => update('extraAnswers', { ...(form.extraAnswers || {}), [q.key]: v });
         return (
           <div key={q.key} style={{ marginBottom: 22, borderTop: '1px solid #EEECE3', paddingTop: 20 }}>
-            <label className="field-label">{q.label}{q.required ? '' : <span style={{ color: '#8C8880', fontWeight: 400 }}> (optioneel)</span>}</label>
+            <label className="field-label">{q.label}{q.required ? '' : <span style={{ color: '#6B675D', fontWeight: 400 }}> (optioneel)</span>}</label>
             {q.type === 'longtext' && <textarea style={{ minHeight: 80 }} maxLength={1200} value={val} onChange={(e) => setVal(e.target.value)} />}
             {q.type === 'text' && <input type="text" maxLength={300} value={val} onChange={(e) => setVal(e.target.value)} />}
             {q.type === 'choice' && (

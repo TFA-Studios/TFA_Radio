@@ -29,14 +29,14 @@ function BreakdownCard({ title, rows, emptyLabel }) {
     <div style={cardStyle}>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14 }}>{title}</div>
       {rows.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: '#8C8880' }}>{emptyLabel || 'Nog geen data.'}</div>
+        <div style={{ fontSize: 12.5, color: '#6B675D' }}>{emptyLabel || 'Nog geen data.'}</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {rows.map((r) => (
             <div key={r.key || r.label}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 4 }}>
                 <span style={{ color: '#383209' }}>{r.label}</span>
-                <span style={{ color: '#8C8880' }}>{r.count} · {r.pct}%</span>
+                <span style={{ color: '#6B675D' }}>{r.count} · {r.pct}%</span>
               </div>
               <div style={{ background: '#EEECE3', borderRadius: 999, height: 8, overflow: 'hidden' }}>
                 <div style={{ width: `${Math.max(r.pct, r.count > 0 ? 2 : 0)}%`, background: r.color, height: '100%', borderRadius: 999 }} />
@@ -57,16 +57,16 @@ function ToneLinksTable({ rows }) {
   return (
     <div style={cardStyle}>
       <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Tone of voice → muziek & stem</div>
-      <div style={{ fontSize: 12, color: '#8C8880', marginBottom: 14, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 12, color: '#6B675D', marginBottom: 14, lineHeight: 1.5 }}>
         Van de briefs die deze tone kozen (brief-stap "Hoe moet de commercial klinken?"): welke playlist en stem kwamen het vaakst terug.
       </div>
       {rows.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: '#8C8880' }}>Nog geen data.</div>
+        <div style={{ fontSize: 12.5, color: '#6B675D' }}>Nog geen data.</div>
       ) : (
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
             <thead>
-              <tr style={{ textAlign: 'left', color: '#8C8880', fontSize: 11, }}>
+              <tr style={{ textAlign: 'left', color: '#6B675D', fontSize: 11, }}>
                 <th style={{ padding: '0 10px 8px 0', fontWeight: 600 }}>Tone</th>
                 <th style={{ padding: '0 10px 8px 0', fontWeight: 600 }}>Briefs</th>
                 <th style={{ padding: '0 10px 8px 0', fontWeight: 600 }}>Populairste playlist</th>
@@ -98,7 +98,7 @@ function TrendCard({ months }) {
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12, height: 110 }}>
         {months.map((m) => (
           <div key={m.key} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, height: '100%', justifyContent: 'flex-end' }}>
-            <span style={{ fontSize: 11.5, color: '#8C8880' }}>{m.count}</span>
+            <span style={{ fontSize: 11.5, color: '#6B675D' }}>{m.count}</span>
             <div
               style={{
                 width: '100%', maxWidth: 34, borderRadius: '6px 6px 0 0', background: '#E6C858',
@@ -173,17 +173,17 @@ export default async function ReportsPage({ searchParams }) {
         >
           <div>
             <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: '#1D1D1D', marginBottom: 4 }}>Van</label>
-            <input type="date" name="from" defaultValue={from} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
+            <input type="date" name="from" aria-label="Van datum" defaultValue={from} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: 12.5, fontWeight: 500, color: '#1D1D1D', marginBottom: 4 }}>Tot</label>
-            <input type="date" name="to" defaultValue={to} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
+            <input type="date" name="to" aria-label="Tot datum" defaultValue={to} style={{ border: '1px solid #C9C5B9', borderRadius: 8, padding: '8px 10px', fontSize: 13 }} />
           </div>
           <button type="submit" style={{ border: 'none', borderRadius: 999, background: '#1D1D1D', color: '#FFFFFF', fontSize: 12.5, fontWeight: 600, padding: '9px 18px', cursor: 'pointer' }}>
             Periode toepassen
           </button>
           {hasRange && (
-            <a href="/dashboard/reports" style={{ fontSize: 12.5, color: '#8C8880', textDecoration: 'underline' }}>
+            <a href="/dashboard/reports" style={{ fontSize: 12.5, color: '#6B675D', textDecoration: 'underline' }}>
               Wis filter (toon alles)
             </a>
           )}
@@ -202,7 +202,7 @@ export default async function ReportsPage({ searchParams }) {
             value={report.approvalRate === null ? 'n.v.t.' : `${report.approvalRate}%`}
             color="#1D7A46"
           />
-          <StatTile label="Gem. hergeneraties per brief" value={report.avgRegenerations} color="#8C6D1F" />
+          <StatTile label="Gem. hergeneraties per brief" value={report.avgRegenerations} color="#6E5410" />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, marginBottom: 20 }} className="tfa-stats-grid-2">

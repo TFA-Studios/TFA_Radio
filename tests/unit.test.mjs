@@ -7,6 +7,9 @@ import { toPublicBrief } from '../lib/publicBrief.js';
 import { fetchWithTimeout, fetchWithRetry } from '../lib/http.js';
 import { parseImpressions, parseGenderSplit, variationInfoLabel, safeWebsiteUrl, briefStageOf } from '../components/flowData.js';
 import { matchVoices } from '../lib/voiceMatch.js';
+import { parseJsonArray } from '../lib/jsonArray.js';
+import { singleFlight } from '../lib/singleFlight.js';
+import { isUnseenBrief } from '../lib/briefState.js';
 
 test('merge: an edit to the main script reaches the variation', () => {
   const r = mergeEditIntoVariation('Koop nu bij Jansen.', 'Koop nu bij Jansen in Zwolle.', 'Koop nu bij Jansen. Black Friday!');
@@ -191,4 +194,35 @@ test('aiErrors: readable reasons without leaking provider output', async () => {
   assert.match(describeAiError('Claude', new Error('Request timed out after 40000ms')), /time-out/);
   assert.equal(isFatalAiError(new Error('Anthropic API error 429: x')), false);
   assert.equal(isFatalAiError(new Error('Anthropic API error 404: x')), true);
+});
+
+test('parseJsonArray: tolerant of empty, malformed and non-array values', () => {
+  assert.deepEqual(parseJsonArray('[1,2]'), [1, 2]);
+  assert.deepEqual(parseJsonArray(''), []);
+  assert.deepEqual(parseJsonArray(null), []);
+  assert.deepEqual(parseJsonArray(undefined), []);
+  assert.deepEqual(parseJsonArray('{not json'), []);
+  assert.deepEqual(parseJsonArray('{"a":1}'), []);
+});
+test('singleFlight: concurrent callers share one run', async () => {
+  let runs = 0;
+  const setup = singleFlight(async () => { runs += 1; await new Promise((r) => setTimeout(r, 20)); });
+  await Promise.all([setup(), setup(), setup()]);
+  await setup();
+  assert.equal(runs, 1);
+});
+test('singleFlight: a failed run is retried by the next call', async () => {
+  let runs = 0;
+  const setup = singleFlight(async () => { runs += 1; if (runs === 1) throw new Error('boom'); });
+  await assert.rejects(setup(), /boom/);
+  await setup();
+  await setup();
+  assert.equal(runs, 2);
+});
+test('isUnseenBrief: new until a producer opened it after submission', () => {
+  assert.equal(isUnseenBrief(null), false);
+  assert.equal(isUnseenBrief({}), false);
+  assert.equal(isUnseenBrief({ submittedAt: '2026-11-01T10:00:00Z' }), true);
+  assert.equal(isUnseenBrief({ submittedAt: '2026-11-01T10:00:00Z', seenAt: '2026-11-01T11:00:00Z' }), false);
+  assert.equal(isUnseenBrief({ submittedAt: '2026-11-02T10:00:00Z', seenAt: '2026-11-01T11:00:00Z' }), true);
 });

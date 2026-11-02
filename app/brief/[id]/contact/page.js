@@ -122,11 +122,11 @@ export default function ContactPage({ params }) {
           <input type="text" value={form.companyName} placeholder="Bijv. Jouw Bedrijfsnaam" onChange={(e) => update('companyName', e.target.value)} />
         </div>
         <div>
-          <label className="field-label">Wat voor bedrijf is het? <span style={{ color: '#8C8880', fontWeight: 400 }}>(kort)</span></label>
+          <label className="field-label">Wat voor bedrijf is het? <span style={{ color: '#6B675D', fontWeight: 400 }}>(kort)</span></label>
           <input type="text" maxLength={300} value={form.companyDescription} placeholder="Bijv. bakkerij in Utrecht, autodealer, webshop in tuinmeubels" onChange={(e) => update('companyDescription', e.target.value)} />
         </div>
         <div>
-          <label className="field-label">Website <span style={{ color: '#8C8880', fontWeight: 400 }}>(optioneel)</span></label>
+          <label className="field-label">Website <span style={{ color: '#6B675D', fontWeight: 400 }}>(optioneel)</span></label>
           <input type="text" inputMode="url" maxLength={200} value={form.website} placeholder="bijv. bakkerijvandijk.nl" onChange={(e) => update('website', e.target.value)} />
         </div>
         <div>
@@ -163,7 +163,7 @@ export default function ContactPage({ params }) {
               aria-label="Verwijder contactpersoon"
               style={{
                 flex: 'none', width: 38, height: 38, borderRadius: 8, border: '1px solid #C9C5B9', background: '#FFFFFF',
-                color: '#8C8880', fontSize: 16, cursor: 'pointer', lineHeight: 1,
+                color: '#6B675D', fontSize: 16, cursor: 'pointer', lineHeight: 1,
               }}
             >
               ×
@@ -184,7 +184,7 @@ export default function ContactPage({ params }) {
 
       <div style={{ marginTop: 36, paddingTop: 22, borderTop: '1px solid #EAE7DE', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
         {!canContinue && (
-          <div style={{ fontSize: 12, color: '#8C8880' }}>
+          <div style={{ fontSize: 12, color: '#6B675D' }}>
             {!additionalContactsValid && !!form.companyName.trim() && !!form.contactPerson.trim() && emailLooksValid
               ? 'Vul een geldig e-mailadres in bij elke extra contactpersoon, of laat het naamveld leeg.'
               : 'Vul je bedrijfsnaam, contactpersoon en een geldig e-mailadres in om verder te gaan.'}

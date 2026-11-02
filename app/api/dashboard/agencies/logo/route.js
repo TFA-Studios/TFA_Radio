@@ -28,6 +28,7 @@ export async function POST(request) {
     const blob = await put(`agency-logos/${kind}.${ext}`, file, { access: 'public', addRandomSuffix: true, contentType: file.type });
     return NextResponse.json({ url: blob.url });
   } catch (e) {
-    return NextResponse.json({ error: 'upload_failed', message: e.message }, { status: 500 });
+    console.error('[api/dashboard/agencies/logo] upload failed:', e && e.message);
+    return NextResponse.json({ error: 'upload_failed' }, { status: 500 });
   }
 }

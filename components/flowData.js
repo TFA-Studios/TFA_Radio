@@ -3,6 +3,7 @@
 // since they're used across the shared StepShell + useBrief hook approach
 // instead of being duplicated per page.
 
+import { parseJsonArray } from '../lib/jsonArray.js';
 export const STEPS = [
   { n: 1, label: 'Contact', path: 'contact' },
   { n: 2, label: 'Levering', path: 'delivery' },
@@ -326,13 +327,13 @@ export function describeGenderSplit(text) {
 // the way an exact date can, so those just render neutrally.
 export function deliveryDeadlineMeta(brief, status) {
   if (!brief || (!brief.airDate && !brief.dateUnknown)) {
-    return { label: 'Nog niet opgegeven', color: '#9C9890', overdue: false };
+    return { label: 'Nog niet opgegeven', color: '#6B675D', overdue: false };
   }
   if (brief.dateUnknown) {
-    return { label: formatAirDate(brief), color: '#9C9890', overdue: false };
+    return { label: formatAirDate(brief), color: '#6B675D', overdue: false };
   }
   const d = new Date(brief.airDate + 'T00:00:00');
-  if (isNaN(d.getTime())) return { label: brief.airDate, color: '#9C9890', overdue: false };
+  if (isNaN(d.getTime())) return { label: brief.airDate, color: '#6B675D', overdue: false };
   const label = d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' });
   const overdue = status !== 'done' && d.getTime() < new Date().setHours(0, 0, 0, 0);
   return { label, color: overdue ? '#C2513F' : '#1D1D1D', overdue };
@@ -359,13 +360,9 @@ export function scriptChangesOf(brief) {
   const count = variationsCountOf(brief);
   if (count) {
     let drafts = [];
-    try {
-      const hist = JSON.parse(brief.scriptHistory || '[]');
-      const entry = (Array.isArray(hist) ? hist : []).find((h) => h.createdAt === brief.scriptGeneratedAt);
-      if (entry) drafts = Array.isArray(entry.variations) && entry.variations.length ? entry.variations : (entry.variation ? [entry.variation] : []);
-    } catch (e) {}
-    let stored = [];
-    try { const p = JSON.parse(brief.variationScripts || '[]'); stored = Array.isArray(p) ? p : []; } catch (e) {}
+    const entry = parseJsonArray(brief.scriptHistory).find((h) => h && h.createdAt === brief.scriptGeneratedAt);
+    if (entry) drafts = Array.isArray(entry.variations) && entry.variations.length ? entry.variations : (entry.variation ? [entry.variation] : []);
+    const stored = parseJsonArray(brief.variationScripts);
     for (let i = 0; i < count; i++) {
       const cur = stored[i];
       if (cur === undefined || cur === null || cur === '') continue;
@@ -515,12 +512,7 @@ export function safeWebsiteUrl(raw) {
 // that needs a brief's variations (the dashboard included) gets them for
 // free instead of silently missing this the way the dashboard did.
 export function parseVariationScripts(brief) {
-  try {
-    const parsed = brief && brief.variationScripts ? JSON.parse(brief.variationScripts) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return parseJsonArray(brief && brief.variationScripts ? brief.variationScripts : '');
 }
 
 // The client's up-to-3 candidate music picks from the Muziek step (step 6) —
@@ -529,12 +521,7 @@ export function parseVariationScripts(brief) {
 // consumers, DashboardClient.js) — kept here too as the one shared version
 // for anything new that needs the parsed array rather than the raw JSON.
 export function parseSelectedTracks(brief) {
-  try {
-    const parsed = brief && brief.selectedTracks ? JSON.parse(brief.selectedTracks) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return parseJsonArray(brief && brief.selectedTracks ? brief.selectedTracks : '');
 }
 
 // Which ONE of the client's (up to 3) candidate tracks actually ended up in
@@ -579,13 +566,7 @@ export const PRODUCTION_STATUS_LABELS = {
 };
 
 export function parseReviewRounds(brief) {
-  if (!brief || !brief.reviewRounds) return [];
-  try {
-    const parsed = JSON.parse(brief.reviewRounds);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return parseJsonArray(brief && brief.reviewRounds ? brief.reviewRounds : '');
 }
 
 // The round the client should currently see/react to — always the most

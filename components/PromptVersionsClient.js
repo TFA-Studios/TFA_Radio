@@ -173,7 +173,7 @@ export default function PromptVersionsClient({ initialVersions }) {
             <button type="submit" disabled={busyId === 'new' || !content.trim()} className="btn-primary" style={{ padding: '9px 16px', fontSize: 13, opacity: busyId === 'new' ? 0.7 : 1 }}>
               {busyId === 'new' ? 'Bezig...' : 'Opslaan als nieuwe (inactieve) versie'}
             </button>
-            <span style={{ fontSize: 11.5, color: '#8C8880' }}>Wordt niet meteen live, dat doe je hieronder.</span>
+            <span style={{ fontSize: 11.5, color: '#6B675D' }}>Wordt niet meteen live, dat doe je hieronder.</span>
           </div>
         </form>
       )}
@@ -196,11 +196,11 @@ export default function PromptVersionsClient({ initialVersions }) {
                   ) : (
                     <span style={{ fontSize: 14, fontWeight: 600 }}>{v.label}</span>
                   )}
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#8C6D1F', background: 'rgba(230,200,88,.18)', borderRadius: 999, padding: '2px 8px' }}>v{v.version || '1.0'}</span>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: '#6E5410', background: 'rgba(230,200,88,.18)', borderRadius: 999, padding: '2px 8px' }}>v{v.version || '1.0'}</span>
                   <StatusBadge status={v.status} />
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  {!isEditing && <span style={{ fontSize: 11, color: '#8C8880' }}>{new Date(v.createdAt).toLocaleString('nl-NL')}</span>}
+                  {!isEditing && <span style={{ fontSize: 11, color: '#6B675D' }}>{new Date(v.createdAt).toLocaleString('nl-NL')}</span>}
                   {isEditing ? (
                     <>
                       <button type="button" disabled={busyId === v.id} onClick={cancelEdit} className="tfa-btn-ghost" style={{ border: '1px solid #C9C5B9', borderRadius: 8, background: '#FFFFFF', padding: '6px 12px', fontSize: 12, cursor: 'pointer' }}>
@@ -258,7 +258,7 @@ export default function PromptVersionsClient({ initialVersions }) {
                     onChange={(e) => setEditContent(e.target.value)}
                     style={{ marginTop: 10, width: '100%', minHeight: 220, border: '1px solid #C9C5B9', borderRadius: 8, padding: '10px 12px', fontSize: 12.5, lineHeight: 1.55, fontFamily: 'inherit' }}
                   />
-                  <div style={{ fontSize: 11.5, color: '#8C8880', marginTop: 6 }}>
+                  <div style={{ fontSize: 11.5, color: '#6B675D', marginTop: 6 }}>
                     Opslaan maakt hier een nieuwe versie van (v{(() => {
                       const maxMinor = versions.reduce((m, ver) => Math.max(m, parseInt((ver.version || '1.0').split('.')[1] || '0', 10)), 0);
                       return '1.' + (maxMinor + 1);
@@ -270,24 +270,24 @@ export default function PromptVersionsClient({ initialVersions }) {
                   const tokens = diffWords(liveVersion.content, v.content);
                   return (
                     <div style={{ marginTop: 10 }}>
-                      <div style={{ fontSize: 11, color: '#8C8880', marginBottom: 6 }}>
+                      <div style={{ fontSize: 11, color: '#6B675D', marginBottom: 6 }}>
                         Vergeleken met de live versie (v{liveVersion.version || '1.0'}) — verwijderd doorgestreept, toegevoegd gemarkeerd:
                       </div>
-                      <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.55, color: '#383209', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '10px 12px', maxHeight: 260, overflowY: 'auto' }}>
+                      <pre tabIndex={0} style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.55, color: '#383209', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '10px 12px', maxHeight: 260, overflowY: 'auto' }}>
                         {hasDiff(tokens) ? <DiffText tokens={tokens} /> : 'Geen verschil met de live versie.'}
                       </pre>
                     </div>
                   );
                 })()
               ) : (
-                <pre style={{ marginTop: 10, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.55, color: '#383209', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '10px 12px', maxHeight: 160, overflowY: 'auto' }}>
+                <pre tabIndex={0} style={{ marginTop: 10, whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 12.5, lineHeight: 1.55, color: '#383209', background: '#FBF9EC', border: '1px solid #EAE3C4', borderRadius: 8, padding: '10px 12px', maxHeight: 160, overflowY: 'auto' }}>
                   {v.content}
                 </pre>
               )}
             </div>
           );
         })}
-        {versions.length === 0 && <div style={{ fontSize: 13, color: '#8C8880' }}>Nog geen versies.</div>}
+        {versions.length === 0 && <div style={{ fontSize: 13, color: '#6B675D' }}>Nog geen versies.</div>}
       </div>
 
       <style jsx>{`

@@ -193,7 +193,7 @@ export default function AgenciesClient({ initialAgencies }) {
       )}
 
       {agencies.length === 0 && !showForm && (
-        <div style={{ ...cardStyle, fontSize: 13, color: '#8C8880' }}>
+        <div style={{ ...cardStyle, fontSize: 13, color: '#6B675D' }}>
           Nog geen agencies toegevoegd — elke brief valt tot dan onder &quot;Advision Media&quot;.
         </div>
       )}
@@ -277,7 +277,7 @@ export default function AgenciesClient({ initialAgencies }) {
                 {logoField('Logo voor donkere achtergrond', 'dark', editLogoDark, setEditLogoDark, true)}
                 {logoField('Logo voor lichte achtergrond', 'light', editLogoLight, setEditLogoLight, false)}
                 {logoField('Icoon (achtergrond-watermerk)', 'icon', editLogoIcon, setEditLogoIcon, false)}
-                <div style={{ gridColumn: '1 / -1', fontSize: 11.5, color: '#8C8880', lineHeight: 1.5 }}>
+                <div style={{ gridColumn: '1 / -1', fontSize: 11.5, color: '#6B675D', lineHeight: 1.5 }}>
                   Met een logo zien de klanten van dit agentschap &ldquo;in samenwerking met&rdquo; + het logo in het formulier, de statuspagina&apos;s en de e-mails. Het icoon komt als heel vage achtergrond (±4%) achter het formulier van deze klanten. Leeg laten = geen logo/icoon.
                 </div>
               </div>
@@ -293,7 +293,7 @@ export default function AgenciesClient({ initialAgencies }) {
                         checked={editHide.includes(k)}
                         onChange={(e) => setEditHide((cur) => (e.target.checked ? cur.concat(k) : cur.filter((x) => x !== k)))}
                       />
-                      {HIDEABLE[k].label} <span style={{ color: '#8C8880', fontSize: 11.5 }}>({HIDEABLE[k].step})</span>
+                      {HIDEABLE[k].label} <span style={{ color: '#6B675D', fontSize: 11.5 }}>({HIDEABLE[k].step})</span>
                     </label>
                   ))}
                 </div>

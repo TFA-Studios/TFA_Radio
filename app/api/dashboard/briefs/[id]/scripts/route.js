@@ -6,6 +6,7 @@ import { beginScriptJob, runScriptJob } from '../../../../../../lib/scriptJobs';
 import { describeProposal, describeProposals, describeScript } from '../../../../../../lib/eventLog';
 import { jobState } from '../../../../../../lib/scriptJobState';
 import { sendScriptsReadyEmail } from '../../../../../../lib/email';
+import { parseJsonArray } from '../../../../../../lib/jsonArray.js';
 
 // Producer-only — gated by middleware.js (isProtectedRoute matches
 // /api/dashboard/(.*)). The producer's side of the "copywriter" workflow:
@@ -17,12 +18,7 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 function historyOf(b) {
-  try {
-    const parsed = b && b.scriptHistory ? JSON.parse(b.scriptHistory) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (e) {
-    return [];
-  }
+  return parseJsonArray(b && b.scriptHistory ? b.scriptHistory : '');
 }
 
 // POST { action: 'regenerate' } — replace the drafts with 3 fresh versions.

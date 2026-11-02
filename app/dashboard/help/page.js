@@ -65,7 +65,7 @@ export default async function HelpPage() {
       <main style={{ flex: 1, padding: '32px 36px', minWidth: 0, display: 'flex', gap: 32 }} className="tfa-help-main tfa-dash-main">
         {/* In-page section nav — sticky, jumps via plain anchors (no client
             JS needed: this whole page can stay a server component). */}
-        <nav className="tfa-help-toc" style={{ flex: '0 0 200px', position: 'sticky', top: 32, alignSelf: 'flex-start', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav aria-label="Inhoud" className="tfa-help-toc" style={{ flex: '0 0 200px', position: 'sticky', top: 32, alignSelf: 'flex-start', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {HELP_SECTIONS.map((s) => (
             <a
               key={s.id}

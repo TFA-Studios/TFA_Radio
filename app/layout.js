@@ -33,7 +33,7 @@ const baseStyle = (
     /* Shared design tokens — reference these in new styles instead of
        hard-coding another radius / grey / gold. */
     :root {
-      --tfa-gold: #E6C858; --tfa-ink: #1D1D1D; --tfa-ink-2: #5C5850; --tfa-ink-3: #8C8880;
+      --tfa-gold: #E6C858; --tfa-ink: #1D1D1D; --tfa-ink-2: #5C5850; --tfa-ink-3: #6B675D;
       --tfa-line: #E3E0D5; --tfa-line-strong: #C9C5B9; --tfa-surface: #FFFFFF; --tfa-surface-tint: #FBF9EC;
       --tfa-radius-sm: 8px; --tfa-radius: 10px; --tfa-radius-lg: 12px;
     }
@@ -42,22 +42,23 @@ const baseStyle = (
     body { font-family: 'Geist', system-ui, sans-serif; color: #1D1D1D; }
     a { color: #383209; }
     a:hover { color: #1D1D1D; }
-    input:focus, textarea:focus, select:focus { outline: 2px solid #E6C858; outline-offset: 1px; }
-    button:focus-visible, a:focus-visible { outline: 2px solid #E6C858; outline-offset: 2px; }
-    ::placeholder { color: #9C9890; }
+    input:focus, textarea:focus, select:focus { outline: 2px solid #1D1D1D; outline-offset: 1px; }
+    button:focus-visible, a:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid #1D1D1D; outline-offset: 2px; }
+    .tfa-sidebar a:focus-visible, .tfa-sidebar button:focus-visible, .tfa-dash-nav a:focus-visible, .tfa-dash-nav button:focus-visible, .tfa-dash-sidebar a:focus-visible, .tfa-dash-sidebar button:focus-visible { outline-color: #E6C858; }
+    ::placeholder { color: #6B675D; }
     input[type=text], input[type=date], input[type=email], textarea, select {
       width: 100%; border: 1px solid #C9C5B9; border-radius: 10px; padding: 12px 14px;
       font-family: 'Geist', sans-serif; font-size: 13.5px; background: #FFFFFF; color: #1D1D1D;
     }
     textarea { resize: vertical; }
     label.field-label { display: block; font-size: 12.5px; font-weight: 600; margin-bottom: 5px; }
-    .hint { font-size: 11.5px; color: #8C8880; line-height: 1.5; }
+    .hint { font-size: 11.5px; color: #6B675D; line-height: 1.5; }
     .btn-primary {
       border: none; border-radius: 10px; background: #E6C858; color: #1D1D1D;
       font-family: 'Geist', sans-serif; font-weight: 600; font-size: 16.5px; padding: 14px 12px; cursor: pointer;
       transition: box-shadow .15s ease, filter .15s ease;
     }
-    .btn-primary:disabled { background: #EAE7DE; color: #8C8880; cursor: not-allowed; }
+    .btn-primary:disabled { background: #EAE7DE; color: #6B675D; cursor: not-allowed; }
     /* Glow-on-hover, applied globally to every standard clickable control
        below (not just buttons that happen to have a distinct :hover rule
        already) — per Karim's note that it wasn't obvious some of these

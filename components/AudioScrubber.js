@@ -29,7 +29,7 @@ export default function AudioScrubber({ currentTime, duration, onSeek }) {
       <span className="tfa-scrub-time">{formatTime(currentTime)} / {formatTime(duration)}</span>
       <style jsx>{`
         .tfa-scrub { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; }
-        .tfa-scrub-time { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; color: #8C6D1F; }
+        .tfa-scrub-time { flex: none; font-size: 11px; font-variant-numeric: tabular-nums; color: #6E5410; }
         input[type='range'] { -webkit-appearance: none; appearance: none; flex: 1; min-width: 0; height: 4px; border-radius: 999px; outline: none; cursor: pointer; margin: 0; }
         input[type='range']::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 50%; background: #1D1D1D; border: 2px solid #E6C858; transition: transform .12s ease; }
         input[type='range']::-moz-range-thumb { width: 8px; height: 8px; border-radius: 50%; background: #1D1D1D; border: 2px solid #E6C858; }
