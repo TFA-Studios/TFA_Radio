@@ -29,7 +29,7 @@ const fontLink = (
 );
 
 const baseStyle = (
-  <style>{`
+  <style dangerouslySetInnerHTML={{ __html: `
     /* Shared design tokens — reference these in new styles instead of
        hard-coding another radius / grey / gold. */
     :root {
@@ -99,7 +99,7 @@ const baseStyle = (
     @media (max-width: 700px) {
       .field-grid { grid-template-columns: 1fr; }
     }
-  `}</style>
+  ` }} />
 );
 
 function Shell({ children }) {

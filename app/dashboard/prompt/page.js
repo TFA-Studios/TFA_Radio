@@ -22,7 +22,7 @@ export default async function PromptVersionsPage() {
         <PromptVersionsClient initialVersions={versions} />
       </main>
 
-      <style>{DASHBOARD_SHELL_STYLES}</style>
+      <style dangerouslySetInnerHTML={{ __html: DASHBOARD_SHELL_STYLES }} />
     </div>
   );
 }

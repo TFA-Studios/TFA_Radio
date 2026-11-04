@@ -20,7 +20,7 @@ export default async function LibraryPage() {
         <LibraryClient tracks={tracks} voices={voices} playlists={playlists} defaultTags={DEFAULT_VOICE_TAGS} />
       </main>
 
-      <style>{DASHBOARD_SHELL_STYLES}</style>
+      <style dangerouslySetInnerHTML={{ __html: DASHBOARD_SHELL_STYLES }} />
     </div>
   );
 }

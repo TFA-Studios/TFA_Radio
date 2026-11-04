@@ -1209,7 +1209,7 @@ export default function LibraryClient({ tracks, voices, playlists, defaultTags }
         )
       )}
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .tfa-lib-form input, .tfa-lib-form select {
           border: 1px solid #C9C5B9; border-radius: 8px; padding: 9px 10px; font-size: 13px; background: #FFFFFF;
         }
@@ -1223,7 +1223,7 @@ export default function LibraryClient({ tracks, voices, playlists, defaultTags }
         .tfa-btn-glow:hover { filter: brightness(1.08); }
         .tfa-staged-remove { transition: background .12s ease, color .12s ease; }
         .tfa-staged-remove:hover { background: rgba(194,81,63,.12); color: #C2513F; }
-      `}</style>
+      ` }} />
     </div>
   );
 }

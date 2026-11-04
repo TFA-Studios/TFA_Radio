@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Preloader from '../../components/Preloader';
-import { enableTestModeFromUrl } from '../../components/TestAutofill';
+import { enableTestModeFromUrl, isTestMode } from '../../components/TestAutofill';
 
 // Landing route the public homepage's CTA points to: creates a fresh brief
 // via POST /api/briefs, then redirects to step 1 with the new id — mirrors
@@ -33,7 +33,7 @@ function StartInner() {
       const res = await fetch('/api/briefs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: codeValue || '' }),
+        body: JSON.stringify({ code: codeValue || '', test: isTestMode() }),
       });
       if (res.status === 401) {
         setStatus('needs-code');

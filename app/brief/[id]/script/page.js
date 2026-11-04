@@ -466,11 +466,11 @@ export default function ScriptPage({ params }) {
         Je krijgt na deze stap nog één moment om het script bij te stellen, voordat de opname start.
       </p>
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes tfa-script-spin {
           to { transform: rotate(360deg); }
         }
-      `}</style>
+      ` }} />
     </StepShell>
   );
 }

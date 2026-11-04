@@ -99,8 +99,8 @@ export default async function HelpPage() {
         </div>
       </main>
 
-      <style>{DASHBOARD_SHELL_STYLES}</style>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: DASHBOARD_SHELL_STYLES }} />
+      <style dangerouslySetInnerHTML={{ __html: `
         .tfa-help-toclink { transition: background .15s ease, color .15s ease; }
         .tfa-help-toclink:hover { background: rgba(29,29,29,.05); color: #1D1D1D; }
         @media (max-width: 900px) {
@@ -113,7 +113,7 @@ export default async function HelpPage() {
              clipping the link list against a box the wrong shape for it. */
           .tfa-help-toc { position: static; flex: none !important; width: 100%; flex-direction: row !important; flex-wrap: wrap; }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

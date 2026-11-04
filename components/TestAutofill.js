@@ -13,6 +13,16 @@ import { profileOfBrief } from '../lib/formProfile';
 // karim@tfa.studio, so confirmation mails come to you.
 const TEST_EMAIL = 'karim@tfa.studio';
 
+// True while test mode is on for this browser tab. A brief created in test mode
+// is flagged as a test brief, so it never shows up in reports or Slack.
+export function isTestMode() {
+  try {
+    return window.sessionStorage.getItem('tfa_test_mode') === '1';
+  } catch (e) {
+    return false;
+  }
+}
+
 export function enableTestModeFromUrl() {
   try {
     const q = new URLSearchParams(window.location.search).get('test');

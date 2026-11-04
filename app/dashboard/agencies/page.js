@@ -23,7 +23,7 @@ export default async function AgenciesPage() {
         <AgenciesClient initialAgencies={agencies} />
       </main>
 
-      <style>{DASHBOARD_SHELL_STYLES}</style>
+      <style dangerouslySetInnerHTML={{ __html: DASHBOARD_SHELL_STYLES }} />
     </div>
   );
 }

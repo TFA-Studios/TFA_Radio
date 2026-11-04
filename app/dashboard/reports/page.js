@@ -3,6 +3,7 @@ import { listBriefs } from '../../../lib/db';
 import { buildReportData } from '../../../lib/reports';
 import PageHeader from '../../../components/PageHeader';
 import DashboardSidebar, { DASHBOARD_SHELL_STYLES } from '../../../components/DashboardSidebar';
+import { isRealBrief } from '../../../lib/briefState.js';
 
 // Real, changing data — never statically cache this page.
 export const dynamic = 'force-dynamic';
@@ -133,7 +134,7 @@ export default async function ReportsPage({ searchParams }) {
   const to = (searchParams && searchParams.to) || '';
   const hasRange = !!(from || to);
 
-  const allBriefs = await listBriefs();
+  const allBriefs = (await listBriefs()).filter(isRealBrief);
   const briefs = hasRange ? allBriefs.filter((b) => inRange(b, from, to)) : allBriefs;
   const report = buildReportData(briefs);
 
@@ -249,8 +250,8 @@ export default async function ReportsPage({ searchParams }) {
         </div>
       </main>
 
-      <style>{DASHBOARD_SHELL_STYLES}</style>
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: DASHBOARD_SHELL_STYLES }} />
+      <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 1100px) {
           .tfa-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
         }
@@ -260,7 +261,7 @@ export default async function ReportsPage({ searchParams }) {
         @media (max-width: 800px) {
           .tfa-reports-grid { grid-template-columns: 1fr !important; }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

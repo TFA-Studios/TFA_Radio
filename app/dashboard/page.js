@@ -14,9 +14,9 @@ export default async function DashboardPage() {
   const isAgency = viewer.role === 'agency';
   // An agency login never receives TFA's internal notes or history log.
   const briefs = scopeBriefs(viewer, await listBriefs())
-    .filter((b) => !isAgency || !b.archivedAt)
+    .filter((b) => !isAgency || (!b.archivedAt && !b.isTest))
     .map((b) => (isAgency ? toPublicBrief(b) : b));
-  const unseenCount = briefs.filter((b) => !b.archivedAt && isUnseenBrief(b)).length;
+  const unseenCount = briefs.filter((b) => !b.archivedAt && !b.isTest && isUnseenBrief(b)).length;
 
   return (
     <div style={{ minHeight: '100vh', background: '#DEDCD7', display: 'flex' }} className="tfa-dash-shell">
@@ -36,7 +36,7 @@ export default async function DashboardPage() {
         <DashboardClient briefs={briefs} readOnly={isAgency} />
       </main>
 
-      <style>{DASHBOARD_SHELL_STYLES}</style>
+      <style dangerouslySetInnerHTML={{ __html: DASHBOARD_SHELL_STYLES }} />
     </div>
   );
 }

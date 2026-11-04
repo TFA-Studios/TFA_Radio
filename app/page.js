@@ -252,7 +252,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .tfa-cta-hero {
           transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
           box-shadow: 0 0 0 0 rgba(230,200,88,0);
@@ -320,7 +320,7 @@ export default function HomePage() {
           .tfa-visit-columns { grid-template-columns: 1fr !important; gap: 32px !important; }
           .tfa-visit-map { height: auto; aspect-ratio: 16 / 10; min-height: 0; }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

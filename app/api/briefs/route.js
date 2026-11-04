@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { rateLimit, clientIp, tooManyRequests } from '../../../lib/rateLimit';
 import { toPublicBrief } from '../../../lib/publicBrief';
 import { nanoid } from 'nanoid';
-import { createBrief, findAgencyByCode } from '../../../lib/db';
+import { createBrief, findAgencyByCode, setBriefsTest } from '../../../lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,9 +29,11 @@ export async function POST(request) {
   const rl = rateLimit('create:' + clientIp(request), 30, 600000);
   if (!rl.ok) return tooManyRequests(rl.retryAfter);
   let bodyCode;
+  let isTest = false;
   try {
     const body = await request.json();
     bodyCode = body?.code;
+    isTest = body?.test === true;
   } catch {
     bodyCode = undefined;
   }
@@ -43,7 +45,9 @@ export async function POST(request) {
   }
 
   const id = nanoid(12);
-  const brief = await createBrief(id, agency);
+  let brief = await createBrief(id, agency);
+  // A brief started from a ?test=1 link is a test brief from the first moment.
+  if (isTest && (await setBriefsTest([id], true))) brief = { ...brief, isTest: true };
   return NextResponse.json(toPublicBrief(brief), { status: 201 });
 }
 

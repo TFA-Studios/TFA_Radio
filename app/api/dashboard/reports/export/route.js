@@ -2,6 +2,7 @@ import { requireStaffApi } from '../../../../../lib/access';
 import { NextResponse } from 'next/server';
 import { listBriefs } from '../../../../../lib/db';
 import { briefsToRows, rowsToCsv } from '../../../../../lib/reports';
+import { isRealBrief } from '../../../../../lib/briefState.js';
 
 // Producer-only (gated by middleware's /api/dashboard/* matcher) CSV export
 // of every brief — the same one-row-per-brief shape the /dashboard/reports
@@ -14,7 +15,7 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get('from') || '';
   const to = searchParams.get('to') || '';
-  let briefs = await listBriefs();
+  let briefs = (await listBriefs()).filter(isRealBrief);
   // Mirrors the /dashboard/reports page's own from/to filtering — when the
   // producer exports from a filtered view, the CSV should match what's on
   // screen instead of always dumping every brief regardless of the range

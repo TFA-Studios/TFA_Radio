@@ -69,11 +69,11 @@ function CrossfadeLoop({ images, intervalMs, caption, sizing, borderRadius }) {
           {caption}
         </div>
       )}
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .tfa-studio-loop-img { animation: tfaStudioKenBurns ${intervalMs + 1400}ms ease-out forwards; }
         @keyframes tfaStudioKenBurns { from { transform: scale(1); } to { transform: scale(1.08); } }
         @media (prefers-reduced-motion: reduce) { .tfa-studio-loop-img { animation: none; } }
-      `}</style>
+      ` }} />
     </div>
   );
 }
@@ -152,12 +152,12 @@ function SlideLoop({ images, intervalMs, caption, maxWidth, borderRadius }) {
           the peek photo just hides and the main photo takes the full
           width instead — still swaps photos on the same interval, just
           without the side-peek effect. */}
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 700px) {
           .tfa-slideloop-peek { display: none !important; }
           .tfa-slideloop-main { left: 3% !important; width: 94% !important; }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }
@@ -198,7 +198,7 @@ function PairRow({ images, caption, maxWidth, borderRadius }) {
           {caption}
         </div>
       )}
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         .tfa-studio-pair-img { transition: transform .5s ease; will-change: transform; }
         @media (hover: hover) and (pointer: fine) {
           .tfa-studio-pair-img:hover { transform: scale(1.045); }
@@ -206,7 +206,7 @@ function PairRow({ images, caption, maxWidth, borderRadius }) {
         @media (max-width: 640px) {
           .tfa-studio-pair { grid-template-columns: 1fr !important; }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

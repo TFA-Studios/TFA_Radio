@@ -149,6 +149,8 @@ function parseAdditionalContacts(brief) {
   }
 }
 
+const selBtn = { border: '1px solid #C9C5B9', background: '#FFFFFF', borderRadius: 8, padding: '7px 13px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', color: '#1D1D1D' };
+
 function StatusSelect({ brief, onChange, compact, disabled }) {
   return (
     <select
@@ -884,8 +886,13 @@ export default function DashboardClient({ briefs, readOnly = false }) {
   const [showArchived, setShowArchived] = useState(false);
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const [exportDone, setExportDone] = useState(false);
+  // Third view next to the dashboard and the archive: briefs marked as test.
+  const [showTests, setShowTests] = useState(false);
   const [archiveBusy, setArchiveBusy] = useState(false);
   const [archiveError, setArchiveError] = useState('');
+  // Row selection for batch archive / restore / delete, and the pending delete confirmation.
+  const [checkedIds, setCheckedIds] = useState(() => new Set());
+  const [deleteAsk, setDeleteAsk] = useState(null); // ids waiting for confirmation
 
   // Which optional columns are on, plus whether the "Kolommen" picker
   // dropdown is open. Starts at DEFAULT_COLUMN_KEYS (matches the table's
@@ -1143,6 +1150,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
       });
       if (!res.ok) throw new Error('archive failed');
       setSelected((cur) => (cur && idSet.has(cur.id) ? null : cur));
+      setCheckedIds(new Set());
       setCleanupOpen(false);
       setExportDone(false);
     } catch (err) {
@@ -1151,6 +1159,59 @@ export default function DashboardClient({ briefs, readOnly = false }) {
     } finally {
       setArchiveBusy(false);
     }
+  }
+
+  // Mark briefs as test (or back to normal): optimistic, rolled back on failure.
+  async function setTest(ids, isTest) {
+    if (!ids.length) return;
+    const prev = rows;
+    const idSet = new Set(ids);
+    setRows((cur) => cur.map((b) => (idSet.has(b.id) ? { ...b, isTest } : b)));
+    setArchiveBusy(true);
+    setArchiveError('');
+    try {
+      const res = await fetch('/api/dashboard/briefs/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, test: isTest }),
+      });
+      if (!res.ok) throw new Error('test flag failed');
+      setSelected((cur) => (cur && idSet.has(cur.id) ? null : cur));
+      setCheckedIds(new Set());
+    } catch (err) {
+      setRows(prev);
+      setArchiveError('Aanpassen is niet gelukt. Er is niets gewijzigd.');
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+
+  // Permanent delete of archived or test briefs: only after the confirmation
+  // dialog (the server only removes archived/test briefs).
+  async function deleteArchived(ids) {
+    if (!ids.length) return;
+    setArchiveBusy(true);
+    setArchiveError('');
+    try {
+      const res = await fetch('/api/dashboard/briefs/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, confirm: true }),
+      });
+      if (!res.ok) throw new Error('delete failed');
+      const idSet = new Set(ids);
+      setRows((cur) => cur.filter((b) => !idSet.has(b.id)));
+      setSelected((cur) => (cur && idSet.has(cur.id) ? null : cur));
+      setCheckedIds(new Set());
+      setDeleteAsk(null);
+    } catch (err) {
+      setArchiveError('Verwijderen is niet gelukt. Er is niets verwijderd.');
+    } finally {
+      setArchiveBusy(false);
+    }
+  }
+  function toggleChecked(id) {
+    setCheckedIds((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   }
 
   async function handleMetaChange(id, patch) {
@@ -1429,8 +1490,10 @@ export default function DashboardClient({ briefs, readOnly = false }) {
   ];
   const activeColumns = COLUMN_DEFS.filter((c) => c.core || visibleColumns.includes(c.key));
 
-  const archivedCount = useMemo(() => rows.filter((b) => !!b.archivedAt).length, [rows]);
-  const scopeRows = useMemo(() => rows.filter((b) => (showArchived ? !!b.archivedAt : !b.archivedAt)), [rows, showArchived]);
+  // Test briefs live in their own view and never count in the dashboard, the archive or the tiles.
+  const archivedCount = useMemo(() => rows.filter((b) => !!b.archivedAt && !b.isTest).length, [rows]);
+  const testCount = useMemo(() => rows.filter((b) => !!b.isTest).length, [rows]);
+  const scopeRows = useMemo(() => rows.filter((b) => (showTests ? !!b.isTest : !b.isTest && (showArchived ? !!b.archivedAt : !b.archivedAt))), [rows, showArchived, showTests]);
 
   const filtered = useMemo(() => {
     const ms = rangeToMs(range);
@@ -1477,6 +1540,8 @@ export default function DashboardClient({ briefs, readOnly = false }) {
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
   const pageSafe = Math.min(page, totalPages);
+  // Only briefs that are in the current view count as selected.
+  const checkedList = useMemo(() => searched.filter((b) => checkedIds.has(b.id)), [searched, checkedIds]);
   const pageItems = sorted.slice((pageSafe - 1) * PAGE_SIZE, pageSafe * PAGE_SIZE);
 
   // One count per STAT_TILE_DEFS entry, keyed by tile key — replaces the
@@ -1549,14 +1614,25 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         ))}
         {!readOnly && (
           <>
-            <button
-              type="button"
-              onClick={() => { setShowArchived((v) => !v); setCleanupOpen(false); setPage(1); }}
-              style={{ border: '1px solid #C9C5B9', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, cursor: 'pointer', background: showArchived ? '#1D1D1D' : '#FFFFFF', color: showArchived ? '#FFFFFF' : '#5C5850' }}
-            >
-              {showArchived ? '← Terug naar dashboard' : `Archief (${archivedCount})`}
-            </button>
-            {!showArchived && (
+            {!showTests && (
+              <button
+                type="button"
+                onClick={() => { setShowArchived((v) => !v); setCleanupOpen(false); setPage(1); setCheckedIds(new Set()); }}
+                style={{ border: '1px solid #C9C5B9', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, cursor: 'pointer', background: showArchived ? '#1D1D1D' : '#FFFFFF', color: showArchived ? '#FFFFFF' : '#5C5850' }}
+              >
+                {showArchived ? '← Terug naar dashboard' : `Archief (${archivedCount})`}
+              </button>
+            )}
+            {!showArchived && (testCount > 0 || showTests) && (
+              <button
+                type="button"
+                onClick={() => { setShowTests((v) => !v); setCleanupOpen(false); setPage(1); setCheckedIds(new Set()); }}
+                style={{ border: '1px solid #C9C5B9', borderRadius: 999, padding: '7px 14px', fontSize: 12.5, cursor: 'pointer', background: showTests ? '#1D1D1D' : '#FFFFFF', color: showTests ? '#FFFFFF' : '#5C5850' }}
+              >
+                {showTests ? '← Terug naar dashboard' : `Tests (${testCount})`}
+              </button>
+            )}
+            {!showArchived && !showTests && (
               <button
                 type="button"
                 onClick={() => { setCleanupOpen((v) => !v); setExportDone(false); setArchiveError(''); }}
@@ -1595,7 +1671,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         </div>
       </div>
 
-      {!readOnly && cleanupOpen && !showArchived && (
+      {!readOnly && cleanupOpen && !showArchived && !showTests && (
         <div style={{ ...cardStyle, marginBottom: 20, border: '1.5px solid #E6C858', background: '#FBF9EC' }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 6 }}>Dashboard opruimen</div>
           <div style={{ fontSize: 12.5, color: '#5C5850', lineHeight: 1.55, marginBottom: 12 }}>
@@ -1626,9 +1702,15 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         </div>
       )}
 
+      {!readOnly && showTests && (
+        <div style={{ ...cardStyle, marginBottom: 20, fontSize: 12.5, color: '#5C5850', lineHeight: 1.55 }}>
+          Je bekijkt de testbriefs ({searched.length}). Ze tellen niet mee in rapporten, de export, de tegels en Slack. Vink briefs aan om ze weer als gewone brief te markeren of definitief te verwijderen.
+        </div>
+      )}
+
       {!readOnly && showArchived && (
         <div style={{ ...cardStyle, marginBottom: 20, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ fontSize: 12.5, color: '#5C5850' }}>Je bekijkt het archief ({searched.length}). Niets hiervan is verwijderd.</div>
+          <div style={{ fontSize: 12.5, color: '#5C5850' }}>Je bekijkt het archief ({searched.length}). Hier staat alles veilig; selecteer briefs om ze terug te zetten of definitief te verwijderen.</div>
           <button
             type="button"
             disabled={archiveBusy || searched.length === 0}
@@ -1749,16 +1831,47 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         </div>
       </div>
 
+      {!readOnly && checkedList.length > 0 && (
+        <div role="region" aria-label="Geselecteerde briefs" style={{ background: '#FFFFFF', border: '1px solid #D2CFC8', borderRadius: 8, padding: '10px 14px', marginBottom: 10, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10, boxShadow: '0 1px 8px rgba(29,29,29,.07)' }}>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{checkedList.length} geselecteerd</span>
+          {!showTests && (
+            <button type="button" disabled={archiveBusy} onClick={() => setArchived(checkedList.map((b) => b.id), !showArchived)} style={selBtn}>
+              {archiveBusy ? 'Bezig…' : showArchived ? 'Terugzetten' : 'Archiveren'}
+            </button>
+          )}
+          <button type="button" disabled={archiveBusy} onClick={() => setTest(checkedList.map((b) => b.id), !showTests)} style={selBtn}>
+            {showTests ? 'Geen test' : 'Markeer als test'}
+          </button>
+          {(showArchived || showTests) && (
+            <button type="button" disabled={archiveBusy} onClick={() => setDeleteAsk(checkedList.map((b) => b.id))} style={{ ...selBtn, color: '#C2513F', borderColor: '#E3B9B0' }}>
+              Definitief verwijderen…
+            </button>
+          )}
+          <button type="button" onClick={() => setCheckedIds(new Set())} style={{ ...selBtn, border: 'none', background: 'transparent', color: '#5C5850', textDecoration: 'underline' }}>Selectie wissen</button>
+          {archiveError && <span style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600 }}>{archiveError}</span>}
+        </div>
+      )}
+
       <div style={{ background: '#FFFFFF', borderRadius: 8, border: '1px solid #D2CFC8', boxShadow: '0 1px 8px rgba(29,29,29,.07)', overflow: 'hidden' }}>
         <div style={{ overflowX: 'auto' }}>
           <table className="tfa-dash-table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 820 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid #E3E0D5', textAlign: 'left' }}>
-                {activeColumns.map((c) => (
+                {!readOnly && (
+                  <th className="tfa-sel-col" style={{ padding: '11px 0 11px 16px', width: 34, background: '#FAF9F6' }}>
+                    <input
+                      type="checkbox"
+                      aria-label="Selecteer alle briefs op deze pagina"
+                      checked={pageItems.length > 0 && pageItems.every((b) => checkedIds.has(b.id))}
+                      onChange={(e) => setCheckedIds((cur) => { const n = new Set(cur); pageItems.forEach((b) => (e.target.checked ? n.add(b.id) : n.delete(b.id))); return n; })}
+                    />
+                  </th>
+                )}
+                {activeColumns.map((c, ci) => (
                   <th
                     key={c.key}
+                    className={[c.sortable === false ? '' : 'tfa-sortable-th', ci === 0 ? 'tfa-first-col' : ''].filter(Boolean).join(' ') || undefined}
                     onClick={() => (c.sortable === false ? null : toggleSort(c.key))}
-                    className={c.sortable === false ? '' : 'tfa-sortable-th'}
                     style={{ padding: '11px 16px', cursor: c.sortable === false ? 'default' : 'pointer', color: '#5C5850', fontWeight: 500, fontSize: 12.5, whiteSpace: 'nowrap', background: '#FAF9F6' }}
                   >
                     {c.label} {sortField === c.key ? (sortDir === 'asc' ? '↑' : '↓') : ''}
@@ -1771,8 +1884,13 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                 const ctx = { due: deliveryDeadlineMeta(b, b.status), unseen: isUnseenBrief(b) };
                 return (
                   <tr key={b.id} onClick={() => handleOpenBrief(b)} onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) { e.preventDefault(); handleOpenBrief(b); } }} tabIndex={0} aria-label={'Open brief van ' + (b.companyName || 'klant')} className="tfa-dash-row" data-unseen={ctx.unseen ? '1' : undefined} style={{ borderBottom: '1px solid #EEECE3', cursor: 'pointer', background: ctx.unseen ? '#FBF9EC' : undefined }}>
-                    {activeColumns.map((c) => (
-                      <td key={c.key} style={{ padding: '12px 16px', ...(c.cellStyle ? c.cellStyle(b, ctx) : null) }}>
+                    {!readOnly && (
+                      <td className="tfa-sel-col" onClick={(e) => e.stopPropagation()} style={{ padding: '12px 0 12px 16px', width: 34 }}>
+                        <input type="checkbox" aria-label={'Selecteer ' + (b.companyName || 'brief')} checked={checkedIds.has(b.id)} onChange={() => toggleChecked(b.id)} />
+                      </td>
+                    )}
+                    {activeColumns.map((c, ci) => (
+                      <td key={c.key} className={ci === 0 ? 'tfa-first-col' : undefined} style={{ padding: '12px 16px', ...(c.cellStyle ? c.cellStyle(b, ctx) : null) }}>
                         {c.cell(b, ctx)}
                       </td>
                     ))}
@@ -1781,7 +1899,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
               })}
               {pageItems.length === 0 && (
                 <tr>
-                  <td colSpan={activeColumns.length} style={{ padding: '24px 16px', textAlign: 'center', color: '#6B675D' }}>Geen briefs in deze periode.</td>
+                  <td colSpan={activeColumns.length + (readOnly ? 0 : 1)} style={{ padding: '24px 16px', textAlign: 'center', color: '#6B675D' }}>Geen briefs in deze periode.</td>
                 </tr>
               )}
             </tbody>
@@ -1795,6 +1913,36 @@ export default function DashboardClient({ briefs, readOnly = false }) {
           </div>
         </div>
       </div>
+
+      {deleteAsk && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="tfa-delete-title"
+          onKeyDown={(e) => { if (e.key === 'Escape') setDeleteAsk(null); }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(29,29,29,.55)', zIndex: 80, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+        >
+          <div style={{ background: '#FFFFFF', borderRadius: 14, padding: '24px 24px 20px', maxWidth: 420, width: '100%', boxShadow: '0 20px 60px rgba(29,29,29,.3)' }}>
+            <h3 id="tfa-delete-title" style={{ margin: '0 0 10px', fontSize: 17, fontWeight: 600 }}>
+              {deleteAsk.length === 1 ? 'Deze brief definitief verwijderen?' : `${deleteAsk.length} briefs definitief verwijderen?`}
+            </h3>
+            <p style={{ margin: '0 0 8px', fontSize: 13, lineHeight: 1.55, color: '#5C5850' }}>
+              Dit kan niet ongedaan worden gemaakt. De brief, de scripts, de geschiedenis en de bijbehorende verzonden e-mails verdwijnen. Alleen gearchiveerde briefs en testbriefs worden verwijderd.
+            </p>
+            <p style={{ margin: '0 0 18px', fontSize: 12.5, color: '#6B675D' }}>
+              Wil je de gegevens bewaren? Download dan eerst de export (CSV).
+            </p>
+            {archiveError && <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, marginBottom: 10 }}>{archiveError}</div>}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <button type="button" autoFocus disabled={archiveBusy} onClick={() => setDeleteAsk(null)} style={selBtn}>Annuleren</button>
+              <button type="button" disabled={archiveBusy} onClick={() => deleteArchived(deleteAsk)} style={{ ...selBtn, background: '#C2513F', borderColor: '#C2513F', color: '#FFFFFF' }}>
+                {archiveBusy ? 'Bezig…' : 'Ja, definitief verwijderen'}
+              </button>
+              <a href="/api/dashboard/reports/export" style={{ fontSize: 12.5, color: '#5C5850', marginLeft: 'auto' }}>Export downloaden</a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selected && (
         <div
@@ -1845,6 +1993,26 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                       style={{ border: '1px solid #D2CFC8', background: '#FFFFFF', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#5C5850' }}
                     >
                       {selected.archivedAt ? 'Terugzetten' : 'Archiveren'}
+                    </button>
+                  )}
+                  {!readOnly && (
+                    <button
+                      type="button"
+                      disabled={archiveBusy}
+                      onClick={() => setTest([selected.id], !selected.isTest)}
+                      style={{ border: '1px solid #D2CFC8', background: '#FFFFFF', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#5C5850' }}
+                    >
+                      {selected.isTest ? 'Geen test' : 'Markeer als test'}
+                    </button>
+                  )}
+                  {!readOnly && (selected.archivedAt || selected.isTest) && (
+                    <button
+                      type="button"
+                      disabled={archiveBusy}
+                      onClick={() => setDeleteAsk([selected.id])}
+                      style={{ border: '1px solid #E3B9B0', background: '#FFFFFF', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#C2513F' }}
+                    >
+                      Verwijderen…
                     </button>
                   )}
                 </div>
@@ -2505,7 +2673,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
         </div>
       )}
 
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 900px) {
           .tfa-stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
         }
@@ -2543,15 +2711,15 @@ export default function DashboardClient({ briefs, readOnly = false }) {
           .tfa-prop-card { padding: 12px !important; }
           .tfa-dash-table { min-width: 620px !important; }
           .tfa-dash-table td, .tfa-dash-table th { padding: 10px 12px !important; }
-          .tfa-dash-table td:first-child, .tfa-dash-table th:first-child { position: sticky; left: 0; z-index: 1; background: #FFFFFF; box-shadow: 1px 0 0 #EEECE3; }
-          .tfa-dash-table th:first-child { background: #FAF9F6; }
-          .tfa-dash-table tr[data-unseen="1"] td:first-child { background: #FBF9EC; }
-          .tfa-dash-table tr:hover td:first-child { background: #FBF6E2 !important; }
+          .tfa-dash-table td.tfa-first-col, .tfa-dash-table th.tfa-first-col { position: sticky; left: 0; z-index: 1; background: #FFFFFF; box-shadow: 1px 0 0 #EEECE3; }
+          .tfa-dash-table th.tfa-first-col { background: #FAF9F6; }
+          .tfa-dash-table tr[data-unseen="1"] td.tfa-first-col { background: #FBF9EC; }
+          .tfa-dash-table tr:hover td.tfa-first-col { background: #FBF6E2 !important; }
         }
         @media (max-width: 560px) {
           .tfa-modal-grid { grid-template-columns: 1fr !important; }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

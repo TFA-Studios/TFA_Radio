@@ -509,7 +509,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
           going global is safe. (`<style jsx global>` would fix this too,
           but this project's build doesn't accept that two-word form —
           verified it fails to compile — so plain <style> it is.) */}
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         /* Base height/overflow live here — NOT inline — specifically so the
            mobile rules below can actually override them. An inline height/
            overflow on these same three elements used to silently defeat
@@ -688,7 +688,7 @@ export default function StepShell({ briefId, current, brief, subtitle, bigNum, k
         }
         .tfa-sidebar-mini-btn { transition: box-shadow .12s ease, border-color .12s ease; }
         .tfa-sidebar-mini-btn:hover { box-shadow: 0 0 0 1px rgba(230,200,88,.5), 0 0 12px rgba(230,200,88,.35); border-color: #E6C858; }
-      `}</style>
+      ` }} />
     </div>
   );
 }

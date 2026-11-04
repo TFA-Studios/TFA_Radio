@@ -9,7 +9,7 @@ import { parseImpressions, parseGenderSplit, variationInfoLabel, safeWebsiteUrl,
 import { matchVoices } from '../lib/voiceMatch.js';
 import { parseJsonArray } from '../lib/jsonArray.js';
 import { singleFlight } from '../lib/singleFlight.js';
-import { isUnseenBrief } from '../lib/briefState.js';
+import { isUnseenBrief, isRealBrief } from '../lib/briefState.js';
 
 test('merge: an edit to the main script reaches the variation', () => {
   const r = mergeEditIntoVariation('Koop nu bij Jansen.', 'Koop nu bij Jansen in Zwolle.', 'Koop nu bij Jansen. Black Friday!');
@@ -225,4 +225,29 @@ test('isUnseenBrief: new until a producer opened it after submission', () => {
   assert.equal(isUnseenBrief({ submittedAt: '2026-11-01T10:00:00Z' }), true);
   assert.equal(isUnseenBrief({ submittedAt: '2026-11-01T10:00:00Z', seenAt: '2026-11-01T11:00:00Z' }), false);
   assert.equal(isUnseenBrief({ submittedAt: '2026-11-02T10:00:00Z', seenAt: '2026-11-01T11:00:00Z' }), true);
+});
+test('isRealBrief: test briefs are not real', () => {
+  assert.equal(isRealBrief({ id: 'a' }), true);
+  assert.equal(isRealBrief({ id: 'a', isTest: false }), true);
+  assert.equal(isRealBrief({ id: 'a', isTest: true }), false);
+  assert.equal(isRealBrief(null), false);
+});
+test('slack: a test brief never pings, a real brief does', async () => {
+  process.env.SLACK_WEBHOOK_URL = 'https://hooks.example.invalid/x';
+  const realFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => { calls += 1; return { ok: true, status: 200, text: async () => 'ok' }; };
+  try {
+    const slack = await import('../lib/slack.js');
+    const brief = { id: 'x', companyName: 'Jansen' };
+    await slack.notifyNewBrief({ ...brief, isTest: true }, 'https://d', 3);
+    await slack.notifyClientConfirmed({ ...brief, isTest: true }, 'https://d');
+    await slack.notifyFeedback({ ...brief, isTest: true }, 'https://d');
+    assert.equal(calls, 0);
+    await slack.notifyFeedback(brief, 'https://d');
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = realFetch;
+    delete process.env.SLACK_WEBHOOK_URL;
+  }
 });

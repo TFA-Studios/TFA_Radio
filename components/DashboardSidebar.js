@@ -81,7 +81,7 @@ export default function DashboardSidebar({ active, unseenCount = 0, role = 'staf
 // Shared <style> block every /dashboard/* page injects verbatim (identical
 // across all of them before this refactor) — kept as a plain string export
 // rather than a styled-jsx-only component so each page can still drop it
-// straight into its own <style>{DASHBOARD_SHELL_STYLES}</style>.
+// straight into its own <style dangerouslySetInnerHTML={{ __html: DASHBOARD_SHELL_STYLES }} />.
 export const DASHBOARD_SHELL_STYLES = `
   /* Base min-height lives here (not inline) specifically so the mobile
      override below can actually win — an inline min-height on the <aside>
