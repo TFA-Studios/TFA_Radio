@@ -101,13 +101,50 @@ test('voice match: always alphabetical, with or without preferences', () => {
   assert.deepEqual(matchVoices(pool, { gender: null, age: null, tags: [] }).voices.map((v) => v.name), ['Anouk', 'bram', 'Zoë']);
   assert.deepEqual(matchVoices(pool, { gender: null, age: '18-34', tags: [] }).voices.map((v) => v.name), ['bram', 'Zoë']);
 });
-test('proposals: replace keeps position, remove keeps at least one, add stops at three', async () => {
-  const { applyProposalOp } = await import('../lib/scriptProposals.js');
+test('proposals: replace keeps position, remove keeps at least one, add stops at the pool limit', async () => {
+  const { applyProposalOp, MAX_DRAFTS } = await import('../lib/scriptProposals.js');
   const h = [{ id: 'a' }, { id: 'b' }];
   assert.deepEqual(applyProposalOp(h, { type: 'replace', versionId: 'b', version: { id: 'n' } }).history.map((x) => x.id), ['a', 'n']);
   assert.equal(applyProposalOp([{ id: 'a' }], { type: 'remove', versionId: 'a' }).error, 'last_one');
   assert.deepEqual(applyProposalOp(h, { type: 'remove', versionId: 'a' }).history.map((x) => x.id), ['b']);
-  assert.equal(applyProposalOp([{ id: 1 }, { id: 2 }, { id: 3 }], { type: 'add', version: { id: 4 } }).error, 'too_many');
+  const full = Array.from({ length: MAX_DRAFTS }, (_, i) => ({ id: i }));
+  assert.equal(applyProposalOp(full, { type: 'add', version: { id: 'x' } }).error, 'too_many');
+});
+test('proposals: a new draft is only sent by default while there is room, a rewrite keeps the choice', async () => {
+  const { applyProposalOp, isSending } = await import('../lib/scriptProposals.js');
+  const three = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+  const added = applyProposalOp(three, { type: 'add', version: { id: 'd' } }).history;
+  assert.equal(added.length, 4);
+  assert.equal(isSending(added[3]), false);
+  const two = applyProposalOp([{ id: 'a' }, { id: 'b' }], { type: 'add', version: { id: 'c' } }).history;
+  assert.equal(isSending(two[2]), true);
+  const off = [{ id: 'a', send: false }, { id: 'b' }];
+  const rewritten = applyProposalOp(off, { type: 'replace', versionId: 'a', version: { id: 'n' } }).history;
+  assert.equal(isSending(rewritten[0]), false);
+  assert.equal(isSending(rewritten[1]), true);
+});
+test('release plan: only chosen drafts with text go out, max three, at least one', async () => {
+  const { releasePlan } = await import('../lib/scriptProposals.js');
+  const pool = [{ id: 'a', main: 'A' }, { id: 'b', main: 'B', send: false }, { id: 'c', main: 'C' }, { id: 'd', main: '  ' }];
+  const plan = releasePlan(pool);
+  assert.deepEqual(plan.send.map((x) => x.id), ['a', 'c']);
+  assert.deepEqual(plan.withheld.map((x) => x.id), ['b', 'd']);
+  assert.equal(releasePlan([{ id: 'a', main: 'A', send: false }]).error, 'nothing_to_send');
+  assert.equal(releasePlan([1, 2, 3, 4].map((n) => ({ id: n, main: 'x' }))).error, 'too_many_to_send');
+});
+test('public brief hides drafts until the scripts are released', () => {
+  const draft = { id: 'x', scriptHistory: '[{"main":"geheim"}]', generatedScript: 'geheim', generatedVarScript: 'v', variationScripts: '["v"]', scriptSource: 'claude' };
+  const hidden = toPublicBrief(draft);
+  assert.equal(hidden.scriptHistory, '[]');
+  assert.equal(hidden.generatedScript, '');
+  assert.equal(hidden.variationScripts, '');
+  assert.equal(toPublicBrief({ ...draft, scriptsReleasedAt: '2026-11-05T10:00:00Z' }).generatedScript, 'geheim');
+  assert.equal(toPublicBrief({ ...draft, finalizedAt: '2026-11-05T10:00:00Z' }).generatedScript, 'geheim');
+});
+test('tones: only known tones come back', async () => {
+  const { parseTones } = await import('../components/flowData.js');
+  assert.deepEqual(parseTones({ toneOfVoice: '["warm","bogus","grappig"]' }), ['warm', 'grappig']);
+  assert.deepEqual(parseTones({ toneOfVoice: 'kapot' }), []);
 });
 test('event log: appends, caps and sanitises', async () => {
   const { addEvent, parseEvents, MAX_EVENTS } = await import('../lib/eventLog.js');
@@ -250,4 +287,39 @@ test('slack: a test brief never pings, a real brief does', async () => {
     globalThis.fetch = realFetch;
     delete process.env.SLACK_WEBHOOK_URL;
   }
+});
+test('email status: problems stick, delivered does not undo a bounce', async () => {
+  const { nextEmailStatus } = await import('../lib/emailStatus.js');
+  assert.equal(nextEmailStatus('sent', 'email.delivered'), 'delivered');
+  assert.equal(nextEmailStatus('delivered', 'email.delivery_delayed'), 'delivered');
+  assert.equal(nextEmailStatus('sent', 'email.bounced'), 'bounced');
+  assert.equal(nextEmailStatus('bounced', 'email.delivered'), 'bounced');
+  assert.equal(nextEmailStatus('delivered', 'email.complained'), 'complained');
+  assert.equal(nextEmailStatus('complained', 'email.bounced'), 'complained');
+  assert.equal(nextEmailStatus('sent', 'email.opened'), 'sent');
+});
+test('webhook signature: valid, tampered, expired and missing secret', async () => {
+  const { verifyWebhook } = await import('../lib/svix.js');
+  const { createHmac } = await import('node:crypto');
+  const secret = 'whsec_' + Buffer.from('geheim-geheim-geheim').toString('base64');
+  const body = '{"type":"email.delivered"}';
+  const now = 1800000000;
+  const sign = (b, ts) => 'v1,' + createHmac('sha256', Buffer.from('geheim-geheim-geheim')).update('msg_1.' + ts + '.' + b).digest('base64');
+  const good = { id: 'msg_1', timestamp: String(now), signature: 'v1,bogus ' + sign(body, now), body, secret, nowSeconds: now };
+  assert.equal(verifyWebhook(good), true);
+  assert.equal(verifyWebhook({ ...good, body: body + ' ' }), false);
+  assert.equal(verifyWebhook({ ...good, nowSeconds: now + 3600 }), false);
+  assert.equal(verifyWebhook({ ...good, secret: '' }), false);
+});
+test('proof hash: stable for the same content, changes when an answer changes', async () => {
+  const { proofHash } = await import('../lib/proofHash.js');
+  const a = { briefId: 'b1', kind: 'submitted', createdAt: '2026-11-06T10:00:00Z', sections: [{ title: 'T', items: [{ label: 'x', value: '1' }] }] };
+  assert.equal(proofHash(a), proofHash(JSON.parse(JSON.stringify(a))));
+  assert.notEqual(proofHash(a), proofHash({ ...a, sections: [{ title: 'T', items: [{ label: 'x', value: '2' }] }] }));
+  assert.notEqual(proofHash(a), proofHash({ ...a, createdAt: '2026-11-06T10:00:01Z' }));
+});
+test('proof pdf text: unsupported characters never reach the built-in font', async () => {
+  const { pdfText } = await import('../lib/pdfText.js');
+  assert.equal(pdfText('30″ → “top” – € 😀'), '30" -> "top" - € ?');
+  assert.equal(pdfText('café ë'), 'café ë');
 });

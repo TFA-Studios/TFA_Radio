@@ -1,6 +1,8 @@
 import { requireStaffApi } from '../../../../../lib/access';
 import { NextResponse } from 'next/server';
-import { deleteRemovableBriefs } from '../../../../../lib/db';
+import { deleteRemovableBriefs, getBrief } from '../../../../../lib/db';
+import { deleteSnapshotsOf } from '../../../../../lib/snapshots';
+import { deleteEmailLogOf } from '../../../../../lib/emailLog';
 
 // Producer-only permanent delete. Only briefs that are already archived or
 // marked as test are removed (enforced in the database layer), and the caller must send
@@ -17,6 +19,11 @@ export async function POST(request) {
     return NextResponse.json({ error: 'invalid_ids' }, { status: 400 });
   }
   const count = await deleteRemovableBriefs(ids);
+  // The proof copies and email log go with the brief (only for briefs that are really gone).
+  const gone = [];
+  for (const id of ids) { if (!(await getBrief(id))) gone.push(id); }
+  await deleteSnapshotsOf(gone);
+  await deleteEmailLogOf(gone);
   console.log('[api/dashboard/briefs/delete] permanently deleted ' + count + ' archived/test brief(s).');
   return NextResponse.json({ ok: true, count });
 }

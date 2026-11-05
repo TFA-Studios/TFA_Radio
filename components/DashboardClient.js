@@ -8,12 +8,15 @@ import {
   parseVariationInfo, variationInfoLabelFull, safeWebsiteUrl, impressionsShort, audienceLabel, describeGenderSplit, scriptChangesOf, scriptCheckState,
 } from './flowData';
 import AutoTextarea from './AutoTextarea';
+import BriefingPanel from './BriefingPanel';
+import { EmailStatusPanel } from './ProofPanels';
 import Indicator from './Indicator';
 import { scriptIndicator, productionIndicator } from './statusIndicators';
 import { profileOfBrief, answersOfBrief } from '../lib/formProfile';
 import { diffWords, hasDiff, DiffPreview } from './textDiff';
 import { SCRIPT_SOURCE_META } from '../lib/reports';
 import { jobState } from '../lib/scriptJobState';
+import { MAX_DRAFTS, MAX_SEND, isSending } from '../lib/scriptProposals.js';
 import { parseJsonArray } from '../lib/jsonArray.js';
 import { isUnseenBrief } from '../lib/briefState.js';
 
@@ -99,11 +102,12 @@ const DEFAULT_COLUMN_KEYS = ['hoofdspotLength', 'assignedTo', 'airDate', 'update
 
 // Sections of the brief detail modal (see the `modalTab` state on DashboardClient).
 // Order follows the pipeline: who the client is -> who owns it and when it
-// must be live -> the scripts -> what the client picked (voice, music) ->
+// must be live -> everything the client answered (briefing) -> the scripts -> what the client picked (voice, music) ->
 // production and review -> (once approved) hand-off.
 const MODAL_TABS = [
   { key: 'overzicht', label: 'Overzicht' },
   { key: 'team', label: 'Team' },
+  { key: 'briefing', label: 'Briefing' },
   { key: 'script', label: 'Script' },
   { key: 'creatief', label: 'Stem & muziek' },
   { key: 'productie', label: 'Productie & review' },
@@ -307,6 +311,15 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   const [comments, setComments] = useState({});
   const [addComment, setAddComment] = useState('');
   const [replaceOpen, setReplaceOpen] = useState(null);
+  // "Nieuw voorstel": how it is made (ai | combine | own), what to combine, the producer's own text.
+  const [newMode, setNewMode] = useState('');
+  const [combineIds, setCombineIds] = useState([]);
+  const [newOwn, setNewOwn] = useState('');
+  const [newOwnVars, setNewOwnVars] = useState([]);
+  const [regenOpen, setRegenOpen] = useState(false);
+  const [regenComment, setRegenComment] = useState('');
+  // Optimistic "versturen" switches, rolled back if the save fails.
+  const [sendPending, setSendPending] = useState({});
   // The writer runs on the server in the background: follow it by reading the
   // brief. Leaving this screen or clicking elsewhere never interrupts it.
   const job = jobState(brief.scriptJob);
@@ -323,7 +336,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
   // runs silently in the background and is rolled back if it fails.
   const [recPending, setRecPending] = useState(null);
 
-  useEffect(() => { setEdits({}); setError(''); setActive(0); setRecPending(null); setReplaceOpen(null); }, [brief.id, brief.scriptGeneratedAt]);
+  useEffect(() => { setEdits({}); setError(''); setActive(0); setRecPending(null); setReplaceOpen(null); setSendPending({}); setCombineIds([]); }, [brief.id, brief.scriptGeneratedAt]);
 
   function isRec(d) {
     if (!recPending) return !!d.recommended;
@@ -346,6 +359,23 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
       setError('Geen verbinding. Probeer het opnieuw.');
     }
     setRecPending(null);
+  }
+
+  const sendOf = (d) => (sendPending[d.id] !== undefined ? sendPending[d.id] : isSending(d));
+  const sendCount = drafts.filter(sendOf).length;
+  async function toggleSend(d, on) {
+    if (on && sendCount >= MAX_SEND) { setError('Je kunt maximaal ' + MAX_SEND + ' voorstellen versturen. Zet eerst een ander voorstel uit.'); return; }
+    setSendPending((cur) => ({ ...cur, [d.id]: on }));
+    setError('');
+    try {
+      const res = await fetch(`/api/dashboard/briefs/${brief.id}/scripts`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ versionId: d.id, send: on }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) setError(data.message || 'Dat is niet gelukt. Probeer het opnieuw.');
+      else onUpdated(data);
+    } catch (e) {
+      setError('Geen verbinding. Probeer het opnieuw.');
+    }
+    setSendPending((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
   }
 
   function valueOf(d, field) {
@@ -399,17 +429,23 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
     if (out) setEdits((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
     return out;
   }
-  // Rewrite / remove / add ONE proposal. The comment goes into the AI prompt
+  // Rewrite / remove ONE proposal. The comment goes into the AI prompt
   // on top of the standing prompt (see lib/scriptgen.js).
   async function proposalAction(action, d) {
-    const comment = action === 'add' ? addComment : (comments[d.id] || '');
-    const out = await call('POST', { action, versionId: d ? d.id : undefined, comment }, (action === 'add' ? 'add' : action + '-' + d.id));
+    const out = await call('POST', { action, versionId: d.id, comment: comments[d.id] || '' }, action + '-' + d.id);
     if (!out) return;
-    if (d) {
-      setEdits((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
-      setComments((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
-    }
-    if (action === 'add') { setAddComment(''); }
+    setEdits((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
+    setComments((cur) => { const n = { ...cur }; delete n[d.id]; return n; });
+  }
+  // New proposal: written by the AI, combined from existing ones, or typed by TFA.
+  async function addNew() {
+    let out = null;
+    if (newMode === 'ai') out = await call('POST', { action: 'add', comment: addComment }, 'new');
+    else if (newMode === 'combine') out = await call('POST', { action: 'combine', sourceIds: combineIds, comment: addComment }, 'new');
+    else if (newMode === 'own') out = await call('POST', { action: 'add_own', main: newOwn, variations: newOwnVars }, 'new');
+    if (!out) return;
+    setAddComment(''); setCombineIds([]); setNewOwn(''); setNewOwnVars([]); setNewMode('');
+    setActive(drafts.length);
   }
   async function release() {
     // Save any unsaved edits first so the client gets what is on screen.
@@ -419,7 +455,9 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
         if (!ok) return;
       }
     }
-    if (typeof window !== 'undefined' && !window.confirm('Scripts vrijgeven aan de klant (' + drafts.length + ' voorstel' + (drafts.length === 1 ? '' : 'len') + ')? De klant krijgt hier meteen een e-mail over.')) return;
+    const held = drafts.length - sendCount;
+    const heldNote = held ? ' ' + held + ' voorstel' + (held === 1 ? ' wordt' : 'len worden') + ' niet verstuurd; de klant kan daar niet meer uit kiezen (de tekst blijft wel in de Historie).' : '';
+    if (typeof window !== 'undefined' && !window.confirm('Scripts vrijgeven aan de klant (' + sendCount + ' voorstel' + (sendCount === 1 ? '' : 'len') + ')?' + heldNote + ' De klant krijgt hier meteen een e-mail over.')) return;
     await call('POST', { action: 'release' }, 'release');
   }
 
@@ -503,7 +541,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
       )}
       {running && (
         <div style={{ marginBottom: 12, background: '#FFFFFF', border: '1px solid #E6C858', borderRadius: 10, padding: '10px 12px', fontSize: 12.5, color: '#383209', lineHeight: 1.5 }}>
-          <b>{job.kind === 'regenerate' || job.kind === 'initial' ? 'De scriptvoorstellen worden geschreven' : 'Er wordt een voorstel geschreven'}</b>
+          <b>{job.kind === 'regenerate' || job.kind === 'initial' ? 'De scriptvoorstellen worden geschreven' : job.kind === 'combine' ? 'Er wordt een gecombineerd voorstel geschreven' : 'Er wordt een voorstel geschreven'}</b>
           {' '}op de achtergrond; dit kan tot een minuut duren. Je kunt gewoon verder werken of een andere brief openen: het verschijnt hier vanzelf.
         </div>
       )}
@@ -519,11 +557,43 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
         </div>
       )}
 
+      {varCount > 0 && (
+        <div style={{ marginBottom: 12, background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, padding: '12px 14px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>De klant vroeg om {varCount === 1 ? 'een variatie' : varCount + ' variaties'}</div>
+          <div style={{ fontSize: 12, color: '#5C5850', margin: '2px 0 8px' }}>Controleer bij elk voorstel dat de variatietekst hierbij past.</div>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13.5, lineHeight: 1.6 }}>
+            {varInfos.map((v, vi) => (
+              <li key={vi}><b>{varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'}:</b> {variationInfoLabelFull(v) || <span style={{ color: '#6B675D' }}>de klant gaf geen toelichting</span>}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {!released && drafts.length > 0 && (
+        <div style={{ marginBottom: 12, background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, padding: '12px 14px' }}>
+          <div style={{ fontSize: 13, fontWeight: 700 }}>
+            Wat gaat naar de klant? <span style={{ fontWeight: 400, color: '#5C5850' }}>{sendCount} van max. {MAX_SEND} geselecteerd</span>
+          </div>
+          <div style={{ marginTop: 6 }}>
+            {drafts.map((d, di) => (
+              <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', borderTop: di ? '1px solid #EEECE3' : 'none' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer', flex: 'none' }}>
+                  <input type="checkbox" checked={sendOf(d)} onChange={(e) => toggleSend(d, e.target.checked)} aria-label={'Voorstel ' + (di + 1) + ' versturen naar klant'} />
+                  Voorstel {di + 1}
+                </label>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: '#5C5850', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{(d.main || '').slice(0, 90)}</span>
+                <button type="button" onClick={() => setActive(di)} style={{ flex: 'none', border: 'none', background: 'transparent', color: '#383209', fontSize: 12.5, fontWeight: 600, textDecoration: 'underline', cursor: 'pointer', padding: 0 }}>Bekijk</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {drafts.length > 0 && (() => {
         const i = Math.min(active, drafts.length - 1);
         const d = drafts[i];
         const rec = isRec(d);
-        const sourceNote = d.source === 'template' ? 'sjabloon (geen AI beschikbaar)' : d.source === 'agency' ? 'script van agentschap' : '';
+        const sourceNote = { template: 'sjabloon (geen AI beschikbaar)', agency: 'script van agentschap', combined: 'gecombineerd uit bestaande voorstellen', own: 'door TFA geschreven' }[d.source] || '';
         return (
           <div key={d.id} className="tfa-prop-card" style={{ background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, padding: '16px 18px', marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -532,6 +602,12 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
                 <span style={{ fontSize: 15, fontWeight: 700 }}>Voorstel {i + 1} van {drafts.length}</span>
                 {sourceNote && <span style={{ fontSize: 12, color: '#6B675D' }}>{sourceNote}</span>}
                 {rec && <span style={{ background: '#E6C858', color: '#383209', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>✓ Onze aanbeveling</span>}
+                {!released && (
+                  <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={sendOf(d)} onChange={(e) => toggleSend(d, e.target.checked)} />
+                    Versturen naar klant
+                  </label>
+                )}
               </div>
               <button type="button" aria-label="Volgend voorstel" disabled={i === drafts.length - 1} onClick={() => setActive(i + 1)} style={arrowStyle(i === drafts.length - 1)}>›</button>
             </div>
@@ -593,7 +669,7 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
                       type="button"
                       disabled={!!busy || running || drafts.length <= 1}
                       title={drafts.length <= 1 ? 'Er moet minstens één voorstel overblijven' : ''}
-                      onClick={() => { if (window.confirm('Dit voorstel weghalen? De klant krijgt dan ' + (drafts.length - 1) + ' voorstel' + (drafts.length - 1 === 1 ? '' : 'len') + '.')) proposalAction('remove', d); }}
+                      onClick={() => { if (window.confirm('Dit voorstel weghalen uit de lijst?')) proposalAction('remove', d); }}
                       style={{ ...btnDanger, opacity: drafts.length <= 1 ? 0.45 : 1 }}
                     >
                       {busy === 'remove-' + d.id ? 'Bezig…' : 'Voorstel weghalen'}
@@ -624,38 +700,99 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
         );
       })()}
 
-      {!released && drafts.length > 0 && drafts.length < 3 && (
+      {!released && drafts.length > 0 && (
         <div style={{ marginBottom: 14, background: '#FFFFFF', border: '1.5px dashed #E6C858', borderRadius: 12, padding: '14px 18px' }}>
           <div style={{ fontSize: 14, fontWeight: 700 }}>
-            Er {drafts.length === 1 ? 'is' : 'zijn'} maar {drafts.length} voorstel{drafts.length === 1 ? '' : 'len'}
+            Nieuw voorstel toevoegen <span style={{ fontWeight: 400, fontSize: 12.5, color: '#5C5850' }}>({drafts.length} van max. {MAX_DRAFTS} in de lijst)</span>
           </div>
-          <div style={{ fontSize: 12.5, color: '#383209', margin: '3px 0 10px', lineHeight: 1.5 }}>De klant kiest het liefst uit drie. Laat een extra voorstel schrijven, met of zonder opmerking.</div>
-          <AutoTextarea minHeight={52} style={taStyle} value={addComment} maxLength={1000} placeholder="Optionele opmerking, bijv. 'speelser, met een knipoog'" onChange={(e) => setAddComment(e.target.value)} />
-          <button type="button" disabled={!!busy || running} onClick={() => proposalAction('add')} style={{ ...btnSecondary, marginTop: 10 }}>
-            {busy === 'add' ? 'Bezig met starten…' : 'Voorstel toevoegen (' + (drafts.length + 1) + ' van 3)'}
-          </button>
+          {drafts.length >= MAX_DRAFTS ? (
+            <div style={{ fontSize: 12.5, color: '#5C5850', marginTop: 4 }}>De lijst is vol. Haal eerst een voorstel weg.</div>
+          ) : (
+            <>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '10px 0 0' }}>
+                {[['ai', 'Laat de AI een voorstel schrijven'], ['combine', 'Combineer bestaande voorstellen'], ['own', 'Zelf een voorstel schrijven']].map(([key, label]) => (
+                  <button key={key} type="button" disabled={!!busy || running || (key === 'combine' && drafts.length < 2)} onClick={() => setNewMode(newMode === key ? '' : key)} aria-pressed={newMode === key} style={{ ...btnSecondary, background: newMode === key ? '#F4F1E4' : '#fff', borderColor: newMode === key ? '#1D1D1D' : '#D2CFC8' }}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {newMode === 'combine' && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 12.5, color: '#383209', marginBottom: 6 }}>Kies de voorstellen waaruit de AI het beste samenvoegt (minstens 2).</div>
+                  <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
+                    {drafts.map((d, di) => (
+                      <label key={d.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer' }}>
+                        <input type="checkbox" checked={combineIds.includes(d.id)} onChange={(e) => setCombineIds((cur) => (e.target.checked ? cur.concat(d.id) : cur.filter((x) => x !== d.id)))} />
+                        Voorstel {di + 1}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(newMode === 'ai' || newMode === 'combine') && (
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ fontSize: 12.5, color: '#383209', marginBottom: 5, lineHeight: 1.5 }}>Wat verwacht je, of wat moet er anders? Dit gaat mee in de instructie aan de AI (optioneel).</div>
+                  <AutoTextarea minHeight={60} style={taStyle} value={addComment} maxLength={1000} placeholder="Bijv. 'de opening van voorstel 2 met de afsluiting van voorstel 3' of 'speelser, met een knipoog'" onChange={(e) => setAddComment(e.target.value)} />
+                  <button type="button" disabled={!!busy || running || (newMode === 'combine' && combineIds.length < 2)} onClick={addNew} className="btn-primary" style={{ marginTop: 10, padding: '10px 18px', flex: 'none' }}>
+                    {busy === 'new' ? 'Bezig met starten…' : newMode === 'combine' ? 'Combineer tot nieuw voorstel' : 'Schrijf nieuw voorstel'}
+                  </button>
+                </div>
+              )}
+              {newMode === 'own' && (
+                <div style={{ marginTop: 12 }}>
+                  <AutoTextarea minHeight={130} style={taStyle} value={newOwn} onChange={(e) => setNewOwn(e.target.value)} placeholder="Plak of schrijf hier het script (hoofdspot)" />
+                  {Array.from({ length: varCount }).map((_, vi) => (
+                    <div key={vi}>
+                      <div style={{ fontSize: 11.5, color: '#5C5850', margin: '8px 0 4px' }}>
+                        {varCount > 1 ? 'Variatie ' + (vi + 1) : 'Variatie'}{variationInfoLabelFull(varInfos[vi]) ? ' · ' + variationInfoLabelFull(varInfos[vi]) : ''} (optioneel)
+                      </div>
+                      <AutoTextarea minHeight={64} style={taStyle} value={newOwnVars[vi] || ''} onChange={(e) => setNewOwnVars((cur) => { const n = cur.slice(); n[vi] = e.target.value; return n; })} />
+                    </div>
+                  ))}
+                  <button type="button" disabled={!!busy || running || !newOwn.trim()} onClick={addNew} className="btn-primary" style={{ marginTop: 10, padding: '10px 18px', flex: 'none' }}>
+                    {busy === 'new' ? 'Bezig…' : 'Voorstel toevoegen'}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 
       {error && <div style={{ fontSize: 12.5, color: '#C2513F', fontWeight: 600, marginBottom: 8 }}>{error}</div>}
 
       {!released && (
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
-          <button type="button" disabled={!!busy || running || drafts.length === 0} onClick={release} className="btn-primary" style={{ padding: '11px 20px', flex: 'none' }}>
-            {busy === 'release' ? 'Bezig…' : 'Vrijgeven aan klant' + (drafts.length ? ' (' + drafts.length + ' voorstel' + (drafts.length === 1 ? '' : 'len') + ')' : '')}
-          </button>
-          <button
-            type="button"
-            disabled={!!busy || running}
-            onClick={() => {
-              if (dirty && typeof window !== 'undefined' && !window.confirm('Je aanpassingen gaan verloren. Toch opnieuw schrijven?')) return;
-              call('POST', { action: 'regenerate' }, 'regen');
-            }}
-            style={btnSecondary}
-          >
-            {busy === 'regen' ? 'Bezig met starten…' : 'Alles opnieuw schrijven (3 nieuwe voorstellen)'}
-          </button>
-        </div>
+        <>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', paddingTop: 4 }}>
+            <button type="button" disabled={!!busy || running || sendCount === 0 || sendCount > MAX_SEND} onClick={release} className="btn-primary" style={{ padding: '11px 20px', flex: 'none' }}>
+              {busy === 'release' ? 'Bezig…' : 'Vrijgeven aan klant' + (drafts.length ? ' (' + sendCount + ' van ' + drafts.length + ' voorstellen)' : '')}
+            </button>
+            <button type="button" disabled={!!busy || running} onClick={() => setRegenOpen(!regenOpen)} aria-expanded={regenOpen} style={{ ...btnSecondary, background: regenOpen ? '#F4F1E4' : '#fff' }}>
+              Alles opnieuw schrijven…
+            </button>
+          </div>
+          {regenOpen && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ fontSize: 12.5, color: '#383209', marginBottom: 5, lineHeight: 1.5 }}>
+                Alle voorstellen in de lijst (ook gecombineerde of zelf geschreven) worden vervangen door 3 nieuwe. Wat verwacht je, of wat moet er anders? Dit gaat mee in de instructie aan de AI (optioneel).
+              </div>
+              <AutoTextarea minHeight={60} style={taStyle} value={regenComment} maxLength={1000} placeholder="Bijv. 'korter en directer' of 'noem de actie eerder'" onChange={(e) => setRegenComment(e.target.value)} />
+              <button
+                type="button"
+                disabled={!!busy || running}
+                onClick={async () => {
+                  if (typeof window !== 'undefined' && !window.confirm('Alle voorstellen vervangen door 3 nieuwe?' + (dirty ? ' Je aanpassingen gaan verloren.' : ''))) return;
+                  const out = await call('POST', { action: 'regenerate', comment: regenComment }, 'regen');
+                  if (out) { setRegenOpen(false); setRegenComment(''); }
+                }}
+                className="btn-primary"
+                style={{ marginTop: 10, padding: '10px 18px', flex: 'none' }}
+              >
+                {busy === 'regen' ? 'Bezig met starten…' : 'Schrijf 3 nieuwe voorstellen'}
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -2024,7 +2161,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                   after Productie / Uitlevering replaces the badge that used
                   to be embedded in the tab itself. */}
               <div role="tablist" style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginTop: 14, overflowX: 'auto', boxShadow: 'inset 0 -1px 0 #E3E0D5' }}>
-                {modalTabsFor(selected).filter((t) => !readOnly || t.key === 'overzicht' || t.key === 'script' || t.key === 'creatief').map((t) => {
+                {modalTabsFor(selected).filter((t) => !readOnly || t.key === 'overzicht' || t.key === 'briefing' || t.key === 'script' || t.key === 'creatief').map((t) => {
                   const active = modalTab === t.key;
                   // Scripts waiting for TFA: the Script tab itself turns a soft red while
                   // you are on another tab (no extra row, nothing shifts).
@@ -2264,6 +2401,7 @@ export default function DashboardClient({ briefs, readOnly = false }) {
 
             {modalTab === 'overzicht' && (
             <div className="tfa-modal-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 14px', marginTop: 16 }}>
+              {!readOnly && <div style={{ gridColumn: '1 / -1' }}><EmailStatusPanel briefId={selected.id} onlyProblems /></div>}
               <div style={{ ...refCardStyle, gridColumn: '1 / -1' }}>
                 <ModalSectionTitle>Over het bedrijf</ModalSectionTitle>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
@@ -2343,6 +2481,8 @@ export default function DashboardClient({ briefs, readOnly = false }) {
               )}
             </div>
             )}
+
+            {modalTab === 'briefing' && <BriefingPanel brief={selected} showProof={!readOnly} />}
 
             {modalTab === 'team' && (
             <div style={{ marginTop: 16 }}>
@@ -2605,6 +2745,8 @@ export default function DashboardClient({ briefs, readOnly = false }) {
 
             {modalTab === 'historie' && !readOnly && (
             <div style={{ marginTop: 16 }}>
+              <EmailStatusPanel briefId={selected.id} />
+              <div style={{ height: 12 }} />
               <HistoryPanel brief={selected} cardStyle={refCardStyle} />
             </div>
             )}

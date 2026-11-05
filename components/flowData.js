@@ -85,6 +85,11 @@ export const TONE_LABELS = {
   oprecht: 'Oprecht',
 };
 
+// The tones the client picked, as keys known to TONE_LABELS (stored as a JSON array).
+export function parseTones(brief) {
+  return parseJsonArray(brief && brief.toneOfVoice).filter((t) => TONE_LABELS[t]);
+}
+
 // The client-facing voice (step 5) and music (step 6) pages used to pick
 // from fixed sample pools here (VOICE_POOL, PLAYLISTS) — hard-coded example
 // voices/tracks that never reflected anything a producer actually added in

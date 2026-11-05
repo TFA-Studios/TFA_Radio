@@ -3,6 +3,7 @@ import { toPublicBrief } from '../../../../../lib/publicBrief';
 import { describeScript } from '../../../../../lib/eventLog';
 import { draftVariationsOf } from '../../../../../lib/scriptSync';
 import { getBrief, selectScriptVersion, logBriefEvent } from '../../../../../lib/db';
+import { captureProof } from '../../../../../lib/proofCapture';
 
 // Public (like the rest of /api/briefs/*) — the client-flow script step
 // uses this so the client can pick their favorite of the (up to 3) script
@@ -27,5 +28,6 @@ export async function POST(request, { params }) {
   let n = 0;
   try { n = (JSON.parse(existing.scriptHistory || '[]').findIndex((h) => h.id === versionId)) + 1; } catch (e) {}
   await logBriefEvent(params.id, { actor: 'klant', type: 'script_chosen', text: 'Klant koos ' + (n ? 'voorstel ' + n : 'een voorstel'), detail: describeScript(updated.generatedScript || '', draftVariationsOf(updated)) });
+  await captureProof(request, updated, 'script_chosen');
   return NextResponse.json(toPublicBrief(updated));
 }

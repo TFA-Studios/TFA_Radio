@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { rateLimit, clientIp, tooManyRequests } from '../../../../lib/rateLimit';
 import { toPublicBrief } from '../../../../lib/publicBrief';
+import { captureProof } from '../../../../lib/proofCapture';
 import { waitUntil } from '@vercel/functions';
 import { getBrief, updateBrief, saveScriptDrafts, saveScriptAudit, listAgencies, logBriefEvent, setScriptJob } from '../../../../lib/db';
 import { scriptChangesOf, parseVariationScripts } from '../../../../components/flowData';
@@ -60,6 +61,7 @@ export async function PATCH(request, { params }) {
   // email and the Slack ping all run in the background (waitUntil keeps the
   // serverless function alive after the response is sent).
   if (body && body.submitted && !wasSubmitted && brief.submittedAt) {
+    await captureProof(request, brief, 'submitted');
     await logBriefEvent(params.id, { actor: 'klant', type: 'submitted', text: 'Klant verstuurde de brief', detail: [brief.product && 'Product: ' + brief.product, brief.usp && 'USP: ' + brief.usp, brief.mainMessage && 'Hoofdboodschap: ' + brief.mainMessage, brief.cta && 'Call-to-action: ' + brief.cta].filter(Boolean).join('\n') });
     const submittedBrief = brief;
     waitUntil(
@@ -104,7 +106,7 @@ export async function PATCH(request, { params }) {
         try {
           // Drafting is over (success or not): the dashboard stops showing "writing".
           if (providedScript || draftCount >= 3) await setScriptJob(params.id, null);
-          else if (draftCount > 0) await setScriptJob(params.id, { status: 'failed', kind: 'initial', startedAt: new Date().toISOString(), message: 'Er zijn maar ' + draftCount + ' van 3 voorstellen gelukt. Voeg de ontbrekende toe met "Voorstel toevoegen".' });
+          else if (draftCount > 0) await setScriptJob(params.id, { status: 'failed', kind: 'initial', startedAt: new Date().toISOString(), message: 'Er zijn maar ' + draftCount + ' van 3 voorstellen gelukt. Voeg de ontbrekende toe met "Nieuw voorstel".' });
           else await setScriptJob(params.id, { status: 'failed', kind: 'initial', startedAt: new Date().toISOString(), message: 'De scripts konden niet automatisch geschreven worden. Klik op "Alles opnieuw schrijven".' });
         } catch (err) {
           console.error('[api/briefs/:id] clearing script job failed:', err && err.message);
@@ -125,6 +127,7 @@ export async function PATCH(request, { params }) {
   // full overview + terms email goes out, and the team hears the brief is
   // ready for production.
   if (body && body.finalized && !wasFinalized && brief.finalizedAt) {
+    await captureProof(request, brief, 'finalized');
     // If the client changed the script (or a variation) after TFA's proposals,
     // nothing counts as approved yet: it goes to the script check first, and
     // the confirmation email below says so.

@@ -5,6 +5,7 @@ import { getBrief, saveScriptDrafts, updateScriptDraft, releaseScripts, editScri
 import { beginScriptJob, runScriptJob } from '../../../../../../lib/scriptJobs';
 import { describeProposal, describeProposals, describeScript } from '../../../../../../lib/eventLog';
 import { jobState } from '../../../../../../lib/scriptJobState';
+import { releasePlan, isSending, MAX_DRAFTS, MAX_SEND } from '../../../../../../lib/scriptProposals';
 import { sendScriptsReadyEmail } from '../../../../../../lib/email';
 import { parseJsonArray } from '../../../../../../lib/jsonArray.js';
 
@@ -17,15 +18,21 @@ import { parseJsonArray } from '../../../../../../lib/jsonArray.js';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
+const TOO_MANY = 'De lijst met voorstellen is vol (' + MAX_DRAFTS + '). Verwijder er eerst een.';
+
 function historyOf(b) {
   return parseJsonArray(b && b.scriptHistory ? b.scriptHistory : '');
 }
 
-// POST { action: 'regenerate' } — replace the drafts with 3 fresh versions.
+// The producer works with a pool of drafts (max MAX_DRAFTS) and switches each
+// one on or off for the client (PATCH { send }); at most MAX_SEND go out.
+// POST { action: 'regenerate', comment? } — replace the drafts with 3 fresh versions; the comment is added to the AI prompt.
 // POST { action: 'rewrite', versionId, comment? } — rewrite ONE proposal; the comment is added to the AI prompt.
-// POST { action: 'add', comment? }  — add one more proposal (max 3).
-// POST { action: 'remove', versionId } — drop one proposal (the client may get 1 or 2 instead of 3).
-// POST { action: 'release' }    — release the drafts to the client (emails them).
+// POST { action: 'add', comment? }  — add one more AI-written proposal.
+// POST { action: 'combine', sourceIds, comment? } — AI merges 2+ existing proposals into a new one.
+// POST { action: 'add_own', main, variations? } — add a script TFA wrote itself.
+// POST { action: 'remove', versionId } — drop one proposal.
+// POST { action: 'release' }    — release the proposals marked "send" to the client (emails them).
 // GET — the brief as the dashboard sees it (used to follow a running job).
 export async function GET(request, { params }) {
   const denied = await requireStaffApi();
@@ -51,7 +58,7 @@ export async function POST(request, { params }) {
     return NextResponse.json((await getBrief(params.id)) || brief);
   }
 
-  if (action === 'regenerate' || action === 'rewrite' || action === 'add' || action === 'remove') {
+  if (['regenerate', 'rewrite', 'add', 'combine', 'add_own', 'remove'].includes(action)) {
     if (brief.scriptsReleasedAt) {
       return NextResponse.json({ error: 'already_released', message: 'De scripts zijn al vrijgegeven aan de klant.' }, { status: 409 });
     }
@@ -70,11 +77,31 @@ export async function POST(request, { params }) {
       return NextResponse.json((await getBrief(params.id)) || out.brief);
     }
 
-    if (action === 'rewrite' && !history.some((h) => h.id === body.versionId)) return NextResponse.json({ error: 'not_found', message: 'Voorstel niet gevonden.' }, { status: 404 });
-    if (action === 'add' && history.length >= 3) {
-      return NextResponse.json({ error: 'too_many', message: 'Er zijn al drie voorstellen. Verwijder er eerst een.' }, { status: 409 });
+    if (action === 'add_own') {
+      const main = typeof body.main === 'string' ? body.main.trim() : '';
+      if (!main) return NextResponse.json({ error: 'empty', message: 'Plak of schrijf eerst het script.' }, { status: 400 });
+      const variations = Array.isArray(body.variations) ? body.variations.map((v) => String(v || '').trim()) : [];
+      const out = await editScriptProposals(params.id, { type: 'add', version: { main, variations, source: 'own' } });
+      if (out.error) return NextResponse.json({ error: out.error, message: TOO_MANY }, { status: 409 });
+      const added = historyOf(out.brief).slice(-1)[0];
+      await logBriefEvent(params.id, { actor: 'tfa', type: 'proposal_added', text: 'TFA voegde een zelf geschreven voorstel toe', detail: added ? describeProposal(added) : '' });
+      return NextResponse.json((await getBrief(params.id)) || out.brief);
     }
-    const job = { kind: action, versionId: action === 'rewrite' ? body.versionId : undefined, comment: action === 'regenerate' ? '' : comment };
+
+    if (action === 'combine') {
+      const sourceIds = Array.isArray(body.sourceIds) ? body.sourceIds.filter((x) => history.some((h) => h.id === x)) : [];
+      if (new Set(sourceIds).size < 2) return NextResponse.json({ error: 'need_two', message: 'Kies minstens twee voorstellen om te combineren.' }, { status: 400 });
+    }
+    if (action === 'rewrite' && !history.some((h) => h.id === body.versionId)) return NextResponse.json({ error: 'not_found', message: 'Voorstel niet gevonden.' }, { status: 404 });
+    if ((action === 'add' || action === 'combine') && history.length >= MAX_DRAFTS) {
+      return NextResponse.json({ error: 'too_many', message: TOO_MANY }, { status: 409 });
+    }
+    const job = {
+      kind: action,
+      versionId: action === 'rewrite' ? body.versionId : undefined,
+      sourceIds: action === 'combine' ? Array.from(new Set(body.sourceIds)) : undefined,
+      comment,
+    };
     if (!(await beginScriptJob(brief, job))) {
       return NextResponse.json({ error: 'busy', message: 'Er wordt al een voorstel geschreven. Even geduld.' }, { status: 409 });
     }
@@ -104,11 +131,17 @@ export async function POST(request, { params }) {
     if (brief.scriptsReleasedAt) {
       return NextResponse.json({ error: 'already_released', message: 'De scripts zijn al vrijgegeven aan de klant.' }, { status: 409 });
     }
+    const plan = releasePlan(historyOf(brief));
+    if (plan.error) {
+      const messages = { nothing_to_send: 'Zet minstens één voorstel op "versturen".', too_many_to_send: 'Je kunt maximaal ' + MAX_SEND + ' voorstellen versturen.' };
+      return NextResponse.json({ error: plan.error, message: messages[plan.error] }, { status: 400 });
+    }
     const released = await releaseScripts(params.id);
     if (!released) {
       return NextResponse.json({ error: 'nothing_to_release', message: 'Er is nog geen script om vrij te geven.' }, { status: 400 });
     }
-    await logBriefEvent(params.id, { actor: 'tfa', type: 'released', text: 'Scripts vrijgegeven aan de klant (' + historyOf(released).length + ' voorstel' + (historyOf(released).length === 1 ? '' : 'len') + ')', detail: describeProposals(historyOf(released)) });
+    const n = plan.send.length;
+    await logBriefEvent(params.id, { actor: 'tfa', type: 'released', text: 'Scripts vrijgegeven aan de klant (' + n + ' voorstel' + (n === 1 ? '' : 'len') + (plan.withheld.length ? ', ' + plan.withheld.length + ' niet verstuurd' : '') + ')', detail: describeProposals(plan.send) + (plan.withheld.length ? '\n\n=====\n\nNIET VERSTUURD\n\n' + describeProposals(plan.withheld) : '') });
     let appUrl;
     try {
       appUrl = new URL(request.url).origin;
@@ -126,7 +159,7 @@ export async function POST(request, { params }) {
   return NextResponse.json({ error: 'invalid_action' }, { status: 400 });
 }
 
-// PATCH { versionId, main?, variation? } — edit one draft before release.
+// PATCH { versionId, main?, variations?, send?, recommended?, reason? } — edit one draft before release.
 export async function PATCH(request, { params }) {
   const denied = await requireStaffApi();
   if (denied) return denied;
@@ -142,7 +175,15 @@ export async function PATCH(request, { params }) {
   // TFA's recommendation among the proposals (optional, with an optional reason).
   if (typeof body.recommended === 'boolean') data.recommended = body.recommended;
   if (typeof body.reason === 'string') data.reason = body.reason;
-  const before = historyOf(await getBrief(params.id)).find((h) => h.id === versionId);
+  const current = await getBrief(params.id);
+  const pool = historyOf(current);
+  const before = pool.find((h) => h.id === versionId);
+  if (typeof body.send === 'boolean') {
+    if (body.send && before && !isSending(before) && pool.filter(isSending).length >= MAX_SEND) {
+      return NextResponse.json({ error: 'too_many_to_send', message: 'Je kunt maximaal ' + MAX_SEND + ' voorstellen versturen. Zet eerst een ander voorstel uit.' }, { status: 409 });
+    }
+    data.send = body.send;
+  }
   const updated = await updateScriptDraft(params.id, versionId, data);
   if (!updated) return NextResponse.json({ error: 'not_found_or_released' }, { status: 404 });
   const textChanged = before && ((typeof data.main === 'string' && data.main !== before.main) || (Array.isArray(data.variations) && JSON.stringify(data.variations) !== JSON.stringify(Array.isArray(before.variations) ? before.variations : (before.variation ? [before.variation] : []))));
