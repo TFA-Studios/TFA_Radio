@@ -8,7 +8,7 @@ import {
   parseVariationInfo, variationInfoLabelFull, safeWebsiteUrl, impressionsShort, audienceLabel, describeGenderSplit, scriptChangesOf, scriptCheckState,
 } from './flowData';
 import AutoTextarea from './AutoTextarea';
-import BriefingPanel from './BriefingPanel';
+import BriefingPanel, { ToneCard } from './BriefingPanel';
 import { EmailStatusPanel } from './ProofPanels';
 import Indicator from './Indicator';
 import { scriptIndicator, productionIndicator } from './statusIndicators';
@@ -556,6 +556,8 @@ function ScriptDraftsPanel({ brief, onUpdated, cardStyle }) {
           De concepten worden nog geschreven (dat duurt even, ververs straks). Zijn ze er na een minuut nog niet, klik dan op &ldquo;Opnieuw schrijven&rdquo; of plak hierboven zelf een script.
         </div>
       )}
+
+      <div style={{ marginBottom: 12 }}><ToneCard brief={brief} compact /></div>
 
       {varCount > 0 && (
         <div style={{ marginBottom: 12, background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, padding: '12px 14px' }}>

@@ -396,16 +396,19 @@ export function scriptCheckState(brief) {
 
 // Number of variations of the hoofdspot a brief has asked for (0 = none).
 // variationsCount is the source of truth once set on the delivery step;
-// needsVariations (the older yes/no field) is only used as a fallback for
-// briefs saved before variationsCount existed, defaulting to 1 in that case
-// — matches how those older briefs actually behaved (a single variation).
+// needsVariations is the yes/no gate: when the client said no, there are no
+// variations, whatever number is still stored (picking "yes" stores a count,
+// and switching back to "no" used to leave that count behind, so briefs
+// without variations showed "1x variatie"). Only when the gate is yes does
+// variationsCount say how many; a missing count then means 1, which is how
+// briefs saved before variationsCount existed behaved.
 export function variationsCountOf(brief) {
-  if (!brief) return 0;
+  if (!brief || !brief.needsVariations) return 0;
   if (brief.variationsCount !== undefined && brief.variationsCount !== null && brief.variationsCount !== '') {
     const n = parseInt(brief.variationsCount, 10);
     if (!isNaN(n) && n >= 0) return n;
   }
-  return brief.needsVariations ? 1 : 0;
+  return 1;
 }
 
 // Short "+ Nx variatie(s)" suffix used everywhere a brief's deliverables are

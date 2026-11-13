@@ -323,3 +323,12 @@ test('proof pdf text: unsupported characters never reach the built-in font', asy
   assert.equal(pdfText('30″ → “top” – € 😀'), '30" -> "top" - € ?');
   assert.equal(pdfText('café ë'), 'café ë');
 });
+test('variations: "no" means zero even when an old count is still stored', async () => {
+  const { variationsCountOf, variationsSummaryLabel } = await import('../components/flowData.js');
+  assert.equal(variationsCountOf({ needsVariations: false, variationsCount: '1' }), 0);
+  assert.equal(variationsSummaryLabel({ needsVariations: false, variationsCount: '2' }), '');
+  assert.equal(variationsCountOf({ needsVariations: true, variationsCount: '2' }), 2);
+  assert.equal(variationsCountOf({ needsVariations: true, variationsCount: '' }), 1);
+  assert.equal(variationsCountOf({ needsVariations: true }), 1);
+  assert.equal(variationsCountOf(null), 0);
+});

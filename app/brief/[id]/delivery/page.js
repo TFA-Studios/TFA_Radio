@@ -170,7 +170,7 @@ export default function DeliveryPage({ params }) {
           <button
             type="button"
             className={'seg-btn' + (form.needsVariations === false ? ' selected' : '')}
-            onClick={() => update({ needsVariations: false })}
+            onClick={() => update({ needsVariations: false, variationsCount: '0' })}
           >
             Nee
           </button>

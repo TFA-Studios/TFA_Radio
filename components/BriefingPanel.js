@@ -5,6 +5,7 @@
 // remarks, variation details) is hidden behind the overview. The answers come
 // from lib/briefAnswers.js, the same list the proof copies are made from.
 import { briefAnswerSections } from '../lib/briefAnswers.js';
+import { TONE_LABELS, parseTones } from './flowData';
 import { ProofSnapshotsPanel } from './ProofPanels';
 
 const card = { background: '#FFFFFF', border: '1px solid #E3E0D5', borderRadius: 12, padding: '14px 16px', boxShadow: '0 1px 6px rgba(29,29,29,.05)' };
@@ -33,11 +34,24 @@ function Answer({ label, value, wide, href }) {
   );
 }
 
-// Tone first: it is what the producer looks for before writing; the rest follows the client's steps.
-function ordered(sections) {
-  const tone = sections.filter((s) => /klinken/.test(s.title));
-  return tone.concat(sections.filter((s) => !tone.includes(s)));
+// The tone the client chose, large and first: it is what the producer checks the scripts against.
+export function ToneCard({ brief, compact }) {
+  const tones = parseTones(brief);
+  return (
+    <section style={{ background: '#FBF9EC', border: '1.5px solid #EAE3C4', borderLeft: '4px solid #E6C858', borderRadius: '4px 12px 12px 4px', padding: compact ? '10px 14px' : '14px 16px' }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: '#5C5850' }}>Gewenste toon van de commercial (gekozen door de klant)</div>
+      <div style={{ fontSize: compact ? 15 : 20, fontWeight: 700, marginTop: 4, color: tones.length ? '#1D1D1D' : '#6B675D' }}>
+        {tones.length ? tones.map((t) => TONE_LABELS[t]).join(' · ') : 'De klant koos geen toon'}
+      </div>
+      {!compact && brief.extraNote && (
+        <div style={{ marginTop: 8, fontSize: 13.5, lineHeight: 1.55 }}><b>Opmerking van de klant:</b> {brief.extraNote}</div>
+      )}
+    </section>
+  );
 }
+
+// The tone has its own card above, so its section is left out of the list.
+const withoutTone = (sections) => sections.filter((s) => !/klinken/.test(s.title));
 
 export default function BriefingPanel({ brief, showProof }) {
   return (
@@ -45,7 +59,8 @@ export default function BriefingPanel({ brief, showProof }) {
       {!brief.submittedAt && (
         <div style={{ fontSize: 12.5, color: '#5C5850' }}>De klant heeft de brief nog niet verstuurd; hieronder staat wat er tot nu toe is ingevuld.</div>
       )}
-      {ordered(briefAnswerSections(brief)).map((section, i) => (
+      <ToneCard brief={brief} />
+      {withoutTone(briefAnswerSections(brief)).map((section, i) => (
         <Section key={i} title={section.title}>
           {section.items.map((it, j) => <Answer key={j} label={it.label} value={it.value} wide={it.wide} href={it.href} />)}
         </Section>
