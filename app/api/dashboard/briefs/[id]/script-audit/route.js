@@ -22,7 +22,7 @@ export async function POST(request, { params }) {
   if (body.action === 'approve') {
     const saved = await saveScriptAudit(params.id, { scriptAuditStatus: 'approved', scriptAuditedAt: now, scriptAuditNote: '', scriptCounterText: '', scriptAuditReply: '' });
     if (body.notify) {
-      try { await sendScriptApprovedEmail(saved, appUrl); } catch (err) { console.error('[script-audit] email failed:', err && err.message); }
+      try { await sendScriptApprovedEmail(saved, appUrl, appUrl ? appUrl + '/dashboard' : undefined); } catch (err) { console.error('[script-audit] email failed:', err && err.message); }
     }
     await logBriefEvent(params.id, { actor: 'tfa', type: 'audit_approved', text: 'TFA keurde de aanpassingen van de klant goed' });
     return NextResponse.json(saved);
@@ -34,7 +34,7 @@ export async function POST(request, { params }) {
     if (!note && !counterText) return NextResponse.json({ error: 'empty', message: 'Schrijf een toelichting of een voorgestelde tekst.' }, { status: 400 });
     const saved = await saveScriptAudit(params.id, { scriptAuditStatus: 'counter', scriptAuditNote: note, scriptCounterText: counterText, scriptAuditedAt: now, scriptAuditReply: '' });
     await logBriefEvent(params.id, { actor: 'tfa', type: 'audit_counter', text: 'TFA stuurde een tegenvoorstel', detail: [note, counterText].filter(Boolean).join('\n\n') });
-    try { await sendScriptCounterEmail(saved, appUrl); } catch (err) { console.error('[script-audit] email failed:', err && err.message); }
+    try { await sendScriptCounterEmail(saved, appUrl, appUrl ? appUrl + '/dashboard' : undefined); } catch (err) { console.error('[script-audit] email failed:', err && err.message); }
     return NextResponse.json(saved);
   }
 

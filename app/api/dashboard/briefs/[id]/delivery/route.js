@@ -31,7 +31,9 @@ export async function POST(request, { params }) {
   // recipient are already on record either way (same never-blocks
   // philosophy as every other notification in this app).
   try {
-    await sendDeliveryEmail(brief, link, recipientEmail);
+    let dashboardUrl;
+    try { dashboardUrl = new URL(request.url).origin + '/dashboard'; } catch (e) { dashboardUrl = undefined; }
+    await sendDeliveryEmail(brief, link, recipientEmail, dashboardUrl);
   } catch (err) {
     console.error('[api/dashboard/briefs/:id/delivery] sendDeliveryEmail failed:', err && err.message);
   }

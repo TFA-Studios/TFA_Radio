@@ -44,7 +44,7 @@ export async function POST(request, { params }) {
   const reviewUrl = appUrl ? appUrl + '/brief/' + brief.id + '/review' : '';
   if (reviewUrl) {
     try {
-      await sendReviewReadyEmail(brief, reviewUrl, newRound);
+      await sendReviewReadyEmail(brief, reviewUrl, newRound, appUrl + '/dashboard');
     } catch (err) {
       console.error('[api/dashboard/briefs/:id/review-round] sendReviewReadyEmail failed:', err && err.message);
     }

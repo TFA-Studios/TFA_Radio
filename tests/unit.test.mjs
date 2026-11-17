@@ -10,6 +10,7 @@ import { matchVoices } from '../lib/voiceMatch.js';
 import { parseJsonArray } from '../lib/jsonArray.js';
 import { singleFlight } from '../lib/singleFlight.js';
 import { isUnseenBrief, isRealBrief } from '../lib/briefState.js';
+import { autoArchiveCutoff, AUTO_ARCHIVE_DAYS } from '../lib/autoArchive.js';
 
 test('merge: an edit to the main script reaches the variation', () => {
   const r = mergeEditIntoVariation('Koop nu bij Jansen.', 'Koop nu bij Jansen in Zwolle.', 'Koop nu bij Jansen. Black Friday!');
@@ -331,4 +332,26 @@ test('variations: "no" means zero even when an old count is still stored', async
   assert.equal(variationsCountOf({ needsVariations: true, variationsCount: '' }), 1);
   assert.equal(variationsCountOf({ needsVariations: true }), 1);
   assert.equal(variationsCountOf(null), 0);
+});
+
+test('autoArchiveCutoff: a delivery is old enough after the grace period', () => {
+  const now = new Date('2026-11-20T12:00:00.000Z');
+  assert.equal(AUTO_ARCHIVE_DAYS, 7);
+  assert.equal(autoArchiveCutoff(now), '2026-11-13T12:00:00.000Z');
+  assert.ok('2026-11-13T11:59:00.000Z' < autoArchiveCutoff(now));
+  assert.ok(!('2026-11-14T00:00:00.000Z' < autoArchiveCutoff(now)));
+});
+
+test('emailOutcomeMessage: says what happened to the mail', async () => {
+  const { emailOutcomeMessage } = await import('../lib/slack.js');
+  const brief = { companyName: 'Bakkerij Jansen' };
+  const ok = emailOutcomeMessage(brief, { label: 'Scripts naar klant', to: ['a@b.nl'], ok: true, note: '2 scripts verstuurd, 1 niet verstuurd. De klant kan nu kiezen.' }, 'https://x.nl/dashboard');
+  assert.match(ok, /Scripts naar klant verstuurd/);
+  assert.match(ok, /Bakkerij Jansen\* → a@b.nl/);
+  assert.match(ok, /1 niet verstuurd/);
+  assert.match(ok, /Bekijk in dashboard/);
+  const bad = emailOutcomeMessage(brief, { label: 'Definitieve levering', to: ['a@b.nl'], ok: false, reason: 'Resend API error 422' }, '');
+  assert.match(bad, /NIET verstuurd/);
+  assert.match(bad, /Reden: Resend API error 422/);
+  assert.doesNotMatch(bad, /:outbox_tray:/);
 });

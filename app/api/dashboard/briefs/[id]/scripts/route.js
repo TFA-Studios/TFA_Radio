@@ -149,7 +149,7 @@ export async function POST(request, { params }) {
       appUrl = undefined;
     }
     try {
-      await sendScriptsReadyEmail(released, appUrl);
+      await sendScriptsReadyEmail(released, appUrl, { sent: plan.send.length, withheld: plan.withheld.length, dashboardUrl: appUrl ? appUrl + '/dashboard' : undefined });
     } catch (err) {
       console.error('[api/dashboard/briefs/:id/scripts] sendScriptsReadyEmail failed:', err && err.message);
     }

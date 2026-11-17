@@ -19,6 +19,7 @@ import { jobState } from '../lib/scriptJobState';
 import { MAX_DRAFTS, MAX_SEND, isSending } from '../lib/scriptProposals.js';
 import { parseJsonArray } from '../lib/jsonArray.js';
 import { isUnseenBrief } from '../lib/briefState.js';
+import { AUTO_ARCHIVE_DAYS } from '../lib/autoArchive.js';
 
 const RANGES = [
   { key: '7d', label: 'Laatste week' },
@@ -2338,6 +2339,11 @@ export default function DashboardClient({ briefs, readOnly = false }) {
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1D7A46' }}>
                     ✓ Verzonden naar {selected.deliveryRecipientEmail} op {formatDateTime(selected.deliveredAt)}
                   </span>
+                  <div style={{ fontSize: 12, color: '#5C5850', marginTop: 4 }}>
+                    {selected.archivedAt
+                      ? 'Deze brief staat in het archief.'
+                      : 'De brief gaat ' + AUTO_ARCHIVE_DAYS + ' dagen na de laatste levering vanzelf naar het archief. Je kunt hem altijd terugzetten.'}
+                  </div>
                 </div>
               ) : (
                 <div style={{ fontSize: 12.5, fontWeight: 600, color: '#5C5850', marginBottom: 12 }}>
